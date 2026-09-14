@@ -54,7 +54,39 @@ Cada actividad del itinerario referencia una `Activity` (con sus reglas propias 
 - **Dónde:** `Expedition.itinerary`.
 - **Por qué:** cada expedición tiene su propio itinerario, que es el conjunto ordenado de instancias de actividad (D5) programadas para esa expedición. Es a través del itinerario que se accede a las actividades de una expedición — no hay una lista de actividades suelta aparte. Esto mantiene el orden y las dependencias en un solo lugar, y es lo que recorren tanto las validaciones (D2) como la estimación (D4).
 - **Alternativas descartadas:** que `Expedition` tenga una lista de actividades sin un itinerario que las agrupe — perdería el lugar natural para el orden, las dependencias entre actividades programadas y los datos propios de cada instancia.
-<!-- Copiar el bloque por cada decisión nueva (D6, D7, ...) a medida que se cierren los niveles del plan.md -->
+
+### D7 — Dos contratos de recurso: por tiempo y por stock
+
+- **Patrón / principio:** Interface Segregation (ISP).
+- **Dónde:** `Resource` (padre, solo `id()`), `ReusableResource` (`Person`, `Vehicle`, `Instrument`) y `DepletableResource` (`Depletable`).
+- **Por qué:** un recurso reutilizable se reserva por franjas horarias (`isAvailableDuring`, `reserve`) y uno consumible se agota (`hasStockFor`, `consume`). Son preguntas distintas que hacen clientes distintos, así que cada una tiene su interfaz chica. `Resource` es el tipo común para cuando alcanza con identificar el recurso (ej. los recursos asignados a un ítem del itinerario). No se usa con `instanceof` para decidir cómo tratar cada tipo: para eso están las interfaces hijas.
+- **Alternativas descartadas:** una única interfaz `Resource` con los cuatro métodos, que obligaría a implementar métodos sin sentido (un combustible no se "reserva" por horario; una persona no tiene stock). Converger después, si la cátedra confirma que es un único concepto, rompe menos código que separar una interfaz ya unificada.
+
+
+### D8 — Reificación de conceptos del dominio en value objects
+
+- **Patrón / principio:** value objects.
+- **Dónde:** `TimePeriod`, `Quantity` + `MeasurementUnit`, `Certification`, `Permit`.
+- **Por qué:** cada uno encapsula su regla en un solo lugar. `TimePeriod` resuelve la superposición como intervalo semiabierto `[inicio, fin)`, así que dos franjas que solo se tocan en el borde no chocan. `Quantity` usa `BigDecimal`, no admite negativos y no permite operar con unidades distintas. `Certification` y `Permit` evitan comparar `String` sueltos. Son `record` inmutables con igualdad por valor.
+- **Alternativas descartadas:** `LocalDateTime` sueltos, `double` + `String` de unidad y listas de `String` para certificaciones y permisos. Esto repartiría la lógica de solapamiento y de unidades en cada clase que la use.
+
+
+### D9 — Disponibilidad temporal compartida por composición
+
+- **Patrón / principio:** composición sobre herencia, sin duplicación (DRY).
+- **Dónde:** `AvailabilityCalendar`, usado por `Person`, `Vehicle` e `Instrument`.
+- **Por qué:** los tres recursos reutilizables comparten exactamente la misma regla de disponibilidad (no reservar franjas superpuestas). Esa regla vive en `AvailabilityCalendar` y cada recurso delega en él, así que cambiarla es tocar una sola clase.
+- **Alternativas descartadas:** clase abstracta base (`AbstractReusableResource`) con la lógica de reservas. Ata la jerarquía a un único eje de variación y complica que un recurso futuro tenga otra forma de disponibilidad. Copiar la lógica en cada clase quedó descartado por duplicación.
+
+
+### D10 — Certificaciones como capacidad aparte de la disponibilidad
+
+- **Patrón / principio:** Interface Segregation (ISP) + composición, mismo criterio que D9.
+- **Dónde:** interfaz `Certifiable` y value object `Certifications`, usados por `Person`, `Vehicle` e `Instrument`.
+- **Por qué:** personas, vehículos e instrumentos pueden tener certificaciones. `Certifiable` permite que la validación de certificaciones faltantes pregunte `hasCertification` sin conocer la clase concreta ni hacer `instanceof`. La regla vive en `Certifications`, así que si una certificación gana reglas propias (ej. vencimiento) se cambia en un solo lugar.
+- **Alternativas descartadas:** agregar `hasCertification` a `ReusableResource`, que mezclaría dos preguntas distintas (disponibilidad y habilitación) y obligaría a cualquier recurso reutilizable futuro a tener certificaciones. Repetir un `Set<Certification>` con su lógica en cada clase quedó descartado por duplicación.
+
+<!-- Copiar el bloque por cada decisión nueva (D11, D12, ...) a medida que se cierren los niveles del plan.md -->
 
 
 ## Patrones que decidimos no aplicar
@@ -63,6 +95,7 @@ Cada actividad del itinerario referencia una `Activity` (con sus reglas propias 
 |--------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|
 | Decorator | Para el caso de "advertencia aceptada con justificación" alcanza con un campo de justificación en el resultado de validación aceptado; no hace falta envolver el objeto.                                | Si más adelante se necesita apilar más comportamiento sobre una validación aceptada (ej. distintos tipos de justificación con reglas propias), habría que reconsiderarlo. |
 | State (máquina de estados formal) | El estado de la expedición es por ahora un enum simple; las reglas de transición hacia "Approved" ya están resueltas por el `ValidationOrchestrator` (D2), sin necesitar una máquina de estados aparte. | Si las transiciones ganan reglas propias más allá de la aprobación (ej. condiciones para pasar a "Suspendida" o "Finalizada"), puede volverse difícil de seguir sin formalizar las transiciones. |
+| Strategy de conversión entre sistemas de medida | Consideramos una posible extensión a futuro con más de un sistema de medida (ej. métrico e imperial: litros y galones, kilogramos y libras). Hoy hay un único sistema, así que `MeasurementUnit` es un enum simple y `Quantity` rechaza operar entre unidades distintas en vez de convertirlas. | Si se agrega otro sistema, habría que introducir una abstracción de conversión (ej. `UnitConverter`) que `Quantity` use para normalizar antes de sumar, restar o comparar. Como hoy toda la aritmética de unidades está encapsulada en `Quantity` (D8), el cambio queda en ese value object y no se propaga al resto del dominio. |
 
 ## Supuestos
 

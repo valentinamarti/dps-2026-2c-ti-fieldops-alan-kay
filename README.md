@@ -24,9 +24,15 @@ It does not include a REST API, real persistence, frontend, security or deployme
 ## Structure
 
 ```
-src/main/java/...   # domain: models, services, use cases, interfaces
-src/test/java/...   # unit and integration tests
-DESIGN.md           # design decisions (in Spanish)
+src/main/java/ar/edu/itba/dps/fieldops
+├── business          # business rules (policies): never depends on providers
+│   ├── models        # entities and value objects
+│   ├── exceptions    # domain exceptions
+│   └── providers     # interfaces the business needs from the outside world
+├── providers         # implementations of those interfaces (details)
+└── Main.java         # composition root: instantiates and wires everything
+src/test/java/...     # unit and integration tests, mirroring the main tree
+DESIGN.md             # design decisions (in Spanish)
 ```
 
 ## Build and test
