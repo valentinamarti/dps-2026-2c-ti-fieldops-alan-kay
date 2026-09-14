@@ -11,7 +11,7 @@ Cada actividad del itinerario referencia una `Activity` (con sus reglas propias 
 ### D1 — Tipos de actividad: composición en vez de herencia (Strategy)
 
 - **Patrón / principio:** Strategy (Open/Closed).
-- **Dónde:** `Activity` + interfaz `ActivityRules`.
+- **Dónde:** `Activity` + interfaz `ActivityRules` (en `business.models.activities`, junto a quien la usa); implementaciones `SampleCollectionRules` y `DivingRules` en `business.rules`.
 - **Por qué:** `Activity` es una única clase con los campos comunes obligatorios a todo tipo (nombre, ventana temporal, zona, dependencias, restricciones), y delega en `ActivityRules` todo lo que varía según el tipo: duración estimada, riesgo, recursos y personal requerido. El enunciado pide que cada tipo tenga sus propias reglas, y agregar un tipo nuevo debe significar agregar una clase, no modificar un `if`/`switch` existente.
 - **Alternativas descartadas:** herencia (subclases de `Activity` por tipo) — mezclaría campos comunes con comportamiento variable en la misma jerarquía. `enum` + `switch` por tipo — antipatrón señalado en clase, viola Open/Closed.
 
@@ -86,7 +86,35 @@ Cada actividad del itinerario referencia una `Activity` (con sus reglas propias 
 - **Por qué:** personas, vehículos e instrumentos pueden tener certificaciones. `Certifiable` permite que la validación de certificaciones faltantes pregunte `hasCertification` sin conocer la clase concreta ni hacer `instanceof`. La regla vive en `Certifications`, así que si una certificación gana reglas propias (ej. vencimiento) se cambia en un solo lugar.
 - **Alternativas descartadas:** agregar `hasCertification` a `ReusableResource`, que mezclaría dos preguntas distintas (disponibilidad y habilitación) y obligaría a cualquier recurso reutilizable futuro a tener certificaciones. Repetir un `Set<Certification>` con su lógica en cada clase quedó descartado por duplicación.
 
-<!-- Copiar el bloque por cada decisión nueva (D11, D12, ...) a medida que se cierren los niveles del plan.md -->
+
+### D11 — Los datos propios de cada tipo de actividad viven en su regla; requisitos como value objects
+
+- **Patrón / principio:** Strategy (D1) + value objects (D8).
+- **Dónde:** `ActivityRules`, `SampleCollectionRules(sampleCount)`, `DivingRules(maxDepthMeters)`, `StaffRequirement`, `RiskLevel`.
+- **Por qué:**
+  - De un tipo de actividad a otro no cambian solo las fórmulas, también los datos que usan (cantidad de muestras, profundidad). Cada implementación recibe sus datos en el constructor, así `Activity` tiene solo los campos comunes y los métodos de `ActivityRules` no necesitan parámetros.
+  - Los requisitos de recursos se explican en D12.
+  - `StaffRequirement` decide si un candidato califica a través de `Certifiable` (D10), sin conocer la clase concreta.
+- **Alternativas descartadas:**
+  - Pasar la `Activity` a cada método (`estimateDuration(Activity)`): hoy ninguna regla usa datos de la actividad, y además crea una dependencia circular entre `Activity` y sus reglas. Consecuencia: si una regla llega a necesitar un dato común (ej. la zona), hay que agregar el parámetro en todas las implementaciones.
+  - Campos específicos de un tipo en `Activity` (ej. `depth` nullable): mezclaría datos de tipos distintos en una sola clase.
+
+
+### D12 — Requisitos de recursos separados por forma de uso, en espejo con los recursos
+
+- **Patrón / principio:** SRP + value objects, sobre el mismo eje que D7.
+- **Dónde:** `ResourceCategory`, `ReusableRequirement(category, count)` y `DepletableRequirement(category, quantity)`; `ActivityRules.requiredEquipment()` y `requiredSupplies()`.
+- **Por qué:**
+  - Una regla de actividad describe **qué necesita** ("1 bote", "20 litros de combustible"), no qué instancia concreta usar. Elegir la instancia es trabajo de la asignación y de la replanificación.
+  - Un recurso responde dos preguntas: **qué es** (`ResourceCategory`: bote, sonar, combustible) y **cómo se usa** (las interfaces de D7: se reserva o se gasta).
+  - Los requisitos siguen esa misma división. Uno reutilizable se cuenta en unidades enteras y se cumple con recursos libres en el horario. Uno consumible se mide con `Quantity` y se cumple con stock. Son reglas distintas que cambian por motivos distintos, así que no es duplicación.
+- **Alternativas descartadas:**
+  - Un único `ResourceRequirement(tipo, Quantity)`: permite pedir "1.5 botes" y obliga a cada cliente a preguntar qué clase de requisito es (`if`/`instanceof` repetido en validación, asignación y estimación).
+  - Requisitos que apuntan a instancias concretas (el bote `v-1`): atan la regla a un catálogo y dejan sin sentido la asignación y la replanificación.
+  - Interfaz padre `Requirement`: hoy nadie necesita una lista mezclada. Se agrega si aparece ese caso.
+- **Pendiente (nivel 3):** los recursos del catálogo tienen que declarar su `ResourceCategory` para poder compararse con los requisitos, y esa comparación tiene que vivir en un solo lugar.
+
+<!-- Copiar el bloque por cada decisión nueva (D13, D14, ...) a medida que se cierren los niveles del plan.md -->
 
 
 ## Patrones que decidimos no aplicar
@@ -103,4 +131,6 @@ Cada actividad del itinerario referencia una `Activity` (con sus reglas propias 
 - "Permisos" y "certificaciones" son conceptos distintos: permisos a nivel expedición/zona (autorización regulatoria), certificaciones a nivel recurso (habilitación puntual). Se modelan certificaciones también para vehículos e instrumentos, no solo personas. **Pendiente de confirmar**
 - Los consumibles se modelan como un tipo de recurso aparte de personal/vehículos/instrumentos, con disponibilidad por stock (`DepletableResource`) en vez de por tiempo (`ReusableResource`). **Pendiente de confirmar.**
 - Se asume que "disponibilidad" en el catálogo de recursos no es un único concepto: para recursos reutilizables es disponibilidad temporal, para consumibles es stock. **Pendiente de confirmar.**
+- Los valores de `SampleCollectionRules` y `DivingRules` (tiempos, umbral de profundidad, cantidad de buzos y equipamiento) son ilustrativos: el enunciado no los define.
+- Las restricciones de una actividad todavía no se modelan: ninguna regla las usa y no está definido qué forma tienen. Se agregan (como value object, no como `String`) cuando una validación las necesite.
  
