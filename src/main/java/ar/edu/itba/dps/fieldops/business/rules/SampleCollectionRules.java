@@ -24,12 +24,14 @@ public class SampleCollectionRules implements ActivityRules {
     private static final StaffRequirement ONE_FIELD_WORKER = new StaffRequirement(1, Set.of());
 
     private final int sampleCount;
+    private final List<DepletableRequirement> supplies;
 
     public SampleCollectionRules(int sampleCount) {
         if (sampleCount <= 0) {
             throw new IllegalArgumentException("sample count must be positive");
         }
         this.sampleCount = sampleCount;
+        this.supplies = List.of(new DepletableRequirement(SAMPLE_CONTAINER, new Quantity(BigDecimal.valueOf(sampleCount), UNITS)));
     }
 
     @Override
@@ -49,8 +51,7 @@ public class SampleCollectionRules implements ActivityRules {
 
     @Override
     public List<DepletableRequirement> requiredSupplies() {
-        final var oneContainerPerSample = new Quantity(BigDecimal.valueOf(sampleCount), UNITS);
-        return List.of(new DepletableRequirement(SAMPLE_CONTAINER, oneContainerPerSample));
+        return supplies;
     }
 
     @Override
