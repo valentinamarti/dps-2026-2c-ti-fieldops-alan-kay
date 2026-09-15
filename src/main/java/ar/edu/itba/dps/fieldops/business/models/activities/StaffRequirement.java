@@ -1,6 +1,6 @@
 package ar.edu.itba.dps.fieldops.business.models.activities;
 
-import ar.edu.itba.dps.fieldops.business.models.resources.Certifiable;
+import ar.edu.itba.dps.fieldops.business.interfaces.resources.Certifiable;
 import ar.edu.itba.dps.fieldops.business.models.resources.Certification;
 
 import java.util.Set;

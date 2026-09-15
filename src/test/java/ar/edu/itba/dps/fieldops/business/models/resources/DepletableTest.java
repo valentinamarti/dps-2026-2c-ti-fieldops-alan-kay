@@ -38,7 +38,7 @@ class DepletableTest {
 
         fuel.consume(Quantity.of("7.5", LITERS));
 
-        assertEquals(Quantity.of("12.5", LITERS), fuel.stock());
+        assertEquals(Quantity.of("12.5", LITERS), fuel.getStock());
     }
 
     @Test
@@ -47,7 +47,7 @@ class DepletableTest {
 
         fuel.consume(Quantity.of("20", LITERS));
 
-        assertEquals(Quantity.of("0", LITERS), fuel.stock());
+        assertEquals(Quantity.of("0", LITERS), fuel.getStock());
     }
 
     @Test
@@ -55,7 +55,7 @@ class DepletableTest {
         final var fuel = fuelWithLiters("20");
 
         assertThrows(InsufficientStockException.class, () -> fuel.consume(Quantity.of("25", LITERS)));
-        assertEquals(Quantity.of("20", LITERS), fuel.stock());
+        assertEquals(Quantity.of("20", LITERS), fuel.getStock());
     }
 
     @Test

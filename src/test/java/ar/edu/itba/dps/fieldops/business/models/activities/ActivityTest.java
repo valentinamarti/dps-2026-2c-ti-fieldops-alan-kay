@@ -1,5 +1,6 @@
 package ar.edu.itba.dps.fieldops.business.models.activities;
 
+import ar.edu.itba.dps.fieldops.business.interfaces.activities.ActivityRules;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;

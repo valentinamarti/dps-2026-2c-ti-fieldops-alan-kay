@@ -1,4 +1,4 @@
-package ar.edu.itba.dps.fieldops.business.models.resources;
+package ar.edu.itba.dps.fieldops.business.interfaces.resources;
 
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 

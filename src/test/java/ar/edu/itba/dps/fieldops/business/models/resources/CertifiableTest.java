@@ -3,6 +3,8 @@ package ar.edu.itba.dps.fieldops.business.models.resources;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import ar.edu.itba.dps.fieldops.business.interfaces.resources.Certifiable;
+
 import java.util.Set;
 import java.util.stream.Stream;
 

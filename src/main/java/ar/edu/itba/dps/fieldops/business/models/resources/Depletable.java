@@ -1,6 +1,7 @@
 package ar.edu.itba.dps.fieldops.business.models.resources;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.InsufficientStockException;
+import ar.edu.itba.dps.fieldops.business.interfaces.resources.DepletableResource;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import lombok.Getter;
 

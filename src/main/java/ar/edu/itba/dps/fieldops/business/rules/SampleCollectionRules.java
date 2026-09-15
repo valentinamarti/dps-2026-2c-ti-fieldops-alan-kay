@@ -1,6 +1,6 @@
 package ar.edu.itba.dps.fieldops.business.rules;
 
-import ar.edu.itba.dps.fieldops.business.models.activities.ActivityRules;
+import ar.edu.itba.dps.fieldops.business.interfaces.activities.ActivityRules;
 import ar.edu.itba.dps.fieldops.business.models.activities.DepletableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.ReusableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;

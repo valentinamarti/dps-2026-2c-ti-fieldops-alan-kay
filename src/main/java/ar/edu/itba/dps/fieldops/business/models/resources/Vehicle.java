@@ -1,5 +1,7 @@
 package ar.edu.itba.dps.fieldops.business.models.resources;
 
+import ar.edu.itba.dps.fieldops.business.interfaces.resources.Certifiable;
+import ar.edu.itba.dps.fieldops.business.interfaces.resources.ReusableResource;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import lombok.Getter;
 
