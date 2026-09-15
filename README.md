@@ -23,23 +23,35 @@ It does not include a REST API, real persistence, frontend, security or deployme
 
 ## Structure
 
+What exists today:
+
 ```
 src/main/java/ar/edu/itba/dps/fieldops
-├── business          # business rules (policies): never depends on providers
-│   ├── models        # entities and value objects
-│   ├── exceptions    # domain exceptions
-│   └── providers     # interfaces the business needs from the outside world
-├── providers         # implementations of those interfaces (details)
-└── Main.java         # composition root: instantiates and wires everything
-src/test/java/...     # unit and integration tests, mirroring the main tree
-DESIGN.md             # design decisions (in Spanish)
+└── business            # business rules (policies): never depends on providers
+    ├── models          # entities and value objects
+    │   ├── activities  # Activity, its rules contract and its requirements
+    │   ├── common      # TimePeriod, Quantity, MeasurementUnit
+    │   ├── resources   # people, vehicles, instruments, consumables
+    │   └── zones       # zones and permits
+    ├── rules           # ActivityRules implementations, one per activity type
+    └── exceptions      # domain exceptions
+src/test/java/...       # unit tests, mirroring the main tree
+DESIGN.md               # design decisions (in Spanish)
+```
+
+Planned for when the project grows past a pure domain module — none of this exists yet:
+
+```
+business/providers      # interfaces the business needs from the outside world
+providers               # implementations of those interfaces (details)
+Main.java               # composition root: instantiates and wires everything
 ```
 
 ## Build and test
 
 ```bash
-mvn test      # compiles and runs the tests
-mvn verify    # full build (includes the JDK 25 check)
+mvn test      # compiles and runs the tests (the JDK 25 check runs first, in validate)
+mvn verify    # full build
 ```
 
 ## Design decisions
