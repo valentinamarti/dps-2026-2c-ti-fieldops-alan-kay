@@ -15,6 +15,7 @@ import java.util.Set;
 import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.LITERS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ActivityTest {
@@ -61,6 +62,35 @@ class ActivityTest {
         final var survey = activityDependingOn(List.of());
 
         assertFalse(survey.dependsOn(landing));
+    }
+
+    @Test
+    void rejectsABlankOrMissingIdentity() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new Activity("", "Survey", WINDOW, ZONE, List.of(), FIXED_RULES));
+        assertThrows(IllegalArgumentException.class,
+                () -> new Activity("a-1", " ", WINDOW, ZONE, List.of(), FIXED_RULES));
+        assertThrows(IllegalArgumentException.class,
+                () -> new Activity(null, "Survey", WINDOW, ZONE, List.of(), FIXED_RULES));
+    }
+
+    @Test
+    void rejectsMissingCollaborators() {
+        assertThrows(NullPointerException.class,
+                () -> new Activity("a-1", "Survey", null, ZONE, List.of(), FIXED_RULES));
+        assertThrows(NullPointerException.class,
+                () -> new Activity("a-1", "Survey", WINDOW, null, List.of(), FIXED_RULES));
+        assertThrows(NullPointerException.class,
+                () -> new Activity("a-1", "Survey", WINDOW, ZONE, null, FIXED_RULES));
+        assertThrows(NullPointerException.class,
+                () -> new Activity("a-1", "Survey", WINDOW, ZONE, List.of(), null));
+    }
+
+    @Test
+    void dependenciesCannotBeChangedFromOutside() {
+        final var survey = activityDependingOn(List.of());
+
+        assertThrows(UnsupportedOperationException.class, () -> survey.getDependencies().add(survey));
     }
 
     /**

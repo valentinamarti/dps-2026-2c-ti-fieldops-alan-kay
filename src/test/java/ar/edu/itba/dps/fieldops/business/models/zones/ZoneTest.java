@@ -7,6 +7,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ZoneTest {
@@ -32,5 +33,23 @@ class ZoneTest {
         final var openField = new Zone("z-2", "Open field", Set.of());
 
         assertTrue(openField.isAccessibleWith(List.of()));
+    }
+
+    @Test
+    void rejectsABlankOrMissingIdentity() {
+        assertThrows(IllegalArgumentException.class, () -> new Zone("", "Coast", Set.of()));
+        assertThrows(IllegalArgumentException.class, () -> new Zone("z-1", " ", Set.of()));
+        assertThrows(IllegalArgumentException.class, () -> new Zone(null, "Coast", Set.of()));
+    }
+
+    @Test
+    void rejectsANullPermitSet() {
+        assertThrows(NullPointerException.class, () -> new Zone("z-1", "Coast", null));
+    }
+
+    @Test
+    void permitNeedsANonBlankName() {
+        assertThrows(IllegalArgumentException.class, () -> new Permit(" "));
+        assertThrows(IllegalArgumentException.class, () -> new Permit(null));
     }
 }
