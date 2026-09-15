@@ -28,9 +28,12 @@ What exists today:
 ```
 src/main/java/ar/edu/itba/dps/fieldops
 └── business            # business rules (policies): never depends on providers
+    ├── interfaces      # domain contracts, apart from the classes implementing them
+    │   ├── activities  # ActivityRules
+    │   └── resources   # Resource, ReusableResource, DepletableResource, Certifiable
     ├── models          # entities and value objects
-    │   ├── activities  # Activity, its rules contract and its requirements
-    │   ├── common      # TimePeriod, Quantity, MeasurementUnit
+    │   ├── activities  # Activity and its requirements
+    │   ├── common      # TimePeriod, Quantity, MeasurementUnit, DomainArguments
     │   ├── resources   # people, vehicles, instruments, consumables
     │   └── zones       # zones and permits
     ├── rules           # ActivityRules implementations, one per activity type
