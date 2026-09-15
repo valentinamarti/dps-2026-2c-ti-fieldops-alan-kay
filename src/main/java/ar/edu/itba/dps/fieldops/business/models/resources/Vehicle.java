@@ -1,10 +1,12 @@
 package ar.edu.itba.dps.fieldops.business.models.resources;
 
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
+import lombok.Getter;
 
 import java.util.Objects;
 import java.util.Set;
 
+@Getter 
 public class Vehicle implements ReusableResource, Certifiable {
 
     private final String id;
@@ -18,19 +20,6 @@ public class Vehicle implements ReusableResource, Certifiable {
         this.name = Objects.requireNonNull(name, "name is required");
         this.licensePlate = Objects.requireNonNull(licensePlate, "licensePlate is required");
         this.certifications = new Certifications(certifications);
-    }
-
-    @Override
-    public String id() {
-        return id;
-    }
-
-    public String name() {
-        return name;
-    }
-
-    public String licensePlate() {
-        return licensePlate;
     }
 
     @Override

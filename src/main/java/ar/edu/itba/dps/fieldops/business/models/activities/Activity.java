@@ -2,11 +2,13 @@ package ar.edu.itba.dps.fieldops.business.models.activities;
 
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
+import lombok.Getter;
 
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 
+@Getter
 public class Activity {
 
     private final String id;
@@ -17,28 +19,12 @@ public class Activity {
     private final ActivityRules rules;
 
     public Activity(String id, String name, TimePeriod timeWindow, Zone zone, List<Activity> dependencies, ActivityRules rules) {
-        this.id = Objects.requireNonNull(id, "id is required");
-        this.name = Objects.requireNonNull(name, "name is required");
-        this.timeWindow = Objects.requireNonNull(timeWindow, "time window is required");
+        this.id = requireValidString(id, "id");
+        this.name = requireValidString(name, "name");
+        this.timeWindow = Objects.requireNonNull(timeWindow, "timeWindow is required");
         this.zone = Objects.requireNonNull(zone, "zone is required");
         this.dependencies = List.copyOf(dependencies);
         this.rules = Objects.requireNonNull(rules, "rules are required");
-    }
-
-    public String id() {
-        return id;
-    }
-
-    public String name() {
-        return name;
-    }
-
-    public TimePeriod timeWindow() {
-        return timeWindow;
-    }
-
-    public Zone zone() {
-        return zone;
     }
 
     public boolean dependsOn(Activity other) {
@@ -63,5 +49,15 @@ public class Activity {
 
     public List<StaffRequirement> requiredStaff() {
         return rules.requiredStaff();
+    }
+
+    private String requireValidString(String str, String fieldName) {
+        if (str == null) {
+            throw new IllegalArgumentException(fieldName + " is required");
+        }
+        if (str.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " cannot be blank");
+        }
+        return str;
     }
 }
