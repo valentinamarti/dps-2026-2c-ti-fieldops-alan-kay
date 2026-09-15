@@ -7,11 +7,13 @@ import lombok.Getter;
 
 import java.util.Objects;
 
-@Getter
 public class Depletable implements DepletableResource {
 
+    @Getter
     private final String id;
+    @Getter
     private final String name;
+    @Getter
     private Quantity stock;
 
     public Depletable(String id, String name, Quantity initialStock) {

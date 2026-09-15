@@ -8,11 +8,13 @@ import lombok.Getter;
 import java.util.Objects;
 import java.util.Set;
 
-@Getter 
 public class Vehicle implements ReusableResource, Certifiable {
 
+    @Getter
     private final String id;
+    @Getter
     private final String name;
+    @Getter
     private final String licensePlate;
     private final Certifications certifications;
     private final AvailabilityCalendar calendar = new AvailabilityCalendar();

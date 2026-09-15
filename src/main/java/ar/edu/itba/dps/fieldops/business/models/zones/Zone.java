@@ -1,5 +1,7 @@
 package ar.edu.itba.dps.fieldops.business.models.zones;
 
+import lombok.Getter;
+
 import java.util.Collection;
 import java.util.Objects;
 import java.util.Set;
@@ -7,7 +9,9 @@ import java.util.stream.Collectors;
 
 public class Zone {
 
+    @Getter
     private final String id;
+    @Getter
     private final String name;
     private final Set<Permit> requiredPermits;
 
@@ -15,14 +19,6 @@ public class Zone {
         this.id = Objects.requireNonNull(id, "id is required");
         this.name = Objects.requireNonNull(name, "name is required");
         this.requiredPermits = Set.copyOf(requiredPermits);
-    }
-
-    public String id() {
-        return id;
-    }
-
-    public String name() {
-        return name;
     }
 
     public Set<Permit> missingPermits(Collection<Permit> grantedPermits) {

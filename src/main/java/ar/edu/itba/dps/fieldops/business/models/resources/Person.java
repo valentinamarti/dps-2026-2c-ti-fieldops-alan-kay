@@ -8,10 +8,11 @@ import lombok.Getter;
 import java.util.Objects;
 import java.util.Set;
 
-@Getter 
 public class Person implements ReusableResource, Certifiable {
 
+    @Getter
     private final String id;
+    @Getter
     private final String name;
     private final Certifications certifications;
     private final AvailabilityCalendar calendar = new AvailabilityCalendar();

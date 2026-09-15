@@ -9,13 +9,17 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 
-@Getter
 public class Activity {
 
+    @Getter
     private final String id;
+    @Getter
     private final String name;
+    @Getter
     private final TimePeriod timeWindow;
+    @Getter
     private final Zone zone;
+    @Getter
     private final List<Activity> dependencies;
     private final ActivityRules rules;
 
