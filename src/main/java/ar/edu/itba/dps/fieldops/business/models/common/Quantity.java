@@ -25,6 +25,9 @@ public record Quantity(BigDecimal amount, MeasurementUnit unit) {
 
     public Quantity minus(Quantity other) {
         requireSameUnitAs(other);
+        if (!isEnoughFor(other)) {
+            throw new IllegalArgumentException("Cannot subtract %s from %s".formatted(other, this));
+        }
         return new Quantity(amount.subtract(other.amount), unit);
     }
 
@@ -37,5 +40,10 @@ public record Quantity(BigDecimal amount, MeasurementUnit unit) {
         if (unit != other.unit) {
             throw new IllegalArgumentException("Cannot combine %s with %s".formatted(unit, other.unit));
         }
+    }
+    
+    @Override
+    public String toString() {
+        return "%s %s".formatted(amount.toPlainString(), unit);
     }
 }

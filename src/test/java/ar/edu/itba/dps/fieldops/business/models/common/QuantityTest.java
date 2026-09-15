@@ -52,4 +52,18 @@ class QuantityTest {
     void isNotEnoughForABiggerRequirement() {
         assertFalse(Quantity.of("10", LITERS).isEnoughFor(Quantity.of("10.5", LITERS)));
     }
+
+    @Test
+    void rendersInPlainNotationSoMessagesStayReadable() {
+        assertEquals("100 LITERS", Quantity.of("100", LITERS).toString());
+        assertEquals("12.5 LITERS", Quantity.of("12.50", LITERS).toString());
+    }
+
+    @Test
+    void refusingToSubtractTooMuchExplainsTheAmounts() {
+        final var error = assertThrows(IllegalArgumentException.class,
+                () -> Quantity.of("1", LITERS).minus(Quantity.of("2", LITERS)));
+
+        assertEquals("Cannot subtract 2 LITERS from 1 LITERS", error.getMessage());
+    }
 }
