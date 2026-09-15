@@ -1,9 +1,9 @@
 package ar.edu.itba.dps.fieldops.business.models.zones;
 
+import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
 import lombok.Getter;
 
 import java.util.Collection;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -16,9 +16,9 @@ public class Zone {
     private final Set<Permit> requiredPermits;
 
     public Zone(String id, String name, Set<Permit> requiredPermits) {
-        this.id = Objects.requireNonNull(id, "id is required");
-        this.name = Objects.requireNonNull(name, "name is required");
-        this.requiredPermits = Set.copyOf(requiredPermits);
+        this.id = DomainArguments.requireText(id, "id");
+        this.name = DomainArguments.requireText(name, "name");
+        this.requiredPermits = DomainArguments.requireSet(requiredPermits, "requiredPermits");
     }
 
     public Set<Permit> missingPermits(Collection<Permit> grantedPermits) {

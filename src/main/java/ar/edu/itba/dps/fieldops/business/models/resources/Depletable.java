@@ -2,6 +2,7 @@ package ar.edu.itba.dps.fieldops.business.models.resources;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.InsufficientStockException;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.DepletableResource;
+import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import lombok.Getter;
 
@@ -17,8 +18,8 @@ public class Depletable implements DepletableResource {
     private Quantity stock;
 
     public Depletable(String id, String name, Quantity initialStock) {
-        this.id = Objects.requireNonNull(id, "id is required");
-        this.name = Objects.requireNonNull(name, "name is required");
+        this.id = DomainArguments.requireText(id, "id");
+        this.name = DomainArguments.requireText(name, "name");
         this.stock = Objects.requireNonNull(initialStock, "initial stock is required");
     }
 

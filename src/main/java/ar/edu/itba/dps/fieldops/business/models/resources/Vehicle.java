@@ -2,10 +2,10 @@ package ar.edu.itba.dps.fieldops.business.models.resources;
 
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.Certifiable;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.ReusableResource;
+import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import lombok.Getter;
 
-import java.util.Objects;
 import java.util.Set;
 
 public class Vehicle implements ReusableResource, Certifiable {
@@ -20,9 +20,9 @@ public class Vehicle implements ReusableResource, Certifiable {
     private final AvailabilityCalendar calendar = new AvailabilityCalendar();
 
     public Vehicle(String id, String name, String licensePlate, Set<Certification> certifications) {
-        this.id = Objects.requireNonNull(id, "id is required");
-        this.name = Objects.requireNonNull(name, "name is required");
-        this.licensePlate = Objects.requireNonNull(licensePlate, "licensePlate is required");
+        this.id = DomainArguments.requireText(id, "id");
+        this.name = DomainArguments.requireText(name, "name");
+        this.licensePlate = DomainArguments.requireText(licensePlate, "licensePlate");
         this.certifications = new Certifications(certifications);
     }
 

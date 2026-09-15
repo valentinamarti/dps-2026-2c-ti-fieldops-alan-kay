@@ -2,10 +2,10 @@ package ar.edu.itba.dps.fieldops.business.models.resources;
 
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.Certifiable;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.ReusableResource;
+import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import lombok.Getter;
 
-import java.util.Objects;
 import java.util.Set;
 
 public class Person implements ReusableResource, Certifiable {
@@ -18,8 +18,8 @@ public class Person implements ReusableResource, Certifiable {
     private final AvailabilityCalendar calendar = new AvailabilityCalendar();
 
     public Person(String id, String name, Set<Certification> certifications) {
-        this.id = Objects.requireNonNull(id, "id is required");
-        this.name = Objects.requireNonNull(name, "name is required");
+        this.id = DomainArguments.requireText(id, "id");
+        this.name = DomainArguments.requireText(name, "name");
         this.certifications = new Certifications(certifications);
     }
 

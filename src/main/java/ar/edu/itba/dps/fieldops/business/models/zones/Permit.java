@@ -1,13 +1,10 @@
 package ar.edu.itba.dps.fieldops.business.models.zones;
 
-import java.util.Objects;
+import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
 
 public record Permit(String name) {
 
     public Permit {
-        Objects.requireNonNull(name, "name is required");
-        if (name.isBlank()) {
-            throw new IllegalArgumentException("name cannot be blank");
-        }
+        name = DomainArguments.requireText(name, "name");
     }
 }
