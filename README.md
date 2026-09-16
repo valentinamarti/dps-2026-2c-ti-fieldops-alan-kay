@@ -34,11 +34,12 @@ src/main/java/ar/edu/itba/dps/fieldops
     ├── models          # entities and value objects
     │   ├── activities  # Activity and its requirements
     │   ├── common      # TimePeriod, Quantity, MeasurementUnit, DomainArguments
+    │   ├── expeditions # Expedition, its builder, statuses and itinerary
     │   ├── resources   # people, vehicles, instruments, consumables and the ResourceCatalog
     │   └── zones       # zones and permits
     ├── rules           # ActivityRules implementations, one per activity type
     └── exceptions      # domain exceptions
-src/test/java/...       # unit tests, mirroring the main tree
+src/test/java/...       # unit tests mirroring the main tree, plus shared fixtures
 DESIGN.md               # design decisions (in Spanish)
 ```
 
