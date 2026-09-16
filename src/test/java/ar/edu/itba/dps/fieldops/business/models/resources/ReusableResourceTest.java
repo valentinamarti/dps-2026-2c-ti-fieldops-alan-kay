@@ -20,6 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ReusableResourceTest {
 
     private static final TimePeriod MORNING = hours(8, 12);
+    private static final ResourceCategory PICKUP = new ResourceCategory("Pickup");
+    private static final ResourceCategory SONAR = new ResourceCategory("Sonar");
 
     private static TimePeriod hours(int fromHour, int toHour) {
         final var day = LocalDateTime.of(2026, 10, 1, 0, 0);
@@ -29,8 +31,8 @@ class ReusableResourceTest {
     static Stream<ReusableResource> resources() {
         return Stream.of(
                 new Person("p-1", "Ana", Set.of()),
-                new Vehicle("v-1", "Pickup", "ABC 123", Set.of()),
-                new Instrument("i-1", "Sonar", Set.of())
+                new Vehicle("v-1", "Hilux", PICKUP, "ABC 123", Set.of()),
+                new Instrument("i-1", "Sonar 3000", SONAR, Set.of())
         );
     }
 

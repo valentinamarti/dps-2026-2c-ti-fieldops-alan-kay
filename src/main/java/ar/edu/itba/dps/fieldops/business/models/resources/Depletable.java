@@ -14,13 +14,20 @@ public class Depletable implements DepletableResource {
     private final String id;
     @Getter
     private final String name;
+    private final ResourceCategory category;
     @Getter
     private Quantity stock;
 
-    public Depletable(String id, String name, Quantity initialStock) {
+    public Depletable(String id, String name, ResourceCategory category, Quantity initialStock) {
         this.id = DomainArguments.requireText(id, "id");
         this.name = DomainArguments.requireText(name, "name");
+        this.category = Objects.requireNonNull(category, "category is required");
         this.stock = Objects.requireNonNull(initialStock, "initial stock is required");
+    }
+
+    @Override
+    public boolean belongsTo(ResourceCategory category) {
+        return this.category.equals(category);
     }
 
     @Override

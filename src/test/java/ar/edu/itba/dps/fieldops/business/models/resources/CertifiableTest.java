@@ -18,12 +18,14 @@ class CertifiableTest {
 
     private static final Certification DIVING = new Certification("Diving");
     private static final Certification FIRST_AID = new Certification("First aid");
+    private static final ResourceCategory BOAT = new ResourceCategory("Boat");
+    private static final ResourceCategory SONAR = new ResourceCategory("Sonar");
 
     static Stream<Certifiable> resourcesCertifiedForDiving() {
         return Stream.of(
                 new Person("p-1", "Ana", Set.of(DIVING)),
-                new Vehicle("v-1", "Boat", "ABC 123", Set.of(DIVING)),
-                new Instrument("i-1", "Sonar", Set.of(DIVING))
+                new Vehicle("v-1", "Albatros", BOAT, "ABC 123", Set.of(DIVING)),
+                new Instrument("i-1", "Sonar 3000", SONAR, Set.of(DIVING))
         );
     }
 
