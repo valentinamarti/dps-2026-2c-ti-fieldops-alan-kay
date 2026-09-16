@@ -30,11 +30,11 @@ src/main/java/ar/edu/itba/dps/fieldops
 └── business            # business rules (policies): never depends on providers
     ├── interfaces      # domain contracts, apart from the classes implementing them
     │   ├── activities  # ActivityRules
-    │   └── resources   # Resource, ReusableResource, DepletableResource, Certifiable
+    │   └── resources   # Resource, ReusableResource, Equipment, DepletableResource, Certifiable, Categorized
     ├── models          # entities and value objects
     │   ├── activities  # Activity and its requirements
     │   ├── common      # TimePeriod, Quantity, MeasurementUnit, DomainArguments
-    │   ├── resources   # people, vehicles, instruments, consumables
+    │   ├── resources   # people, vehicles, instruments, consumables and the ResourceCatalog
     │   └── zones       # zones and permits
     ├── rules           # ActivityRules implementations, one per activity type
     └── exceptions      # domain exceptions
