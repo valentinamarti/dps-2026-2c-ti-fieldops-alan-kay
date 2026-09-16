@@ -18,6 +18,10 @@ public record TimePeriod(LocalDateTime start, LocalDateTime end) {
         return start.isBefore(other.end) && other.start.isBefore(end);
     }
 
+    public boolean contains(TimePeriod other) {
+        return !other.start.isBefore(start) && !other.end.isAfter(end);
+    }
+
     public boolean includes(LocalDateTime instant) {
         return !instant.isBefore(start) && instant.isBefore(end);
     }

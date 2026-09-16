@@ -54,6 +54,18 @@ class TimePeriodTest {
     }
 
     @Test
+    void containsAPeriodThatFitsInsideIt() {
+        assertTrue(hours(8, 18).contains(hours(10, 12)));
+        assertTrue(hours(8, 18).contains(hours(8, 18)));
+    }
+
+    @Test
+    void doesNotContainAPeriodThatGoesBeyondIt() {
+        assertFalse(hours(8, 12).contains(hours(11, 14)));
+        assertFalse(hours(10, 12).contains(hours(8, 18)));
+    }
+
+    @Test
     void includesItsStartButNotItsEnd() {
         final var period = hours(8, 12);
 
