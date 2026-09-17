@@ -36,4 +36,12 @@ public final class DomainArguments {
         Objects.requireNonNull(values, field + " is required");
         return List.copyOf(values);
     }
+
+    public static <T> Set<T> requireNonEmptySet(Set<T> values, String field) {
+        return requireNotEmpty(requireSet(values, field), field);
+    }
+
+    public static <T> List<T> requireNonEmptyList(List<T> values, String field) {
+        return requireNotEmpty(requireList(values, field), field);
+    }
 }

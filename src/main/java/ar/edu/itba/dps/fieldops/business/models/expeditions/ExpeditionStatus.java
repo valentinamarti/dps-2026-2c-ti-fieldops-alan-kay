@@ -21,6 +21,6 @@ public enum ExpeditionStatus {
     );
 
     public boolean canTransitionTo(ExpeditionStatus next) {
-        return NEXT_STATUSES.get(this).contains(next);
+        return NEXT_STATUSES.getOrDefault(this, Set.of()).contains(next);
     }
 }

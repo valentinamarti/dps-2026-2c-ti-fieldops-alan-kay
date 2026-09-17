@@ -23,9 +23,18 @@ public class MissingCertificationsValidation implements ValidationRule {
     private Stream<ValidationResult> unqualifiedRequirements(ItineraryItem item) {
         return item.getActivity().requiredStaff().stream()
                 .filter(requirement -> !requirement.certifications().isEmpty())
-                .filter(requirement -> qualified(item, requirement) < requirement.headcount())
-                .map(requirement -> ValidationResult.critical("%s needs %d people certified in %s but only %d qualify".formatted(
-                        item.getActivity().getName(), requirement.headcount(), names(requirement), qualified(item, requirement))));
+                .map(requirement -> new Shortage(requirement, qualified(item, requirement)))
+                .filter(Shortage::isShortage)
+                .map(shortage -> ValidationResult.critical("%s needs %d people certified in %s but only %d qualify".formatted(
+                        item.getActivity().getName(), shortage.requirement().headcount(),
+                        names(shortage.requirement()), shortage.qualified())));
+    }
+
+    private record Shortage(StaffRequirement requirement, long qualified) {
+
+        boolean isShortage() {
+            return qualified < requirement.headcount();
+        }
     }
 
     private long qualified(ItineraryItem item, StaffRequirement requirement) {

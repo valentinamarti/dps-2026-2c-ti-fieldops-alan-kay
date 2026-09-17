@@ -4,6 +4,7 @@ import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotApprovableExcep
 import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotEditableException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
+import ar.edu.itba.dps.fieldops.business.exceptions.ResourceUnavailableException;
 import ar.edu.itba.dps.fieldops.business.exceptions.UnacceptedWarningException;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.DepletableResource;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.Equipment;
@@ -53,10 +54,10 @@ public class Expedition {
         this.id = DomainArguments.requireText(id, "id");
         this.name = DomainArguments.requireText(name, "name");
         this.period = Objects.requireNonNull(period, "period is required");
-        this.objectives = DomainArguments.requireNotEmpty(DomainArguments.requireList(objectives, "objectives"), "objectives");
+        this.objectives = DomainArguments.requireNonEmptyList(objectives, "objectives");
         this.objectives.forEach(objective -> DomainArguments.requireText(objective, "objective"));
-        this.zones = DomainArguments.requireNotEmpty(DomainArguments.requireSet(zones, "zones"), "zones");
-        this.responsibles = DomainArguments.requireNotEmpty(DomainArguments.requireSet(responsibles, "responsibles"), "responsibles");
+        this.zones = DomainArguments.requireNonEmptySet(zones, "zones");
+        this.responsibles = DomainArguments.requireNonEmptySet(responsibles, "responsibles");
         this.restrictions = Objects.requireNonNull(restrictions, "restrictions are required");
         this.grantedPermits = DomainArguments.requireSet(grantedPermits, "grantedPermits");
     }
@@ -100,8 +101,9 @@ public class Expedition {
         if (!result.canBeApproved()) {
             throw new ExpeditionNotApprovableException(result.criticals());
         }
-        acceptedWarnings = result.warnings().stream().map(warning -> acceptanceOf(warning, acceptances)).toList();
+        final var accepted = result.warnings().stream().map(warning -> acceptanceOf(warning, acceptances)).toList();
         reserveAssignedResources();
+        acceptedWarnings = accepted;
         status = ExpeditionStatus.APPROVED;
     }
 
@@ -112,9 +114,22 @@ public class Expedition {
                 .orElseThrow(() -> new UnacceptedWarningException(warning));
     }
 
+    /**
+     * Checks every assigned resource before booking any of them, so a resource taken by another
+     * expedition since the validation ran leaves this one untouched instead of half reserved.
+     */
     private void reserveAssignedResources() {
+        itinerary.getItems().forEach(this::requireAssignedResourcesAvailable);
         itinerary.getItems().forEach(item ->
                 item.getAssignedReusableResources().forEach(resource -> resource.reserve(item.getScheduledPeriod())));
+    }
+
+    private void requireAssignedResourcesAvailable(ItineraryItem item) {
+        for (final var resource : item.getAssignedReusableResources()) {
+            if (!resource.isAvailableDuring(item.getScheduledPeriod())) {
+                throw new ResourceUnavailableException(item.getScheduledPeriod());
+            }
+        }
     }
 
     private void transitionTo(ExpeditionStatus next) {

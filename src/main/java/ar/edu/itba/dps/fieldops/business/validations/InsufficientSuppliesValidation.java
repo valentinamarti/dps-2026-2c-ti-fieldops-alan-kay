@@ -8,6 +8,7 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,15 +32,27 @@ public class InsufficientSuppliesValidation implements ValidationRule {
 
     private Stream<ValidationResult> insufficientStock(List<ItineraryItem> items) {
         return demandPerSupply(items).entrySet().stream()
-                .filter(demand -> !demand.getKey().hasStockFor(demand.getValue()))
-                .map(demand -> ValidationResult.critical("%s does not have enough stock for the %s the itinerary needs"
-                        .formatted(demand.getKey().getId(), demand.getValue())));
+                .flatMap(demand -> stockResults(demand.getKey(), demand.getValue()));
     }
 
-    private Map<DepletableResource, Quantity> demandPerSupply(List<ItineraryItem> items) {
-        final var demand = new LinkedHashMap<DepletableResource, Quantity>();
+    private Stream<ValidationResult> stockResults(DepletableResource supply, List<Quantity> demanded) {
+        if (demanded.stream().anyMatch(quantity -> quantity.unit() != supply.unit())) {
+            return Stream.of(ValidationResult.critical("%s is measured in %s, but the itinerary asks for it in another unit"
+                    .formatted(supply.getId(), supply.unit())));
+        }
+        final var total = demanded.stream().reduce(Quantity::plus).orElseThrow();
+        if (supply.hasStockFor(total)) {
+            return Stream.empty();
+        }
+        return Stream.of(ValidationResult.critical("%s does not have enough stock for the %s the itinerary needs"
+                .formatted(supply.getId(), total)));
+    }
+
+    private Map<DepletableResource, List<Quantity>> demandPerSupply(List<ItineraryItem> items) {
+        final var demand = new LinkedHashMap<DepletableResource, List<Quantity>>();
         items.forEach(item -> item.getActivity().requiredSupplies().forEach(requirement ->
-                supplyFor(item, requirement).ifPresent(supply -> demand.merge(supply, requirement.quantity(), Quantity::plus))));
+                supplyFor(item, requirement).ifPresent(supply ->
+                        demand.computeIfAbsent(supply, key -> new ArrayList<>()).add(requirement.quantity()))));
         return demand;
     }
 

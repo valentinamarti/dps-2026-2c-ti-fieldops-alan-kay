@@ -49,6 +49,15 @@ class InsufficientSuppliesValidationTest {
     }
 
     @Test
+    void flagsASupplyMeasuredInADifferentUnitThanTheItineraryAsksFor() {
+        final var jarsByTheLiter = supply("d-1", "Sample container", Quantity.of("50", LITERS));
+        expedition.assignSupply(scheduleSampling("a-1", hours(9, 11)), jarsByTheLiter);
+
+        final var expected = ValidationResult.critical("d-1 is measured in LITERS, but the itinerary asks for it in another unit");
+        assertEquals(List.of(expected), validation.validate(expedition));
+    }
+
+    @Test
     void flagsASupplyWhoseStockDoesNotCoverEveryActivityThatUsesIt() {
         final var jars = supply("d-1", "Sample container", Quantity.of("5", UNITS));
         expedition.assignSupply(scheduleSampling("a-1", hours(9, 11)), jars);
