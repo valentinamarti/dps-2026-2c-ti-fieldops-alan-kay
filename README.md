@@ -30,14 +30,17 @@ src/main/java/ar/edu/itba/dps/fieldops
 └── business            # business rules (policies): never depends on providers
     ├── interfaces      # domain contracts, apart from the classes implementing them
     │   ├── activities  # ActivityRules
-    │   └── resources   # Resource, ReusableResource, Equipment, DepletableResource, Certifiable, Categorized
+    │   ├── resources   # Resource, ReusableResource, Equipment, DepletableResource, Certifiable, Categorized
+    │   └── validation  # ValidationRule, ExpeditionValidator
     ├── models          # entities and value objects
     │   ├── activities  # Activity and its requirements
     │   ├── common      # TimePeriod, Quantity, MeasurementUnit, DomainArguments
     │   ├── expeditions # Expedition, its builder, statuses and itinerary
     │   ├── resources   # people, vehicles, instruments, consumables and the ResourceCatalog
+    │   ├── validation  # ValidationResult, Severity, ApprovalResult, AcceptedWarning
     │   └── zones       # zones and permits
     ├── rules           # ActivityRules implementations, one per activity type
+    ├── validations     # ValidationRule implementations and the ValidationOrchestrator
     └── exceptions      # domain exceptions
 src/test/java/...       # unit tests mirroring the main tree, plus shared fixtures
 DESIGN.md               # design decisions (in Spanish)

@@ -2,9 +2,9 @@
 
 ## Modelo de dominio
 
-`Expedition` es la entidad central: tiene objetivos, período, zonas de trabajo, responsables, permisos, restricciones, un itinerario (lista ordenada de actividades programadas) y un estado (borrador / revisada / aprobada / en ejecución / suspendida / finalizada). Se apoya en un catálogo de recursos (personas, vehículos, instrumentos, consumibles) y en un catálogo de zonas.
+`Expedition` es la entidad central: tiene objetivos, período, zonas de trabajo, responsables, permisos, restricciones, un itinerario (lista ordenada de actividades programadas) y un estado (borrador / revisada / aprobada / en ejecución / suspendida / finalizada). Se apoya en un catálogo de recursos (`ResourceCatalog`: personas, vehículos, instrumentos y consumibles).
 
-Cada actividad del itinerario referencia una `Activity` (con sus reglas propias según el tipo — duración, riesgo, recursos y personal requerido) más el horario real y los recursos asignados para esa expedición puntual. Antes de poder aprobarse, una expedición se corre contra un conjunto de reglas de validación (superposiciones, recursos faltantes, certificaciones, permisos, capacidad); las críticas bloquean la aprobación, las advertencias se pueden aceptar dejando una justificación registrada.
+Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus reglas propias según el tipo — duración, riesgo, recursos y personal requerido) más el horario real y los recursos asignados para esa expedición puntual. Antes de poder aprobarse, una expedición se corre contra un conjunto de reglas de validación (superposiciones, recursos y consumibles faltantes, certificaciones, permisos, capacidad y tolerancia de riesgo); las críticas bloquean la aprobación, y las advertencias se pueden aceptar por un responsable dejando una justificación registrada.
 
 ## Patrones y principios aplicados
 
@@ -18,10 +18,20 @@ Cada actividad del itinerario referencia una `Activity` (con sus reglas propias 
 
 ### D2 — Validaciones como objetos con severidad (Policy) + orquestador
 
-- **Patrón / principio:** Policy.
-- **Dónde:** interfaz `ValidationRule`, sus implementaciones concretas, y `ValidationOrchestrator`.
-- **Por qué:** cada regla (superposición de horarios, recursos faltantes, certificaciones ausentes, permisos faltantes, exceso de capacidad) es un objeto independiente que devuelve severidad (crítica / advertencia) además de si aplica. El orquestador corre todas las reglas y separa resultados en críticas y advertencias, que es exactamente lo que exige el enunciado para decidir si una expedición puede aprobarse.
-- **Alternativas descartadas:** dos interfaces separadas (una para críticas, otra para advertencias) — obligaría a duplicar una regla si su severidad pudiera depender del contexto. Lista de validaciones sueltas sin severidad (boceto inicial) — no permite distinguir qué bloquea la aprobación de qué no.
+- **Patrón / principio:** Policy (una regla por objeto) + Open/Closed.
+- **Dónde:** interfaz `ValidationRule` (en `business.interfaces.validation`); implementaciones en `business.validations`: `ResourceOverlapValidation`, `MissingResourcesValidation`, `InsufficientSuppliesValidation`, `MissingCertificationsValidation`, `MissingPermitsValidation`, `CapacityExceededValidation` y `RiskToleranceValidation`; `ValidationOrchestrator`; resultados en `business.models.validation`: `ValidationResult`, `Severity` y `ApprovalResult`.
+- **Por qué:**
+  - Cada regla es un objeto independiente que devuelve los problemas que encuentra, cada uno con su severidad (crítica o advertencia). El orquestador corre todas las reglas y arma un `ApprovalResult` que separa críticas de advertencias y responde `canBeApproved()`, que es exactamente lo que exige el enunciado para decidir si una expedición puede aprobarse.
+  - Agregar una regla es agregar una clase y sumarla a la lista del orquestador, sin modificar las reglas existentes ni el orquestador (Open/Closed). `RiskToleranceValidation` es el ejemplo: no está en la lista del enunciado y se sumó sin tocar las demás.
+  - Cada regla devuelve una **lista** de resultados y no uno solo: una misma regla puede encontrar varios problemas (ej. dos actividades sin buzos certificados), y la validación de un borrador tiene que juntarlos todos (D14).
+  - La falta de recursos quedó en dos reglas: `MissingResourcesValidation` cuenta personal y equipos de cada ítem, e `InsufficientSuppliesValidation` suma lo que piden todas las actividades que usan un mismo consumible y lo compara con su stock. Son cálculos distintos que cambian por motivos distintos (SRP).
+  - Severidades elegidas: son críticas las que hacen imposible o no permitido ejecutar el plan (un recurso en dos lugares a la vez, personal, equipos o stock que no alcanzan, personal sin certificación, permisos faltantes, más participantes que los permitidos). Es advertencia una actividad con más riesgo que la tolerancia de la expedición: se puede ejecutar, pero un responsable tiene que aceptarlo (D22).
+  - `ValidationResult` es un `record`: validar dos veces la misma expedición produce resultados iguales por valor, y eso permite reconocer una advertencia aceptada aunque se vuelva a validar.
+- **Alternativas descartadas:**
+  - Dos interfaces separadas (una para críticas, otra para advertencias) — obligaría a duplicar una regla si su severidad pudiera depender del contexto.
+  - Lista de validaciones sueltas sin severidad (boceto inicial) — no permite distinguir qué bloquea la aprobación de qué no.
+  - Que cada regla devuelva un `Optional` con un único resultado — se perderían todos los problemas menos el primero.
+  - Todos los chequeos en un método de `Expedition` — mezclaría en una clase reglas que cambian por motivos distintos (permisos, stock, certificaciones).
 
 
 ### D3 — Builder para Expedición, con validación de negocio separada
@@ -36,6 +46,7 @@ Cada actividad del itinerario referencia una `Activity` (con sus reglas propias 
   - Builder + Director — más estructura de la que hace falta para este caso.
   - Validar todas las reglas de negocio dentro de `build()` — mezclaría "está bien formado" con "es válido para operar", que tienen ciclos de vida distintos.
   - Que el builder reciba `ItineraryItem` ya armados — obligaría a que existan ítems fuera de una expedición y a repetir en el builder los chequeos de zona, período y dependencias.
+
 
 ### D4 — Estimación como agregación, Informe como caso de uso que reutiliza
 
@@ -68,6 +79,7 @@ Cada actividad del itinerario referencia una `Activity` (con sus reglas propias 
 - **Alternativas descartadas:**
   - Que `Expedition` tenga una lista de actividades sin un itinerario que las agrupe — perdería el lugar natural para el orden, las dependencias entre actividades programadas y los datos propios de cada ítem.
   - Orden manual por posición (mover arriba o abajo) — permitiría un orden que contradice los horarios.
+
 
 ### D7 — Dos contratos de recurso: por tiempo y por stock
 
@@ -150,7 +162,7 @@ Cada actividad del itinerario referencia una `Activity` (con sus reglas propias 
 ### D15 — Entidades por identidad (clases), value objects por valor (`record`)
 
 - **Patrón / principio:** distinción entidad / value object.
-- **Dónde:** clases con identidad: `Person`, `Vehicle`, `Instrument`, `Depletable`, `Zone`, `Activity`. `record` con igualdad por valor: `TimePeriod`, `Quantity`, `Certification`, `Certifications`, `Permit`, `ResourceCategory`, `ReusableRequirement`, `DepletableRequirement`, `StaffRequirement`.
+- **Dónde:** clases con identidad: `Person`, `Vehicle`, `Instrument`, `Depletable`, `Zone`, `Activity`, `Expedition`, `ItineraryItem`. `record` con igualdad por valor: `TimePeriod`, `Quantity`, `Certification`, `Certifications`, `Permit`, `ResourceCategory`, `ReusableRequirement`, `DepletableRequirement`, `StaffRequirement`, `ExpeditionRestrictions`, `ValidationResult`, `ApprovalResult`, `AcceptedWarning`.
 - **Por qué:**
   - Las entidades tienen `id` pero **no** redefinen `equals`/`hashCode`: se comparan por identidad de instancia. Dos `Vehicle` con la misma patente son dos vehículos distintos del catálogo, y cada uno tiene su propio `AvailabilityCalendar` (D9) — igualarlos por `id` haría que reservar uno pareciera reservar al otro.
   - De ahí se apoya `Activity.dependsOn`: una dependencia apunta a *esa* actividad concreta, no a "cualquier actividad que se llame igual".
@@ -173,10 +185,11 @@ Cada actividad del itinerario referencia una `Activity` (con sus reglas propias 
   - Reificar el identificador en un value object (`ResourceId`), que es lo que hace D8 con `Certification` y `Permit`: es el camino más OO y queda abierto, pero hoy un `id` no tiene ninguna regla propia más allá de "no está vacío" — sería un tipo nuevo por cada entidad sin comportamiento que justifique el costo de tocar todas las firmas. Se reconsidera si los ids ganan reglas (formato, unicidad dentro del catálogo).
 - **Consecuencia:** `DomainArguments` es una clase de métodos estáticos, que no es orientada a objetos. Se acepta porque es exactamente el rol de `Objects.requireNonNull` en la biblioteca estándar: una precondición, no una responsabilidad del dominio. Si crece más allá de guards de argumentos, es señal de que hay un concepto sin reificar.
 
+
 ### D17 — La categoría como capacidad; el requisito decide si un recurso lo cumple
 
 - **Patrón / principio:** Interface Segregation (ISP) + Information Expert, mismo criterio que D10 y D13.
-- **Dónde:** interfaz `Categorized` (`belongsTo`); `Equipment extends ReusableResource, Categorized` (implementada por `Vehicle` e `Instrument`); `DepletableResource extends Resource, Categorized` (`Depletable`). La comparación vive en `ReusableRequirement.accepts` y `DepletableRequirement.isCoveredBy`.
+- **Dónde:** interfaz `Categorized` (`belongsTo`); `Equipment extends ReusableResource, Categorized` (implementada por `Vehicle` e `Instrument`); `DepletableResource extends Resource, Categorized` (`Depletable`). La comparación vive en `ReusableRequirement.accepts`, `DepletableRequirement.accepts` y `DepletableRequirement.isCoveredBy`.
 - **Por qué:**
   - Cierra el pendiente de D12: para saber si un recurso del catálogo cumple un requisito, el recurso tiene que declarar qué es.
   - El requisito es el que conoce la categoría y la cantidad pedidas, así que es el que decide si un candidato lo cumple. El recurso solo responde `belongsTo`, sin exponer su categoría. Validación, asignación y replanificación le preguntan al requisito, y la regla de "cumple" queda en un solo lugar.
@@ -204,6 +217,7 @@ Cada actividad del itinerario referencia una `Activity` (con sus reglas propias 
   - Un catálogo por tipo de recurso: repetiría la regla de unicidad y permitiría repetir un `id` entre tipos.
   - Exponer las listas con getters y filtrar afuera: cada cliente reimplementaría "cumple el requisito y está libre".
 - **Consecuencia:** es una clase concreta en memoria. Si más adelante hay persistencia, el contrato se extrae a `business/providers` con estas mismas consultas y esta clase pasa a ser un detalle.
+
 
 ### D19 — La expedición es la única puerta para modificar su itinerario
 
@@ -249,11 +263,30 @@ Cada actividad del itinerario referencia una `Activity` (con sus reglas propias 
   - Convertir todo en reglas de validación — permitiría armar itinerarios imposibles (una actividad antes de su dependencia) que recién se detectarían al pedir la aprobación.
   - Rechazar al agendar también la falta de recursos — impediría armar el itinerario antes de asignar.
 
+
+### D22 — La aprobación corre la validación y registra las advertencias aceptadas
+
+- **Patrón / principio:** Dependency Inversion + fail fast.
+- **Dónde:** `Expedition.approve(ExpeditionValidator, List<AcceptedWarning>)`; interfaz `ExpeditionValidator` (en `business.interfaces.validation`), implementada por `ValidationOrchestrator`; `AcceptedWarning`; `ExpeditionNotApprovableException` y `UnacceptedWarningException`.
+- **Por qué:**
+  - El enunciado exige que una expedición con errores críticos no pueda pasar a aprobada. Para que eso no dependa de que alguien se acuerde de validar antes, `approve` recibe el validador y lo corre en ese momento: no se puede aprobar con un resultado viejo o armado a mano.
+  - Cada advertencia tiene que estar cubierta por un `AcceptedWarning` de alguien que sea responsable de la expedición, con una justificación no vacía. Las aceptaciones quedan registradas en la expedición (`getAcceptedWarnings`) para el informe. No se puede crear un `AcceptedWarning` sobre un resultado crítico: lo crítico no se acepta, se corrige.
+  - `Expedition` depende de la interfaz `ExpeditionValidator` y no del orquestador concreto, igual que `Activity` depende de `ActivityRules` (D1). Así los tests de aprobación usan un validador de prueba con resultados fijos, y el orquestador y cada regla se prueban por separado.
+  - La transición se verifica antes de validar: una expedición que no está en revisión ni siquiera se valida.
+  - Al aprobar se reservan los recursos reutilizables asignados, cada uno para el horario de su ítem. Recién ahí el plan compromete recursos: mientras es borrador se puede asignar y reasignar libremente, y las demás expediciones ven esos recursos ocupados recién cuando esta se aprueba.
+- **Alternativas descartadas:**
+  - `approve(ApprovalResult)` — permitiría aprobar con un resultado calculado antes de un cambio, o con uno vacío.
+  - `Map<ValidationResult, String>` de justificaciones (boceto inicial) — no registra quién aceptó cada advertencia, y el enunciado pide que la acepte un responsable.
+  - Que `Expedition` dependa directamente de `ValidationOrchestrator` — ataría la entidad a una implementación y a su lista concreta de reglas.
+  - Reservar los recursos al asignarlos — la validación de superposición nunca encontraría nada, porque la segunda reserva fallaría con excepción en vez de reportarse junto con los demás problemas.
+- **Consecuencia:** la reserva confía en que el validador incluya `ResourceOverlapValidation`. Si se aprobara con un validador que no la incluye y un recurso está ocupado, `reserve` falla con `ResourceUnavailableException` a mitad de las reservas.
+
+
 ## Patrones que decidimos no aplicar
 
 | Patrón | Por qué no                                                                                                                                                                                              | Consecuencias |
 |--------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|
-| Decorator | Para el caso de "advertencia aceptada con justificación" alcanza con un campo de justificación en el resultado de validación aceptado; no hace falta envolver el objeto.                                | Si más adelante se necesita apilar más comportamiento sobre una validación aceptada (ej. distintos tipos de justificación con reglas propias), habría que reconsiderarlo. |
+| Decorator | Para "advertencia aceptada con justificación" alcanza con `AcceptedWarning`, un `record` que referencia el resultado y le suma responsable y justificación (D22). No hace falta que la advertencia aceptada se comporte como un `ValidationResult`. | Si más adelante se necesita apilar comportamiento sobre un resultado de validación (ej. distintos tipos de aceptación con reglas propias), habría que reconsiderarlo. |
 | State (máquina de estados formal) | Las transiciones válidas son una tabla dentro de `ExpeditionStatus` (D20), y hoy lo único que cambia según el estado es si el itinerario se puede modificar (D19). Una clase por estado agregaría seis clases para responder dos preguntas. | Si cada estado empieza a habilitar o prohibir muchas operaciones distintas (ej. qué se puede registrar en ejecución o durante una suspensión), los chequeos de estado se repetirían en `Expedition` y convendría pasar a State. |
 | Strategy de conversión entre sistemas de medida | Consideramos una posible extensión a futuro con más de un sistema de medida (ej. métrico e imperial: litros y galones, kilogramos y libras). Hoy hay un único sistema, así que `MeasurementUnit` es un enum simple y `Quantity` rechaza operar entre unidades distintas en vez de convertirlas. | Si se agrega otro sistema, habría que introducir una abstracción de conversión (ej. `UnitConverter`) que `Quantity` use para normalizar antes de sumar, restar o comparar. Como hoy toda la aritmética de unidades está encapsulada en `Quantity` (D8), el cambio queda en ese value object y no se propaga al resto del dominio. |
 
@@ -268,4 +301,6 @@ Cada actividad del itinerario referencia una `Activity` (con sus reglas propias 
 - `Activity.dependsOn` responde solo por las dependencias **directas**, no por las transitivas: hoy nadie recorre el grafo. No hace falta detectar ciclos porque son imposibles por construcción — `dependencies` es `final`, se copia con `List.copyOf` en el constructor y no hay setter, así que una actividad solo puede depender de otras que ya existían cuando se la creó. El orden se resuelve en el itinerario: al agendar se exige que cada dependencia directa ya esté agendada y termine antes (D21), y como eso se cumple para cada ítem, también se cumple para las transitivas.
 - Los objetivos de la expedición son texto libre: ninguna regla los usa, así que no se reifican (mismo criterio que D16 con los ids).
 - Las restricciones generales de la expedición se interpretan como un máximo de participantes y una tolerancia de riesgo (`ExpeditionRestrictions`): el enunciado las pide pero no define cuáles son.
- 
+- La capacidad de la expedición se mide como la cantidad de personas distintas asignadas a su itinerario: una persona asignada a varias actividades cuenta una sola vez, y los responsables cuentan solo si están asignados a alguna actividad.
+- Para calcular el stock necesario, cada requisito de consumible se descuenta del primer consumible asignado al ítem que sea de su categoría.
+- La validación de superposición también compara contra las reservas de otras expediciones ya aprobadas, así que tiene sentido correrla antes de aprobar: una vez aprobada, la expedición tiene sus propias reservas.
