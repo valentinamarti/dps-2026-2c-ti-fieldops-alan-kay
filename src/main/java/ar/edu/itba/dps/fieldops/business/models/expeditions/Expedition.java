@@ -4,6 +4,7 @@ import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotApprovableExcep
 import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotEditableException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
+import ar.edu.itba.dps.fieldops.business.exceptions.InvalidTrackingException;
 import ar.edu.itba.dps.fieldops.business.exceptions.ResourceUnavailableException;
 import ar.edu.itba.dps.fieldops.business.exceptions.UnacceptedWarningException;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.DepletableResource;
@@ -19,6 +20,7 @@ import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import lombok.Getter;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -107,6 +109,56 @@ public class Expedition {
         status = ExpeditionStatus.APPROVED;
     }
 
+    public void start() {
+        transitionTo(ExpeditionStatus.IN_EXECUTION);
+    }
+
+    public void suspend() {
+        transitionTo(ExpeditionStatus.SUSPENDED);
+    }
+
+    public void resume() {
+        transitionTo(ExpeditionStatus.IN_EXECUTION);
+    }
+
+    public void finish() {
+        transitionTo(ExpeditionStatus.FINISHED);
+    }
+
+    public void startActivity(ItineraryItem item, LocalDateTime at) {
+        inExecution(item).start(at);
+    }
+
+    /**
+     * Closing an activity consumes what it actually used, so the supplies left reflect the field, not the plan.
+     */
+    public void finishActivity(ItineraryItem item, LocalDateTime at, String result) {
+        final var tracked = inExecution(item);
+        tracked.startedTracking().finish(at, result);
+        consumeAssignedSupplies(tracked);
+    }
+
+    public void recordObservation(ItineraryItem item, Observation observation) {
+        inExecution(item).startedTracking().record(observation);
+    }
+
+    public void reportIncident(ItineraryItem item, Incident incident) {
+        inExecution(item).startedTracking().record(incident);
+    }
+
+    private void consumeAssignedSupplies(ItineraryItem item) {
+        item.getActivity().requiredSupplies().forEach(requirement ->
+                item.supplyFor(requirement).ifPresent(supply -> supply.consume(requirement.quantity())));
+    }
+
+    private ItineraryItem inExecution(ItineraryItem item) {
+        if (status != ExpeditionStatus.IN_EXECUTION) {
+            throw new InvalidTrackingException(
+                    "activities can only be tracked while the expedition is in execution, but it is %s".formatted(status));
+        }
+        return requireOwnItem(item);
+    }
+
     private AcceptedWarning acceptanceOf(ValidationResult warning, List<AcceptedWarning> acceptances) {
         return acceptances.stream()
                 .filter(acceptance -> acceptance.covers(warning) && responsibles.contains(acceptance.responsible()))
@@ -145,6 +197,10 @@ public class Expedition {
 
     private ItineraryItem editable(ItineraryItem item) {
         requireEditable();
+        return requireOwnItem(item);
+    }
+
+    private ItineraryItem requireOwnItem(ItineraryItem item) {
         if (!itinerary.contains(item)) {
             throw new IllegalArgumentException("the item does not belong to this expedition");
         }

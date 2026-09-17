@@ -57,6 +57,6 @@ public class InsufficientSuppliesValidation implements ValidationRule {
     }
 
     private Optional<DepletableResource> supplyFor(ItineraryItem item, DepletableRequirement requirement) {
-        return item.getAssignedSupplies().stream().filter(requirement::accepts).findFirst();
+        return item.supplyFor(requirement);
     }
 }
