@@ -1,14 +1,19 @@
 package ar.edu.itba.dps.fieldops.business.models.expeditions;
 
+import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotApprovableException;
 import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotEditableException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
+import ar.edu.itba.dps.fieldops.business.exceptions.UnacceptedWarningException;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.DepletableResource;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.Equipment;
+import ar.edu.itba.dps.fieldops.business.interfaces.validation.ExpeditionValidator;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
+import ar.edu.itba.dps.fieldops.business.models.validation.AcceptedWarning;
+import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
 import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import lombok.Getter;
@@ -16,6 +21,7 @@ import lombok.Getter;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class Expedition {
 
@@ -33,11 +39,14 @@ public class Expedition {
     private final Set<Person> responsibles;
     @Getter
     private final ExpeditionRestrictions restrictions;
+    @Getter
     private final Set<Permit> grantedPermits;
     @Getter
     private final Itinerary itinerary = new Itinerary();
     @Getter
     private ExpeditionStatus status = ExpeditionStatus.DRAFT;
+    @Getter
+    private List<AcceptedWarning> acceptedWarnings = List.of();
 
     Expedition(String id, String name, TimePeriod period, List<String> objectives, Set<Zone> zones,
                Set<Person> responsibles, ExpeditionRestrictions restrictions, Set<Permit> grantedPermits) {
@@ -71,6 +80,12 @@ public class Expedition {
         editable(item).assignSupply(supply);
     }
 
+    public Set<Person> participants() {
+        return itinerary.getItems().stream()
+                .flatMap(item -> item.getAssignedStaff().stream())
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
     public void submitForReview() {
         transitionTo(ExpeditionStatus.IN_REVIEW);
     }
@@ -79,11 +94,38 @@ public class Expedition {
         transitionTo(ExpeditionStatus.DRAFT);
     }
 
+    public void approve(ExpeditionValidator validator, List<AcceptedWarning> acceptances) {
+        requireCanTransitionTo(ExpeditionStatus.APPROVED);
+        final var result = validator.validate(this);
+        if (!result.canBeApproved()) {
+            throw new ExpeditionNotApprovableException(result.criticals());
+        }
+        acceptedWarnings = result.warnings().stream().map(warning -> acceptanceOf(warning, acceptances)).toList();
+        reserveAssignedResources();
+        status = ExpeditionStatus.APPROVED;
+    }
+
+    private AcceptedWarning acceptanceOf(ValidationResult warning, List<AcceptedWarning> acceptances) {
+        return acceptances.stream()
+                .filter(acceptance -> acceptance.covers(warning) && responsibles.contains(acceptance.responsible()))
+                .findFirst()
+                .orElseThrow(() -> new UnacceptedWarningException(warning));
+    }
+
+    private void reserveAssignedResources() {
+        itinerary.getItems().forEach(item ->
+                item.getAssignedReusableResources().forEach(resource -> resource.reserve(item.getScheduledPeriod())));
+    }
+
     private void transitionTo(ExpeditionStatus next) {
+        requireCanTransitionTo(next);
+        status = next;
+    }
+
+    private void requireCanTransitionTo(ExpeditionStatus next) {
         if (!status.canTransitionTo(next)) {
             throw new InvalidStatusTransitionException(status, next);
         }
-        status = next;
     }
 
     private ItineraryItem editable(ItineraryItem item) {

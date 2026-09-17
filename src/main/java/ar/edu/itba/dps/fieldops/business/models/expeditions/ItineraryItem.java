@@ -3,6 +3,7 @@ package ar.edu.itba.dps.fieldops.business.models.expeditions;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.DepletableResource;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.Equipment;
+import ar.edu.itba.dps.fieldops.business.interfaces.resources.ReusableResource;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
@@ -49,6 +50,12 @@ public class ItineraryItem {
 
     public Set<DepletableResource> getAssignedSupplies() {
         return Collections.unmodifiableSet(assignedSupplies);
+    }
+
+    public Set<ReusableResource> getAssignedReusableResources() {
+        final var resources = new LinkedHashSet<ReusableResource>(assignedStaff);
+        resources.addAll(assignedEquipment);
+        return Collections.unmodifiableSet(resources);
     }
 
     boolean endsBeforeStartOf(ItineraryItem other) {
