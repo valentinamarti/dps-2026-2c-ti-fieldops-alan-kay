@@ -1,5 +1,6 @@
 package ar.edu.itba.dps.fieldops.business.models.activities;
 
+import ar.edu.itba.dps.fieldops.business.interfaces.resources.Categorized;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.DepletableResource;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
@@ -16,7 +17,11 @@ public record DepletableRequirement(ResourceCategory category, Quantity quantity
         }
     }
 
+    public boolean accepts(Categorized candidate) {
+        return candidate.belongsTo(category);
+    }
+
     public boolean isCoveredBy(DepletableResource supply) {
-        return supply.belongsTo(category) && supply.hasStockFor(quantity);
+        return accepts(supply) && supply.hasStockFor(quantity);
     }
 }
