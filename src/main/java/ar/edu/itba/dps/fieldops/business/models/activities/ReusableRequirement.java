@@ -1,9 +1,9 @@
 package ar.edu.itba.dps.fieldops.business.models.activities;
 
+import ar.edu.itba.dps.fieldops.business.interfaces.resources.Categorized;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
 
 import java.util.Objects;
-
 
 public record ReusableRequirement(ResourceCategory category, int count) {
 
@@ -12,5 +12,9 @@ public record ReusableRequirement(ResourceCategory category, int count) {
         if (count <= 0) {
             throw new IllegalArgumentException("count must be positive");
         }
+    }
+
+    public boolean accepts(Categorized candidate) {
+        return candidate.belongsTo(category);
     }
 }

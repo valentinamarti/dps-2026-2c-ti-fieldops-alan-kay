@@ -13,8 +13,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DepletableTest {
 
+    private static final ResourceCategory FUEL = new ResourceCategory("Fuel");
+
     private static Depletable fuelWithLiters(String liters) {
-        return new Depletable("c-1", "Fuel", Quantity.of(liters, LITERS));
+        return new Depletable("c-1", "Diesel", FUEL, Quantity.of(liters, LITERS));
     }
 
     @Test
