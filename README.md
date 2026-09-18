@@ -41,6 +41,9 @@ src/main/java/ar/edu/itba/dps/fieldops
     │   └── zones       # zones and permits
     ├── rules           # ActivityRules implementations, one per activity type
     ├── validations     # ValidationRule implementations and the ValidationOrchestrator
+    ├── estimations     # ExpeditionEstimator
+    ├── reports         # ExpeditionReporter
+    ├── replanning      # ExpeditionReplanner, builds a draft alternative around an affected item
     └── exceptions      # domain exceptions
 src/test/java/...       # unit tests mirroring the main tree, plus shared fixtures
 DESIGN.md               # design decisions (in Spanish)
