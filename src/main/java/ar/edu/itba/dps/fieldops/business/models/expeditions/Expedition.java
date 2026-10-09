@@ -14,6 +14,7 @@ import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
+import ar.edu.itba.dps.fieldops.business.models.resources.Reservation;
 import ar.edu.itba.dps.fieldops.business.models.validation.AcceptedWarning;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
 import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
@@ -173,7 +174,7 @@ public class Expedition {
     private void reserveAssignedResources() {
         itinerary.getItems().forEach(this::requireAssignedResourcesAvailable);
         itinerary.getItems().forEach(item ->
-                item.getAssignedReusableResources().forEach(resource -> resource.reserve(item.getScheduledPeriod())));
+                item.getAssignedReusableResources().forEach(resource -> resource.reserve(new Reservation(id, item.getScheduledPeriod()))));
     }
 
     private void requireAssignedResourcesAvailable(ItineraryItem item) {

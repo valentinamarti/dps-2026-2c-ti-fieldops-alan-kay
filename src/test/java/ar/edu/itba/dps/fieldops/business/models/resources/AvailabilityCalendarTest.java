@@ -2,6 +2,7 @@ package ar.edu.itba.dps.fieldops.business.models.resources;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.ResourceUnavailableException;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -12,11 +13,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AvailabilityCalendarTest {
 
+    private static final ExpeditionId AN_EXPEDITION = new ExpeditionId("e-1");
+
     private final AvailabilityCalendar calendar = new AvailabilityCalendar();
 
     private static TimePeriod hours(int fromHour, int toHour) {
         final var day = LocalDateTime.of(2026, 10, 1, 0, 0);
         return new TimePeriod(day.plusHours(fromHour), day.plusHours(toHour));
+    }
+
+    private static Reservation bookedByAnExpedition(int fromHour, int toHour) {
+        return new Reservation(AN_EXPEDITION, hours(fromHour, toHour));
     }
 
     @Test
@@ -26,22 +33,30 @@ class AvailabilityCalendarTest {
 
     @Test
     void aBookedPeriodIsNoLongerFree() {
-        calendar.book(hours(8, 12));
+        calendar.book(bookedByAnExpedition(8, 12));
 
         assertFalse(calendar.isFreeDuring(hours(11, 14)));
     }
 
     @Test
+    void aPeriodBookedByOneExpeditionIsNotFreeForAnother() {
+        calendar.book(bookedByAnExpedition(8, 12));
+
+        assertThrows(ResourceUnavailableException.class,
+                () -> calendar.book(new Reservation(new ExpeditionId("e-2"), hours(10, 11))));
+    }
+
+    @Test
     void periodsThatOnlyTouchAtTheBorderDoNotCollide() {
-        calendar.book(hours(8, 12));
+        calendar.book(bookedByAnExpedition(8, 12));
 
         assertTrue(calendar.isFreeDuring(hours(12, 16)));
     }
 
     @Test
     void severalNonOverlappingPeriodsCanBeBooked() {
-        calendar.book(hours(8, 10));
-        calendar.book(hours(14, 16));
+        calendar.book(bookedByAnExpedition(8, 10));
+        calendar.book(bookedByAnExpedition(14, 16));
 
         assertTrue(calendar.isFreeDuring(hours(10, 14)));
         assertFalse(calendar.isFreeDuring(hours(9, 15)));
@@ -49,9 +64,9 @@ class AvailabilityCalendarTest {
 
     @Test
     void bookingAnOverlappingPeriodIsRejectedAndLeavesTheCalendarUntouched() {
-        calendar.book(hours(8, 12));
+        calendar.book(bookedByAnExpedition(8, 12));
 
-        assertThrows(ResourceUnavailableException.class, () -> calendar.book(hours(10, 11)));
+        assertThrows(ResourceUnavailableException.class, () -> calendar.book(bookedByAnExpedition(10, 11)));
         assertTrue(calendar.isFreeDuring(hours(12, 16)));
         assertFalse(calendar.isFreeDuring(hours(8, 12)));
     }

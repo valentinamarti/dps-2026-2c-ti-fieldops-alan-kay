@@ -2,7 +2,9 @@ package ar.edu.itba.dps.fieldops.business.validations;
 
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
+import ar.edu.itba.dps.fieldops.business.models.resources.Reservation;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import org.junit.jupiter.api.Test;
@@ -18,6 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ResourceOverlapValidationTest {
+
+    private static final ExpeditionId ANOTHER_EXPEDITION = new ExpeditionId("e-2");
 
     private final ResourceOverlapValidation validation = new ResourceOverlapValidation();
     private final Zone coast = zone("z-1");
@@ -48,7 +52,7 @@ class ResourceOverlapValidationTest {
 
     @Test
     void flagsAResourceAlreadyBookedByAnotherExpedition() {
-        worker.reserve(hours(10, 11));
+        worker.reserve(new Reservation(ANOTHER_EXPEDITION, hours(10, 11)));
         scheduleWithWorker("a-1", hours(9, 11));
 
         final var expected = ValidationResult.critical("p-2 is already booked during Sampling a-1");

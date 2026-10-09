@@ -42,7 +42,7 @@ public class Instrument implements Equipment, Certifiable {
     }
 
     @Override
-    public void reserve(TimePeriod period) {
-        calendar.book(period);
+    public void reserve(Reservation reservation) {
+        calendar.book(reservation);
     }
 }

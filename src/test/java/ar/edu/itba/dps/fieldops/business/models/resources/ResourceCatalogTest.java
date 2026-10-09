@@ -6,6 +6,7 @@ import ar.edu.itba.dps.fieldops.business.models.activities.ReusableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.StaffRequirement;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -23,6 +24,7 @@ class ResourceCatalogTest {
     private static final ResourceCategory SONAR = new ResourceCategory("Sonar");
     private static final ResourceCategory FUEL = new ResourceCategory("Fuel");
     private static final ResourceCategory WATER = new ResourceCategory("Water");
+    private static final ExpeditionId ANOTHER_EXPEDITION = new ExpeditionId("e-2");
     private static final TimePeriod MORNING = hours(8, 12);
 
     private final ResourceCatalog catalog = new ResourceCatalog();
@@ -52,7 +54,7 @@ class ResourceCatalogTest {
         final var certifiedAndFree = new Person("p-1", "Ana", Set.of(DIVING));
         final var certifiedButBusy = new Person("p-2", "Bruno", Set.of(DIVING));
         final var freeButNotCertified = new Person("p-3", "Carla", Set.of());
-        certifiedButBusy.reserve(MORNING);
+        certifiedButBusy.reserve(new Reservation(ANOTHER_EXPEDITION, MORNING));
         catalog.addStaff(certifiedAndFree);
         catalog.addStaff(certifiedButBusy);
         catalog.addStaff(freeButNotCertified);
@@ -67,7 +69,7 @@ class ResourceCatalogTest {
         final var freeBoat = new Vehicle("v-1", "Albatros", BOAT, "ABC 123", Set.of());
         final var busyBoat = new Vehicle("v-2", "Petrel", BOAT, "DEF 456", Set.of());
         final var freeSonar = new Instrument("i-1", "Sonar 3000", SONAR, Set.of());
-        busyBoat.reserve(hours(10, 11));
+        busyBoat.reserve(new Reservation(ANOTHER_EXPEDITION, hours(10, 11)));
         catalog.addEquipment(freeBoat);
         catalog.addEquipment(busyBoat);
         catalog.addEquipment(freeSonar);

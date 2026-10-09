@@ -103,7 +103,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 
 - **Patrón / principio:** composición sobre herencia, sin duplicación (DRY).
 - **Dónde:** `AvailabilityCalendar`, usado por `Person`, `Vehicle` e `Instrument`.
-- **Por qué:** los tres recursos reutilizables comparten exactamente la misma regla de disponibilidad (no reservar franjas superpuestas). Esa regla vive en `AvailabilityCalendar` y cada recurso delega en él, así que cambiarla es tocar una sola clase.
+- **Por qué:** los tres recursos reutilizables comparten exactamente la misma regla de disponibilidad (no reservar franjas superpuestas). Esa regla vive en `AvailabilityCalendar` y cada recurso delega en él, así que cambiarla es tocar una sola clase. El calendario guarda reservas con dueño (`Reservation`, D27), no franjas sueltas.
 - **Alternativas descartadas:** clase abstracta base (`AbstractReusableResource`) con la lógica de reservas. Ata la jerarquía a un único eje de variación y complica que un recurso futuro tenga otra forma de disponibilidad. Copiar la lógica en cada clase quedó descartado por duplicación.
 
 
@@ -162,7 +162,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 ### D15 — Entidades por identidad (clases), value objects por valor (`record`)
 
 - **Patrón / principio:** distinción entidad / value object.
-- **Dónde:** clases con identidad: `Person`, `Vehicle`, `Instrument`, `Depletable`, `Zone`, `Activity`, `Expedition`, `ItineraryItem`. `record` con igualdad por valor: `ExpeditionId`, `TimePeriod`, `Quantity`, `Certification`, `Certifications`, `Permit`, `ResourceCategory`, `ReusableRequirement`, `DepletableRequirement`, `StaffRequirement`, `ExpeditionRestrictions`, `ValidationResult`, `ApprovalResult`, `AcceptedWarning`.
+- **Dónde:** clases con identidad: `Person`, `Vehicle`, `Instrument`, `Depletable`, `Zone`, `Activity`, `Expedition`, `ItineraryItem`. `record` con igualdad por valor: `ExpeditionId`, `Reservation`, `TimePeriod`, `Quantity`, `Certification`, `Certifications`, `Permit`, `ResourceCategory`, `ReusableRequirement`, `DepletableRequirement`, `StaffRequirement`, `ExpeditionRestrictions`, `ValidationResult`, `ApprovalResult`, `AcceptedWarning`.
 - **Por qué:**
   - Las entidades tienen `id` pero **no** redefinen `equals`/`hashCode`: se comparan por identidad de instancia. Dos `Vehicle` con la misma patente son dos vehículos distintos del catálogo, y cada uno tiene su propio `AvailabilityCalendar` (D9) — igualarlos por `id` haría que reservar uno pareciera reservar al otro.
   - De ahí se apoya `Activity.dependsOn`: una dependencia apunta a *esa* actividad concreta, no a "cualquier actividad que se llame igual".
@@ -320,6 +320,16 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 - **Por qué:** las próximas correcciones se apoyan en este id (una reserva sabe qué expedición la hizo, una alternativa sabe a cuál reemplaza). Con un `String` suelto se puede pasar el id de un recurso donde va el de una expedición; con `ExpeditionId` el compilador lo rechaza. Como `record`, compara por valor (D15). Un valor en blanco falla en el propio id y uno nulo en `Expedition`, con la división de excepciones de D16. `toString()` devuelve solo el valor, para que los mensajes digan `e-1`.
 - **Alternativas descartadas:** dejar el `String` y controlar solo la unicidad — no evita confundirlo con otro id.
 - **Consecuencia:** el id todavía lo elige quien construye la expedición (`withId`), así que dos expediciones pueden repetirlo hasta el paso siguiente.
+
+
+### D27 — Una reserva sabe para qué expedición es (corrección de la Entrega 1)
+
+- **Origen:** corrección de la Entrega 1, punto 1 (las reservas no tienen dueño y no se pueden liberar). Evaluamos la sugerencia del informe (`Reservation(expeditionId, period)`, liberar por expedición y reservar todo o nada) y la seguimos. Este primer paso le da dueño a la reserva; liberar y reservar todo o nada son los pasos siguientes.
+- **Patrón / principio:** value object (D8).
+- **Dónde:** `Reservation(ExpeditionId, TimePeriod)` en `business.models.resources`; `AvailabilityCalendar.book(Reservation)` y `ReusableResource.reserve(Reservation)`. Al aprobar, `Expedition` reserva a nombre de su propio id (D26).
+- **Por qué:** reservar es comprometer un recurso *para alguien*. El calendario guardaba `TimePeriod` sueltos, así que no podía responder de quién era una franja ni deshacerla cuando esa expedición ya no la necesitaba (aprobación fallida, cancelación, reemplazo). Con el dueño en la reserva, eso pasa a ser una pregunta que el calendario puede contestar. La regla de disponibilidad no cambia: una franja reservada no está libre para nadie, sin importar quién la reservó.
+- **Alternativas descartadas:** guardar en `Expedition` qué recursos reservó — repartiría el registro de compromisos entre dos objetos que se pueden desincronizar, y el informe señala justamente que el calendario tiene que ser ese registro.
+- **Consecuencia:** el dueño todavía no se usa para nada observable. Las reservas huérfanas que muestra el informe siguen pasando hasta que se pueda liberar (paso siguiente) y reservar todo o nada.
 
 ## Patrones que decidimos no aplicar
 

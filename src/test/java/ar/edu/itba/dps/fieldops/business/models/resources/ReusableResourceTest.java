@@ -3,6 +3,7 @@ package ar.edu.itba.dps.fieldops.business.models.resources;
 import ar.edu.itba.dps.fieldops.business.exceptions.ResourceUnavailableException;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.ReusableResource;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -19,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ReusableResourceTest {
 
+    private static final ExpeditionId ANOTHER_EXPEDITION = new ExpeditionId("e-2");
     private static final TimePeriod MORNING = hours(8, 12);
     private static final ResourceCategory PICKUP = new ResourceCategory("Pickup");
     private static final ResourceCategory SONAR = new ResourceCategory("Sonar");
@@ -45,7 +47,7 @@ class ReusableResourceTest {
     @ParameterizedTest
     @MethodSource("resources")
     void isNotAvailableDuringAPeriodThatOverlapsABooking(ReusableResource resource) {
-        resource.reserve(MORNING);
+        resource.reserve(new Reservation(ANOTHER_EXPEDITION, MORNING));
 
         assertFalse(resource.isAvailableDuring(hours(11, 14)));
     }
@@ -53,7 +55,7 @@ class ReusableResourceTest {
     @ParameterizedTest
     @MethodSource("resources")
     void isAvailableRightAfterABookingEnds(ReusableResource resource) {
-        resource.reserve(MORNING);
+        resource.reserve(new Reservation(ANOTHER_EXPEDITION, MORNING));
 
         assertTrue(resource.isAvailableDuring(hours(12, 16)));
     }
@@ -61,8 +63,8 @@ class ReusableResourceTest {
     @ParameterizedTest
     @MethodSource("resources")
     void cannotBeReservedTwiceForOverlappingPeriods(ReusableResource resource) {
-        resource.reserve(MORNING);
+        resource.reserve(new Reservation(ANOTHER_EXPEDITION, MORNING));
 
-        assertThrows(ResourceUnavailableException.class, () -> resource.reserve(hours(10, 11)));
+        assertThrows(ResourceUnavailableException.class, () -> resource.reserve(new Reservation(ANOTHER_EXPEDITION, hours(10, 11))));
     }
 }

@@ -5,19 +5,21 @@ import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class AvailabilityCalendar {
 
-    private final List<TimePeriod> bookedPeriods = new ArrayList<>();
+    private final List<Reservation> reservations = new ArrayList<>();
 
     public boolean isFreeDuring(TimePeriod period) {
-        return bookedPeriods.stream().noneMatch(period::overlapsWith);
+        return reservations.stream().noneMatch(reservation -> reservation.overlapsWith(period));
     }
 
-    public void book(TimePeriod period) {
-        if (!isFreeDuring(period)) {
-            throw new ResourceUnavailableException(period);
+    public void book(Reservation reservation) {
+        Objects.requireNonNull(reservation, "reservation is required");
+        if (!isFreeDuring(reservation.period())) {
+            throw new ResourceUnavailableException(reservation.period());
         }
-        bookedPeriods.add(period);
+        reservations.add(reservation);
     }
 }
