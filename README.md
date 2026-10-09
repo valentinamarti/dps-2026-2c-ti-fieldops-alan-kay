@@ -46,8 +46,8 @@ src/main/java/ar/edu/itba/dps/fieldops
     ├── estimations     # ExpeditionEstimator
     ├── reports         # ExpeditionReporter
     ├── replanning      # ExpeditionReplanner, builds a draft alternative around an affected item
-    ├── services        # ResourceReservations, books every resource of an expedition or none
-    ├── usecases        # ApproveExpedition, coordinates validation, approval and reservations
+    ├── services        # ResourceReservations, books every resource of an expedition or none, and releases them
+    ├── usecases        # ApproveExpedition and FinishExpedition, coordinate the expedition with its reservations
     └── exceptions      # domain exceptions
 src/test/java/...       # unit tests mirroring the main tree, an end-to-end integration test and shared fixtures
 DESIGN.md               # design decisions (in Spanish)

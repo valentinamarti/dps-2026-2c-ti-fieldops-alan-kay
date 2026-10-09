@@ -23,6 +23,13 @@ public class ResourceReservations {
         commitments.forEach(Commitment::book);
     }
 
+    public void releaseFor(Expedition expedition) {
+        expedition.getItinerary().getItems().stream()
+                .flatMap(item -> item.getAssignedReusableResources().stream())
+                .distinct()
+                .forEach(resource -> resource.releaseAll(expedition.getId()));
+    }
+
     private void requireReservable(List<Commitment> commitments) {
         commitments.forEach(this::requireFree);
         requireNoClashesBetween(commitments);

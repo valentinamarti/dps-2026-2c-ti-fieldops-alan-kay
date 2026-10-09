@@ -90,4 +90,20 @@ class ResourceReservationsTest {
 
         assertTrue(worker.isAvailableDuring(hours(9, 11)));
     }
+
+    @Test
+    void releasingAnExpeditionFreesEveryResourceItUsesAndKeepsWhatOthersBooked() {
+        final var cooler = instrument("i-1", "Cooler");
+        final var item = expedition.schedule(sampling("a-1", coast, hours(0, 24)), hours(9, 11));
+        expedition.assignStaff(item, worker);
+        expedition.assignEquipment(item, cooler);
+        reservations.reserveFor(expedition);
+        worker.reserve(new Reservation(new ExpeditionId("e-2"), hours(14, 16)));
+
+        reservations.releaseFor(expedition);
+
+        assertTrue(worker.isAvailableDuring(hours(9, 11)));
+        assertTrue(cooler.isAvailableDuring(hours(9, 11)));
+        assertFalse(worker.isAvailableDuring(hours(14, 16)));
+    }
 }

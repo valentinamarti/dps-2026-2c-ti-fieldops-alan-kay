@@ -332,15 +332,16 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 
 ### D27 — Reservas con dueño, liberables y todo o nada; indisponibilidades aparte (corrección de la Entrega 1)
 
-- **Origen:** corrección de la Entrega 1, punto 1 (las reservas no tienen dueño y no se pueden liberar; tampoco se distingue una reserva de una indisponibilidad, como una licencia o un mantenimiento). Evaluamos la sugerencia del informe (que la reserva tenga dueño, `Reservation(expeditionId, period)`, que se pueda liberar lo de una expedición y que chequear y reservar sea una sola operación de un servicio) y la seguimos.
+- **Origen:** corrección de la Entrega 1, punto 1 (las reservas no tienen dueño y no se pueden liberar; tampoco se distingue una reserva de una indisponibilidad, como una licencia o un mantenimiento, y terminar antes una expedición no libera sus horarios). Evaluamos la sugerencia del informe (que la reserva tenga dueño, `Reservation(expeditionId, period)`, que se pueda liberar lo de una expedición y que chequear y reservar sea una sola operación de un servicio) y la seguimos.
 - **Patrón / principio:** value object (D8) + Information Expert (el calendario es el registro de compromisos, así que es quien libera) + servicio de dominio para la operación que toca varios recursos a la vez.
-- **Dónde:** `Reservation(ExpeditionId, TimePeriod)` y `Unavailability(TimePeriod, reason)` en `business.models.resources`; `AvailabilityCalendar.book(Reservation)`, `releaseAll(ExpeditionId)` y `markUnavailable(Unavailability)`; `ReusableResource.reserve(Reservation)`, `releaseAll(ExpeditionId)` y `markUnavailable(Unavailability)`; `ResourceReservations.requireReservable(Expedition)` y `reserveFor(Expedition)` en `business.services`, invocados desde el caso de uso `ApproveExpedition` (D28).
+- **Dónde:** `Reservation(ExpeditionId, TimePeriod)` y `Unavailability(TimePeriod, reason)` en `business.models.resources`; `AvailabilityCalendar.book(Reservation)`, `releaseAll(ExpeditionId)` y `markUnavailable(Unavailability)`; `ReusableResource.reserve(Reservation)`, `releaseAll(ExpeditionId)` y `markUnavailable(Unavailability)`; `ResourceReservations.requireReservable(Expedition)`, `reserveFor(Expedition)` y `releaseFor(Expedition)` en `business.services`, invocados desde los casos de uso `ApproveExpedition` y `FinishExpedition` (D28).
 - **Por qué:**
   - Reservar es comprometer un recurso *para alguien*. El calendario guardaba `TimePeriod` sueltos, así que no podía responder de quién era una franja ni deshacerla cuando esa expedición ya no la necesitaba. Con el dueño en la reserva, `releaseAll` libera exactamente lo de una expedición y deja intacto lo de las demás. Liberar una expedición que no tiene reservas no es un error (mismo criterio que repetir una asignación, D19).
   - La regla de disponibilidad no cambia: una franja reservada no está libre para nadie, sin importar quién la reservó.
   - Una indisponibilidad (licencia, mantenimiento) también ocupa el calendario, pero no es un compromiso con una expedición: no tiene dueño, liberar una expedición no la levanta, y lleva su motivo. Registrarla nunca falla, aunque pise una reserva existente, porque es algo que pasó y no un pedido; la validación de superposición la reporta como recurso no disponible (`"... is not available during ..."`).
   - Aprobar reserva varios recursos de una vez, y antes una falla a mitad de camino dejaba reservada una parte. `ResourceReservations` arma todos los compromisos de la expedición, los verifica contra los calendarios **y entre sí** (dos ítems propios que comparten un recurso en horarios superpuestos), y recién si todo da, reserva. Si algo falla, no reserva nada.
   - `requireReservable` hace la misma verificación sin reservar, para que el caso de uso pueda comprobar que todo se puede reservar antes de aprobar.
+  - Al terminar, `releaseFor` libera todas las reservas de la expedición en cada recurso que usa. Así una expedición que termina antes devuelve los horarios de las actividades que no se hicieron. Libera también las franjas ya pasadas, que no cambian nada porque nadie reserva hacia atrás.
 - **Alternativas descartadas:**
   - Guardar en `Expedition` qué recursos reservó — repartiría el registro de compromisos entre dos objetos que se pueden desincronizar, y el informe señala justamente que el calendario tiene que ser ese registro.
   - Liberar por período (`release(TimePeriod)`) — no distingue de quién es la franja, que es justamente lo que faltaba.
@@ -351,15 +352,16 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 
 ### D28 — Casos de uso para las operaciones que coordinan varios objetos (corrección de la Entrega 1)
 
-- **Origen:** corrección de la Entrega 1, punto 7 (dónde viven los casos de uso) y punto 1 (el servicio de reservas, "invocado desde el caso de uso de aprobación"). Evaluamos la sugerencia del informe y la seguimos con `ApproveExpedition`.
+- **Origen:** corrección de la Entrega 1, punto 7 (dónde viven los casos de uso) y punto 1 (el servicio de reservas, "invocado desde el caso de uso de aprobación"). Evaluamos la sugerencia del informe y la seguimos con `ApproveExpedition` y `FinishExpedition`.
 - **Patrón / principio:** caso de uso (capa de aplicación) + inyección de dependencias por constructor.
-- **Dónde:** `ApproveExpedition` en `business.usecases`, que recibe el `ExpeditionValidator` y el `ResourceReservations` en el constructor.
+- **Dónde:** en `business.usecases`: `ApproveExpedition`, que recibe el `ExpeditionValidator` y el `ResourceReservations` en el constructor, y `FinishExpedition`, que recibe el `ResourceReservations`.
 - **Por qué:**
   - Una operación es método de la entidad cuando toca un solo objeto y no necesita nada de afuera (`schedule`, `assign*`, `startActivity`). Aprobar no es así: cambia el estado de la expedición y el calendario de cada recurso que usa, y necesita un validador. Esa coordinación es un caso de uso.
   - El orden importa: primero `requireReservable` (verifica sin reservar), después `Expedition.approve` (valida, exige las advertencias aceptadas y pasa a aprobada) y recién al final `reserveFor`. Si falla la verificación o la validación, no cambió nada. Si se aprobara antes de verificar, una reserva fallida dejaría una expedición aprobada sin recursos.
   - El validador y el servicio llegan por constructor: quien aprueba no elige con qué validar en cada llamada.
+  - Terminar también cambia la expedición y los calendarios de sus recursos. `FinishExpedition` primero termina la expedición y después libera: si la transición no es válida, falla antes de liberar nada, y liberar no puede fallar.
 - **Alternativas descartadas:** que el caso de uso reserve primero y libere si la validación falla — es la vuelta atrás que D27 ya descartó.
-- **Consecuencia:** `Expedition.approve` sigue siendo público y aprueba sin reservar; la aprobación completa es la de `ApproveExpedition`.
+- **Consecuencia:** `Expedition.approve` y `Expedition.finish` siguen siendo públicos y no tocan los calendarios; la aprobación y la finalización completas son las de los casos de uso.
 
 ## Patrones que decidimos no aplicar
 

@@ -26,6 +26,7 @@ import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.reports.ExpeditionReporter;
 import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
 import ar.edu.itba.dps.fieldops.business.usecases.ApproveExpedition;
+import ar.edu.itba.dps.fieldops.business.usecases.FinishExpedition;
 import ar.edu.itba.dps.fieldops.business.validations.CapacityExceededValidation;
 import ar.edu.itba.dps.fieldops.business.validations.InsufficientSuppliesValidation;
 import ar.edu.itba.dps.fieldops.business.validations.MissingCertificationsValidation;
@@ -76,7 +77,9 @@ class ExpeditionLifecycleIntegrationTest {
             new MissingPermitsValidation(),
             new CapacityExceededValidation(),
             new RiskToleranceValidation()));
-    private final ApproveExpedition approveExpedition = new ApproveExpedition(validator, new ResourceReservations());
+    private final ResourceReservations reservations = new ResourceReservations();
+    private final ApproveExpedition approveExpedition = new ApproveExpedition(validator, reservations);
+    private final FinishExpedition finishExpedition = new FinishExpedition(reservations);
     private final ExpeditionReporter reporter = new ExpeditionReporter(new ExpeditionEstimator());
 
     private final TimePeriod divePeriod = hours(9, 12);
@@ -150,7 +153,7 @@ class ExpeditionLifecycleIntegrationTest {
         expedition.finishActivity(diveItem, LocalDateTime.of(2026, 10, 1, 12, 0), "Reef mapped");
         expedition.startActivity(surveyItem, LocalDateTime.of(2026, 10, 1, 13, 0));
         expedition.finishActivity(surveyItem, LocalDateTime.of(2026, 10, 1, 15, 0), "Six samples collected");
-        expedition.finish();
+        finishExpedition.finish(expedition);
 
         final var report = reporter.reportOf(expedition);
         assertEquals(ExpeditionStatus.FINISHED, report.status());
@@ -162,6 +165,7 @@ class ExpeditionLifecycleIntegrationTest {
         assertEquals(List.of(acceptance), report.acceptedWarnings());
         assertEquals(Quantity.of("80", LITERS), fuel.getStock());
         assertEquals(Quantity.of("17", UNITS), jars.getStock());
+        assertTrue(leader.isAvailableDuring(divePeriod));
     }
 
     @Test
