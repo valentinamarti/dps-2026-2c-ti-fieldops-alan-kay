@@ -24,6 +24,8 @@ import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
 import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.reports.ExpeditionReporter;
+import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
+import ar.edu.itba.dps.fieldops.business.usecases.ApproveExpedition;
 import ar.edu.itba.dps.fieldops.business.validations.CapacityExceededValidation;
 import ar.edu.itba.dps.fieldops.business.validations.InsufficientSuppliesValidation;
 import ar.edu.itba.dps.fieldops.business.validations.MissingCertificationsValidation;
@@ -74,6 +76,7 @@ class ExpeditionLifecycleIntegrationTest {
             new MissingPermitsValidation(),
             new CapacityExceededValidation(),
             new RiskToleranceValidation()));
+    private final ApproveExpedition approveExpedition = new ApproveExpedition(validator, new ResourceReservations());
     private final ExpeditionReporter reporter = new ExpeditionReporter(new ExpeditionEstimator());
 
     private final TimePeriod divePeriod = hours(9, 12);
@@ -137,7 +140,7 @@ class ExpeditionLifecycleIntegrationTest {
 
         expedition.submitForReview();
         final var acceptance = new AcceptedWarning(result.warnings().getFirst(), leader, "Both divers are instructors");
-        expedition.approve(validator, List.of(acceptance));
+        approveExpedition.approve(expedition, List.of(acceptance));
         assertEquals(ExpeditionStatus.APPROVED, expedition.getStatus());
         assertFalse(leader.isAvailableDuring(divePeriod));
 
@@ -181,7 +184,7 @@ class ExpeditionLifecycleIntegrationTest {
         assertTrue(messages.stream().anyMatch(message -> message.contains("staff")), messages::toString);
         assertFalse(result.canBeApproved());
 
-        assertThrows(ExpeditionNotApprovableException.class, () -> expedition.approve(validator, List.of()));
+        assertThrows(ExpeditionNotApprovableException.class, () -> approveExpedition.approve(expedition, List.of()));
         assertEquals(ExpeditionStatus.IN_REVIEW, expedition.getStatus());
         assertTrue(leader.isAvailableDuring(divePeriod));
     }

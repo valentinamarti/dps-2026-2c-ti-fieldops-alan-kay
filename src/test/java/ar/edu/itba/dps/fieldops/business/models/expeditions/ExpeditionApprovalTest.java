@@ -2,7 +2,6 @@ package ar.edu.itba.dps.fieldops.business.models.expeditions;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotApprovableException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
-import ar.edu.itba.dps.fieldops.business.exceptions.ResourceUnavailableException;
 import ar.edu.itba.dps.fieldops.business.exceptions.UnacceptedWarningException;
 import ar.edu.itba.dps.fieldops.business.interfaces.validation.ExpeditionValidator;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
@@ -20,9 +19,7 @@ import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.pers
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.sampling;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ExpeditionApprovalTest {
 
@@ -88,45 +85,6 @@ class ExpeditionApprovalTest {
     void mustBeInReviewToBeApproved() {
         assertThrows(InvalidStatusTransitionException.class, () -> expedition.approve(finding(), List.of()));
         assertEquals(ExpeditionStatus.DRAFT, expedition.getStatus());
-    }
-
-    @Test
-    void reservesTheAssignedResourcesForTheirScheduledPeriods() {
-        final var item = expedition.schedule(sampling("a-1", coast, hours(8, 18)), hours(9, 11));
-        final var worker = person("p-2");
-        expedition.assignStaff(item, worker);
-        expedition.submitForReview();
-
-        expedition.approve(finding(), List.of());
-
-        assertFalse(worker.isAvailableDuring(hours(10, 12)));
-        assertTrue(worker.isAvailableDuring(hours(11, 13)));
-    }
-
-    @Test
-    void aResourceTakenAfterTheValidationStopsTheApprovalWithoutReservingAnything() {
-        final var takenWorker = person("p-2");
-        final var freeWorker = person("p-3");
-        final var otherExpedition = expeditionIn(coast, leader).build();
-        final var otherItem = otherExpedition.schedule(sampling("a-9", coast, hours(8, 18)), hours(9, 11));
-        otherExpedition.assignStaff(otherItem, takenWorker);
-        otherExpedition.submitForReview();
-        otherExpedition.approve(finding(), List.of());
-
-        final var earlyItem = expedition.schedule(sampling("a-1", coast, hours(0, 24)), hours(6, 8));
-        final var clashingItem = expedition.schedule(sampling("a-2", coast, hours(0, 24)), hours(10, 12));
-        expedition.assignStaff(earlyItem, freeWorker);
-        expedition.assignStaff(clashingItem, takenWorker);
-        expedition.submitForReview();
-
-        assertThrows(ResourceUnavailableException.class, () -> expedition.approve(finding(RISKY_DIVE), acceptances()));
-        assertEquals(ExpeditionStatus.IN_REVIEW, expedition.getStatus());
-        assertTrue(expedition.getAcceptedWarnings().isEmpty());
-        assertTrue(freeWorker.isAvailableDuring(hours(6, 8)));
-    }
-
-    private List<AcceptedWarning> acceptances() {
-        return List.of(new AcceptedWarning(RISKY_DIVE, leader, "Both divers are instructors"));
     }
 
     @Test

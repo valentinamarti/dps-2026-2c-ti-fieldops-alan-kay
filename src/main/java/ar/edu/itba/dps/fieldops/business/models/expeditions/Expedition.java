@@ -5,7 +5,6 @@ import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotEditableExcepti
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidTrackingException;
-import ar.edu.itba.dps.fieldops.business.exceptions.ResourceUnavailableException;
 import ar.edu.itba.dps.fieldops.business.exceptions.UnacceptedWarningException;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.DepletableResource;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.Equipment;
@@ -14,7 +13,6 @@ import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
-import ar.edu.itba.dps.fieldops.business.models.resources.Reservation;
 import ar.edu.itba.dps.fieldops.business.models.validation.AcceptedWarning;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
 import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
@@ -104,9 +102,7 @@ public class Expedition {
         if (!result.canBeApproved()) {
             throw new ExpeditionNotApprovableException(result.criticals());
         }
-        final var accepted = result.warnings().stream().map(warning -> acceptanceOf(warning, acceptances)).toList();
-        reserveAssignedResources();
-        acceptedWarnings = accepted;
+        acceptedWarnings = result.warnings().stream().map(warning -> acceptanceOf(warning, acceptances)).toList();
         status = ExpeditionStatus.APPROVED;
     }
 
@@ -165,24 +161,6 @@ public class Expedition {
                 .filter(acceptance -> acceptance.covers(warning) && responsibles.contains(acceptance.responsible()))
                 .findFirst()
                 .orElseThrow(() -> new UnacceptedWarningException(warning));
-    }
-
-    /**
-     * Checks every assigned resource before booking any of them, so a resource taken by another
-     * expedition since the validation ran leaves this one untouched instead of half reserved.
-     */
-    private void reserveAssignedResources() {
-        itinerary.getItems().forEach(this::requireAssignedResourcesAvailable);
-        itinerary.getItems().forEach(item ->
-                item.getAssignedReusableResources().forEach(resource -> resource.reserve(new Reservation(id, item.getScheduledPeriod()))));
-    }
-
-    private void requireAssignedResourcesAvailable(ItineraryItem item) {
-        for (final var resource : item.getAssignedReusableResources()) {
-            if (!resource.isAvailableDuring(item.getScheduledPeriod())) {
-                throw new ResourceUnavailableException(item.getScheduledPeriod());
-            }
-        }
     }
 
     private void transitionTo(ExpeditionStatus next) {
