@@ -2,6 +2,7 @@ package ar.edu.itba.dps.fieldops.business.replanning;
 
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionBuilder;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 
 import java.util.Objects;
@@ -9,7 +10,7 @@ import java.util.stream.Stream;
 
 public class ExpeditionReplanner {
 
-    public Expedition planAlternative(Expedition original, String alternativeId, ItineraryItem affectedItem) {
+    public Expedition planAlternative(Expedition original, ExpeditionId alternativeId, ItineraryItem affectedItem) {
         Objects.requireNonNull(original, "original is required");
         Objects.requireNonNull(affectedItem, "affectedItem is required");
         requireOwnItem(original, affectedItem);

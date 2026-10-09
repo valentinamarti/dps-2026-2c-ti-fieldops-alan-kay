@@ -162,7 +162,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 ### D15 — Entidades por identidad (clases), value objects por valor (`record`)
 
 - **Patrón / principio:** distinción entidad / value object.
-- **Dónde:** clases con identidad: `Person`, `Vehicle`, `Instrument`, `Depletable`, `Zone`, `Activity`, `Expedition`, `ItineraryItem`. `record` con igualdad por valor: `TimePeriod`, `Quantity`, `Certification`, `Certifications`, `Permit`, `ResourceCategory`, `ReusableRequirement`, `DepletableRequirement`, `StaffRequirement`, `ExpeditionRestrictions`, `ValidationResult`, `ApprovalResult`, `AcceptedWarning`.
+- **Dónde:** clases con identidad: `Person`, `Vehicle`, `Instrument`, `Depletable`, `Zone`, `Activity`, `Expedition`, `ItineraryItem`. `record` con igualdad por valor: `ExpeditionId`, `TimePeriod`, `Quantity`, `Certification`, `Certifications`, `Permit`, `ResourceCategory`, `ReusableRequirement`, `DepletableRequirement`, `StaffRequirement`, `ExpeditionRestrictions`, `ValidationResult`, `ApprovalResult`, `AcceptedWarning`.
 - **Por qué:**
   - Las entidades tienen `id` pero **no** redefinen `equals`/`hashCode`: se comparan por identidad de instancia. Dos `Vehicle` con la misma patente son dos vehículos distintos del catálogo, y cada uno tiene su propio `AvailabilityCalendar` (D9) — igualarlos por `id` haría que reservar uno pareciera reservar al otro.
   - De ahí se apoya `Activity.dependsOn`: una dependencia apunta a *esa* actividad concreta, no a "cualquier actividad que se llame igual".
@@ -177,12 +177,12 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 ### D16 — Guards de argumentos compartidos, en un solo lugar
 
 - **Patrón / principio:** fail fast + DRY.
-- **Dónde:** `DomainArguments` (`requireText`, `requireSet`, `requireList`, `requireNotEmpty`), usado por `Person`, `Vehicle`, `Instrument`, `Depletable`, `Zone`, `Activity`, `Expedition`, `Certification`, `Certifications`, `Permit`, `ResourceCategory` y `StaffRequirement`.
+- **Dónde:** `DomainArguments` (`requireText`, `requireSet`, `requireList`, `requireNotEmpty`), usado por `Person`, `Vehicle`, `Instrument`, `Depletable`, `Zone`, `Activity`, `Expedition`, `Certification`, `Certifications`, `Permit`, `ResourceCategory`, `StaffRequirement` y `ExpeditionId`.
 - **Por qué:** antes cada clase validaba distinto. Cuatro rechazaban un `id` en blanco y cinco lo aceptaban, así que `new Person("", "Ana", Set.of())` construía una persona sin identidad que recién iba a romper mucho después. Y las colecciones nulas fallaban dentro de `Set.copyOf`, con el mensaje interno del JDK (`Cannot invoke "java.util.Collection.isEmpty()" because "coll" is null`) en vez de decir qué campo faltaba. Ahora la regla vive en una sola clase: un texto obligatorio no puede ser nulo ni estar en blanco, y una colección obligatoria no puede ser nula y siempre se copia a una versión inmutable.
 - **Sobre los tipos de excepción:** un texto mal formado es `IllegalArgumentException` (el argumento llegó, pero no sirve); una colaboración ausente es `NullPointerException` con el nombre del campo, que es la semántica de `Objects.requireNonNull` y la que ya usaban `Activity` y `Depletable` para sus colaboradores. Se mantuvo esa división en vez de unificar todo en una sola, para no cambiar el comportamiento ya testeado.
 - **Alternativas descartadas:**
   - Repetir el guard privado que tenía `Activity` en cada clase: el mismo bloque duplicado en nueve lugares, y la garantía de que la próxima clase se olvide de alguna rama.
-  - Reificar el identificador en un value object (`ResourceId`), que es lo que hace D8 con `Certification` y `Permit`: es el camino más OO y queda abierto, pero hoy un `id` no tiene ninguna regla propia más allá de "no está vacío" — sería un tipo nuevo por cada entidad sin comportamiento que justifique el costo de tocar todas las firmas. Se reconsidera si los ids ganan reglas (formato, unicidad dentro del catálogo).
+  - Reificar el identificador en un value object (`ResourceId`), que es lo que hace D8 con `Certification` y `Permit`: es el camino más OO y queda abierto, pero hoy un `id` no tiene ninguna regla propia más allá de "no está vacío" — sería un tipo nuevo por cada entidad sin comportamiento que justifique el costo de tocar todas las firmas. Se reconsidera si los ids ganan reglas (formato, unicidad dentro del catálogo). Aplicado para la expedición en D26.
 - **Consecuencia:** `DomainArguments` es una clase de métodos estáticos, que no es orientada a objetos. Se acepta porque es exactamente el rol de `Objects.requireNonNull` en la biblioteca estándar: una precondición, no una responsabilidad del dominio. Si crece más allá de guards de argumentos, es señal de que hay un concepto sin reificar.
 
 
@@ -299,7 +299,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 ### D25 — Replanificación: reutilizar el builder para construir una alternativa en borrador
 
 - **Patrón / principio:** reutilización de Builder (D3) y de las puertas ya existentes (D19, D21) en vez de una regla nueva.
-- **Dónde:** `ExpeditionReplanner` (en `business.replanning`), único método `planAlternative(Expedition original, String alternativeId, ItineraryItem affectedItem)`.
+- **Dónde:** `ExpeditionReplanner` (en `business.replanning`), único método `planAlternative(Expedition original, ExpeditionId alternativeId, ItineraryItem affectedItem)`.
 - **Por qué:**
   - D20 ya había decidido que una expedición aprobada no vuelve a borrador: si hay que cambiarla, se construye una alternativa. Esta clase es esa construcción: arma un `ExpeditionBuilder` con los datos generales de la original (objetivos, zonas, responsables, restricciones, permisos), agenda de nuevo cada ítem salvo el afectado y copia sus asignaciones. El resultado es una `Expedition` nueva en borrador.
   - Cancelación, indisponibilidad y retraso —los tres motivos que pide el enunciado— no necesitan un método por caso: las tres se resuelven con el mismo primitivo, "sacar el ítem afectado del plan y dejarlo en borrador". Para una cancelación, el responsable no vuelve a agendar esa actividad; para un retraso, la reagenda en otro horario con `schedule` (D21); para una indisponibilidad, la reagenda y asigna otro recurso con `assignStaff`/`assignEquipment`/`assignSupply` (D19). Ningún caso pide una heurística de reprogramación automática, así que no hace falta una por motivo.
@@ -310,6 +310,16 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - Reagendar automáticamente la actividad afectada eligiendo horario y recursos — el enunciado pide "construir una alternativa" para que un responsable la ajuste, no un algoritmo de reprogramación; además duplicaría la lógica de asignación (D18) sin un criterio de selección definido por el enunciado.
   - Guardar el motivo de la replanificación en `Expedition` — hoy ninguna regla ni informe lo consume, mismo criterio que los objetivos como texto libre (D16); se agrega si aparece un caso concreto que lo necesite.
 - **Consecuencia:** si el ítem afectado tiene dependientes ya agendados, `planAlternative` falla en vez de dejarlos huérfanos o quitarlos en cascada; quien replanifica tiene que decidir explícitamente qué hacer con ellos primero.
+
+
+### D26 — El id de la expedición como value object (corrección de la Entrega 1)
+
+- **Origen:** corrección de la Entrega 1, punto 5 (el id de la expedición lo inventa el cliente). Evaluamos la sugerencia del informe (que el id lo genere el sistema) y vamos a seguirla. Este primer paso convierte el id en un value object, que es lo que D16 preveía cuando un id ganara reglas propias. La generación es el paso siguiente.
+- **Patrón / principio:** value object (D8).
+- **Dónde:** `ExpeditionId`, usado por `Expedition`, `ExpeditionBuilder.withId` y `ExpeditionReplanner.planAlternative`.
+- **Por qué:** las próximas correcciones se apoyan en este id (una reserva sabe qué expedición la hizo, una alternativa sabe a cuál reemplaza). Con un `String` suelto se puede pasar el id de un recurso donde va el de una expedición; con `ExpeditionId` el compilador lo rechaza. Como `record`, compara por valor (D15). Un valor en blanco falla en el propio id y uno nulo en `Expedition`, con la división de excepciones de D16. `toString()` devuelve solo el valor, para que los mensajes digan `e-1`.
+- **Alternativas descartadas:** dejar el `String` y controlar solo la unicidad — no evita confundirlo con otro id.
+- **Consecuencia:** el id todavía lo elige quien construye la expedición (`withId`), así que dos expediciones pueden repetirlo hasta el paso siguiente.
 
 ## Patrones que decidimos no aplicar
 

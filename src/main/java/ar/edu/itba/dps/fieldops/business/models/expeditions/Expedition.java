@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 public class Expedition {
 
     @Getter
-    private final String id;
+    private final ExpeditionId id;
     @Getter
     private final String name;
     @Getter
@@ -51,9 +51,9 @@ public class Expedition {
     @Getter
     private List<AcceptedWarning> acceptedWarnings = List.of();
 
-    Expedition(String id, String name, TimePeriod period, List<String> objectives, Set<Zone> zones,
+    Expedition(ExpeditionId id, String name, TimePeriod period, List<String> objectives, Set<Zone> zones,
                Set<Person> responsibles, ExpeditionRestrictions restrictions, Set<Permit> grantedPermits) {
-        this.id = DomainArguments.requireText(id, "id");
+        this.id = Objects.requireNonNull(id, "id is required");
         this.name = DomainArguments.requireText(name, "name");
         this.period = Objects.requireNonNull(period, "period is required");
         this.objectives = DomainArguments.requireNonEmptyList(objectives, "objectives");

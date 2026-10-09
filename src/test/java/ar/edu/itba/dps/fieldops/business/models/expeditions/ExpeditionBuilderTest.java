@@ -54,6 +54,11 @@ class ExpeditionBuilderTest {
     }
 
     @Test
+    void rejectsAnExpeditionWithoutId() {
+        assertThrows(NullPointerException.class, () -> expeditionIn(coast, leader).withId(null).build());
+    }
+
+    @Test
     void rejectsAnExpeditionWithoutNamePeriodOrRestrictions() {
         assertThrows(IllegalArgumentException.class, () -> expeditionIn(coast, leader).withName(" ").build());
         assertThrows(NullPointerException.class, () -> expeditionIn(coast, leader).withPeriod(null).build());
@@ -62,11 +67,11 @@ class ExpeditionBuilderTest {
 
     @Test
     void rejectsAnExpeditionWithoutObjectivesZonesOrResponsibles() {
-        final var withoutObjectives = new ExpeditionBuilder().withId("e-1").withName("Survey").withPeriod(hours(0, 24))
+        final var withoutObjectives = new ExpeditionBuilder().withId(new ExpeditionId("e-1")).withName("Survey").withPeriod(hours(0, 24))
                 .withRestrictions(RESTRICTIONS).addZone(coast).addResponsible(leader);
-        final var withoutZones = new ExpeditionBuilder().withId("e-1").withName("Survey").withPeriod(hours(0, 24))
+        final var withoutZones = new ExpeditionBuilder().withId(new ExpeditionId("e-1")).withName("Survey").withPeriod(hours(0, 24))
                 .withRestrictions(RESTRICTIONS).addObjective("Map the reef").addResponsible(leader);
-        final var withoutResponsibles = new ExpeditionBuilder().withId("e-1").withName("Survey").withPeriod(hours(0, 24))
+        final var withoutResponsibles = new ExpeditionBuilder().withId(new ExpeditionId("e-1")).withName("Survey").withPeriod(hours(0, 24))
                 .withRestrictions(RESTRICTIONS).addObjective("Map the reef").addZone(coast);
 
         assertThrows(IllegalArgumentException.class, withoutObjectives::build);

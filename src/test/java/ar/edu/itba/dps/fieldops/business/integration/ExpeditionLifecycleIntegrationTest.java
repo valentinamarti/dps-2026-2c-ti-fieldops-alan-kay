@@ -9,6 +9,7 @@ import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionBuilder;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionRestrictions;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Incident;
@@ -95,7 +96,7 @@ class ExpeditionLifecycleIntegrationTest {
 
     private Expedition draft() {
         return new ExpeditionBuilder()
-                .withId("e-1")
+                .withId(new ExpeditionId("e-1"))
                 .withName("Reef survey")
                 .withPeriod(hours(0, 24))
                 .addObjective("Map the reef and collect water samples")
@@ -162,7 +163,7 @@ class ExpeditionLifecycleIntegrationTest {
     @Test
     void anExpeditionMissingPermitsAndResourcesCannotBeApproved() {
         final var expedition = new ExpeditionBuilder()
-                .withId("e-2")
+                .withId(new ExpeditionId("e-2"))
                 .withName("Unprepared dive")
                 .withPeriod(hours(0, 24))
                 .addObjective("Dive without a permit")

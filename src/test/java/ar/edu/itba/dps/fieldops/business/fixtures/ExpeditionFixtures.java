@@ -5,6 +5,7 @@ import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionBuilder;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionRestrictions;
 import ar.edu.itba.dps.fieldops.business.models.resources.Certification;
 import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
@@ -63,7 +64,7 @@ public final class ExpeditionFixtures {
 
     public static ExpeditionBuilder expeditionIn(Zone zone, Person responsible) {
         return new ExpeditionBuilder()
-                .withId("e-1")
+                .withId(new ExpeditionId("e-1"))
                 .withName("Coastal survey")
                 .withPeriod(hours(0, 24))
                 .addObjective("Map the coastal reef")

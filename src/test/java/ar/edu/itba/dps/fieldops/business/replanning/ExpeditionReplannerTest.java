@@ -1,6 +1,7 @@
 package ar.edu.itba.dps.fieldops.business.replanning;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
@@ -33,7 +34,7 @@ class ExpeditionReplannerTest {
         final var worker = person("p-2");
         expedition.assignStaff(keptItem, worker);
 
-        final var alternative = replanner.planAlternative(expedition, "e-1-alt", affectedItem);
+        final var alternative = replanner.planAlternative(expedition, new ExpeditionId("e-1-alt"), affectedItem);
 
         assertEquals(ExpeditionStatus.DRAFT, alternative.getStatus());
         assertEquals(1, alternative.getItinerary().getItems().size());
@@ -49,7 +50,7 @@ class ExpeditionReplannerTest {
         final var foreignItem = otherExpedition.schedule(sampling("a-1", coast, hours(8, 18)), hours(9, 11));
 
         assertThrows(IllegalArgumentException.class,
-                () -> replanner.planAlternative(expedition, "e-1-alt", foreignItem));
+                () -> replanner.planAlternative(expedition, new ExpeditionId("e-1-alt"), foreignItem));
     }
 
     @Test
@@ -61,6 +62,6 @@ class ExpeditionReplannerTest {
         expedition.schedule(dependent, hours(12, 14));
 
         assertThrows(InvalidScheduleException.class,
-                () -> replanner.planAlternative(expedition, "e-1-alt", affectedItem));
+                () -> replanner.planAlternative(expedition, new ExpeditionId("e-1-alt"), affectedItem));
     }
 }

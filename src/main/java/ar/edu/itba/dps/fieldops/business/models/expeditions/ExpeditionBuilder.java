@@ -18,12 +18,12 @@ public class ExpeditionBuilder {
     private final Set<Person> responsibles = new HashSet<>();
     private final Set<Permit> grantedPermits = new HashSet<>();
     private final List<PlannedActivity> plannedActivities = new ArrayList<>();
-    private String id;
+    private ExpeditionId id;
     private String name;
     private TimePeriod period;
     private ExpeditionRestrictions restrictions;
 
-    public ExpeditionBuilder withId(String id) {
+    public ExpeditionBuilder withId(ExpeditionId id) {
         this.id = id;
         return this;
     }
