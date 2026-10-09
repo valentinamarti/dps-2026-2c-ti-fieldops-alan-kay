@@ -17,7 +17,7 @@ public class ResourceOverlapValidation implements ValidationRule {
         for (int i = 0; i < items.size(); i++) {
             final var item = items.get(i);
             items.subList(i + 1, items.size()).forEach(later -> results.addAll(sharedResources(item, later)));
-            results.addAll(alreadyBookedResources(item));
+            results.addAll(unavailableResources(item));
         }
         return results;
     }
@@ -33,10 +33,10 @@ public class ResourceOverlapValidation implements ValidationRule {
                 .toList();
     }
 
-    private List<ValidationResult> alreadyBookedResources(ItineraryItem item) {
+    private List<ValidationResult> unavailableResources(ItineraryItem item) {
         return item.getAssignedReusableResources().stream()
                 .filter(resource -> !resource.isAvailableDuring(item.getScheduledPeriod()))
-                .map(resource -> ValidationResult.critical("%s is already booked during %s"
+                .map(resource -> ValidationResult.critical("%s is not available during %s"
                         .formatted(resource.getId(), item.getActivity().getName())))
                 .toList();
     }

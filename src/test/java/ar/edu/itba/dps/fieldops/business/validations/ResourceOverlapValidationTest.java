@@ -5,6 +5,7 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.resources.Reservation;
+import ar.edu.itba.dps.fieldops.business.models.resources.Unavailability;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import org.junit.jupiter.api.Test;
@@ -55,7 +56,16 @@ class ResourceOverlapValidationTest {
         worker.reserve(new Reservation(ANOTHER_EXPEDITION, hours(10, 11)));
         scheduleWithWorker("a-1", hours(9, 11));
 
-        final var expected = ValidationResult.critical("p-2 is already booked during Sampling a-1");
+        final var expected = ValidationResult.critical("p-2 is not available during Sampling a-1");
+        assertEquals(List.of(expected), validation.validate(expedition));
+    }
+
+    @Test
+    void flagsAResourceThatIsUnavailable() {
+        worker.markUnavailable(new Unavailability(hours(10, 11), "Medical leave"));
+        scheduleWithWorker("a-1", hours(9, 11));
+
+        final var expected = ValidationResult.critical("p-2 is not available during Sampling a-1");
         assertEquals(List.of(expected), validation.validate(expedition));
     }
 }

@@ -54,4 +54,9 @@ public class Vehicle implements Equipment, Certifiable {
     public void releaseAll(ExpeditionId owner) {
         calendar.releaseAll(owner);
     }
+
+    @Override
+    public void markUnavailable(Unavailability unavailability) {
+        calendar.markUnavailable(unavailability);
+    }
 }

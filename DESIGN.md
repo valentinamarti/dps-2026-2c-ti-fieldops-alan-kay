@@ -162,7 +162,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 ### D15 — Entidades por identidad (clases), value objects por valor (`record`)
 
 - **Patrón / principio:** distinción entidad / value object.
-- **Dónde:** clases con identidad: `Person`, `Vehicle`, `Instrument`, `Depletable`, `Zone`, `Activity`, `Expedition`, `ItineraryItem`. `record` con igualdad por valor: `ExpeditionId`, `Reservation`, `TimePeriod`, `Quantity`, `Certification`, `Certifications`, `Permit`, `ResourceCategory`, `ReusableRequirement`, `DepletableRequirement`, `StaffRequirement`, `ExpeditionRestrictions`, `ValidationResult`, `ApprovalResult`, `AcceptedWarning`.
+- **Dónde:** clases con identidad: `Person`, `Vehicle`, `Instrument`, `Depletable`, `Zone`, `Activity`, `Expedition`, `ItineraryItem`. `record` con igualdad por valor: `ExpeditionId`, `Reservation`, `Unavailability`, `TimePeriod`, `Quantity`, `Certification`, `Certifications`, `Permit`, `ResourceCategory`, `ReusableRequirement`, `DepletableRequirement`, `StaffRequirement`, `ExpeditionRestrictions`, `ValidationResult`, `ApprovalResult`, `AcceptedWarning`.
 - **Por qué:**
   - Las entidades tienen `id` pero **no** redefinen `equals`/`hashCode`: se comparan por identidad de instancia. Dos `Vehicle` con la misma patente son dos vehículos distintos del catálogo, y cada uno tiene su propio `AvailabilityCalendar` (D9) — igualarlos por `id` haría que reservar uno pareciera reservar al otro.
   - De ahí se apoya `Activity.dependsOn`: una dependencia apunta a *esa* actividad concreta, no a "cualquier actividad que se llame igual".
@@ -321,19 +321,22 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 - **Alternativas descartadas:** dejar el `String` y controlar solo la unicidad — no evita confundirlo con otro id.
 
 
-### D27 — Reservas con dueño, liberables y todo o nada (corrección de la Entrega 1)
+### D27 — Reservas con dueño, liberables y todo o nada; indisponibilidades aparte (corrección de la Entrega 1)
 
-- **Origen:** corrección de la Entrega 1, punto 1 (las reservas no tienen dueño y no se pueden liberar). Evaluamos la sugerencia del informe (que la reserva tenga dueño, `Reservation(expeditionId, period)`, que se pueda liberar lo de una expedición y que chequear y reservar sea una sola operación de un servicio) y la seguimos.
+- **Origen:** corrección de la Entrega 1, punto 1 (las reservas no tienen dueño y no se pueden liberar; tampoco se distingue una reserva de una indisponibilidad, como una licencia o un mantenimiento). Evaluamos la sugerencia del informe (que la reserva tenga dueño, `Reservation(expeditionId, period)`, que se pueda liberar lo de una expedición y que chequear y reservar sea una sola operación de un servicio) y la seguimos.
 - **Patrón / principio:** value object (D8) + Information Expert (el calendario es el registro de compromisos, así que es quien libera) + servicio de dominio para la operación que toca varios recursos a la vez.
-- **Dónde:** `Reservation(ExpeditionId, TimePeriod)` en `business.models.resources`; `AvailabilityCalendar.book(Reservation)` y `releaseAll(ExpeditionId)`; `ReusableResource.reserve(Reservation)` y `releaseAll(ExpeditionId)`; `ResourceReservations.requireReservable(Expedition)` y `reserveFor(Expedition)` en `business.services`, invocados desde el caso de uso `ApproveExpedition` (D28).
+- **Dónde:** `Reservation(ExpeditionId, TimePeriod)` y `Unavailability(TimePeriod, reason)` en `business.models.resources`; `AvailabilityCalendar.book(Reservation)`, `releaseAll(ExpeditionId)` y `markUnavailable(Unavailability)`; `ReusableResource.reserve(Reservation)`, `releaseAll(ExpeditionId)` y `markUnavailable(Unavailability)`; `ResourceReservations.requireReservable(Expedition)` y `reserveFor(Expedition)` en `business.services`, invocados desde el caso de uso `ApproveExpedition` (D28).
 - **Por qué:**
   - Reservar es comprometer un recurso *para alguien*. El calendario guardaba `TimePeriod` sueltos, así que no podía responder de quién era una franja ni deshacerla cuando esa expedición ya no la necesitaba. Con el dueño en la reserva, `releaseAll` libera exactamente lo de una expedición y deja intacto lo de las demás. Liberar una expedición que no tiene reservas no es un error (mismo criterio que repetir una asignación, D19).
   - La regla de disponibilidad no cambia: una franja reservada no está libre para nadie, sin importar quién la reservó.
+  - Una indisponibilidad (licencia, mantenimiento) también ocupa el calendario, pero no es un compromiso con una expedición: no tiene dueño, liberar una expedición no la levanta, y lleva su motivo. Registrarla nunca falla, aunque pise una reserva existente, porque es algo que pasó y no un pedido; la validación de superposición la reporta como recurso no disponible (`"... is not available during ..."`).
   - Aprobar reserva varios recursos de una vez, y antes una falla a mitad de camino dejaba reservada una parte. `ResourceReservations` arma todos los compromisos de la expedición, los verifica contra los calendarios **y entre sí** (dos ítems propios que comparten un recurso en horarios superpuestos), y recién si todo da, reserva. Si algo falla, no reserva nada.
   - `requireReservable` hace la misma verificación sin reservar, para que el caso de uso pueda comprobar que todo se puede reservar antes de aprobar.
 - **Alternativas descartadas:**
   - Guardar en `Expedition` qué recursos reservó — repartiría el registro de compromisos entre dos objetos que se pueden desincronizar, y el informe señala justamente que el calendario tiene que ser ese registro.
   - Liberar por período (`release(TimePeriod)`) — no distingue de quién es la franja, que es justamente lo que faltaba.
+  - Modelar la indisponibilidad como una `Reservation` con un dueño ficticio — mezclaría dos conceptos y un `releaseAll` de ese dueño la levantaría.
+  - Rechazar una indisponibilidad que pisa una reserva — impediría registrar lo que realmente pasó, mismo criterio que D23 con los retrasos.
   - Reservar de a uno y, si algo falla, liberar lo reservado — deja un momento en que el recurso figura ocupado y depende de que la vuelta atrás no falle.
   - Que `Expedition.approve` reciba el servicio y reserve adentro — volvería a poner en la entidad una operación que modifica varios recursos, que es la causa que señaló el informe.
 

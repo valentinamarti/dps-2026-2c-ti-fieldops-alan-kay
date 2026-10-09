@@ -77,4 +77,13 @@ class ReusableResourceTest {
 
         assertTrue(resource.isAvailableDuring(MORNING));
     }
+
+    @ParameterizedTest
+    @MethodSource("resources")
+    void isNotAvailableWhileMarkedUnavailable(ReusableResource resource) {
+        resource.markUnavailable(new Unavailability(MORNING, "Maintenance"));
+
+        assertFalse(resource.isAvailableDuring(hours(11, 14)));
+        assertTrue(resource.isAvailableDuring(hours(12, 16)));
+    }
 }

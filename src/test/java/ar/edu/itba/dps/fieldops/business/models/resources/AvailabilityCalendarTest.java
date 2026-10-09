@@ -85,6 +85,34 @@ class AvailabilityCalendarTest {
     }
 
     @Test
+    void anUnavailablePeriodIsNotFreeAndCannotBeBooked() {
+        calendar.markUnavailable(new Unavailability(hours(8, 12), "Maintenance"));
+
+        assertFalse(calendar.isFreeDuring(hours(10, 11)));
+        assertThrows(ResourceUnavailableException.class, () -> calendar.book(bookedByAnExpedition(10, 11)));
+    }
+
+    @Test
+    void aResourceCanBecomeUnavailableDuringAPeriodItWasAlreadyBookedFor() {
+        calendar.book(bookedByAnExpedition(8, 12));
+
+        calendar.markUnavailable(new Unavailability(hours(10, 11), "Medical leave"));
+
+        assertFalse(calendar.isFreeDuring(hours(10, 11)));
+    }
+
+    @Test
+    void releasingAnExpeditionDoesNotLiftAnUnavailability() {
+        calendar.book(bookedByAnExpedition(8, 10));
+        calendar.markUnavailable(new Unavailability(hours(14, 16), "Maintenance"));
+
+        calendar.releaseAll(AN_EXPEDITION);
+
+        assertTrue(calendar.isFreeDuring(hours(8, 10)));
+        assertFalse(calendar.isFreeDuring(hours(14, 16)));
+    }
+
+    @Test
     void bookingAnOverlappingPeriodIsRejectedAndLeavesTheCalendarUntouched() {
         calendar.book(bookedByAnExpedition(8, 12));
 
