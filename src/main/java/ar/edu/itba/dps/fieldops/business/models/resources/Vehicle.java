@@ -3,14 +3,12 @@ package ar.edu.itba.dps.fieldops.business.models.resources;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.Certifiable;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.Equipment;
 import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
-import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
-import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import lombok.Getter;
 
 import java.util.Objects;
 import java.util.Set;
 
-public class Vehicle implements Equipment, Certifiable {
+public class Vehicle extends ScheduledResource implements Equipment, Certifiable {
 
     @Getter
     private final String id;
@@ -20,7 +18,6 @@ public class Vehicle implements Equipment, Certifiable {
     private final String licensePlate;
     private final ResourceCategory category;
     private final Certifications certifications;
-    private final AvailabilityCalendar calendar = new AvailabilityCalendar();
 
     public Vehicle(String id, String name, ResourceCategory category, String licensePlate, Set<Certification> certifications) {
         this.id = DomainArguments.requireText(id, "id");
@@ -38,25 +35,5 @@ public class Vehicle implements Equipment, Certifiable {
     @Override
     public boolean hasCertification(Certification certification) {
         return certifications.includes(certification);
-    }
-
-    @Override
-    public boolean isAvailableDuring(TimePeriod period) {
-        return calendar.isFreeDuring(period);
-    }
-
-    @Override
-    public void reserve(Reservation reservation) {
-        calendar.book(reservation);
-    }
-
-    @Override
-    public void releaseAll(ExpeditionId owner) {
-        calendar.releaseAll(owner);
-    }
-
-    @Override
-    public void markUnavailable(Unavailability unavailability) {
-        calendar.markUnavailable(unavailability);
     }
 }
