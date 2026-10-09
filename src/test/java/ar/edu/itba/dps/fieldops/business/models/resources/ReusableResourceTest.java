@@ -67,4 +67,14 @@ class ReusableResourceTest {
 
         assertThrows(ResourceUnavailableException.class, () -> resource.reserve(new Reservation(ANOTHER_EXPEDITION, hours(10, 11))));
     }
+
+    @ParameterizedTest
+    @MethodSource("resources")
+    void isAvailableAgainOnceTheExpeditionThatBookedItReleasesIt(ReusableResource resource) {
+        resource.reserve(new Reservation(ANOTHER_EXPEDITION, MORNING));
+
+        resource.releaseAll(ANOTHER_EXPEDITION);
+
+        assertTrue(resource.isAvailableDuring(MORNING));
+    }
 }

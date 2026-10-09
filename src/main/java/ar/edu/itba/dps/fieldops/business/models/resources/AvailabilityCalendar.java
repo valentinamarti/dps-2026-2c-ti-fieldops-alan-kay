@@ -2,6 +2,7 @@ package ar.edu.itba.dps.fieldops.business.models.resources;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.ResourceUnavailableException;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,5 +22,10 @@ public class AvailabilityCalendar {
             throw new ResourceUnavailableException(reservation.period());
         }
         reservations.add(reservation);
+    }
+
+    public void releaseAll(ExpeditionId owner) {
+        Objects.requireNonNull(owner, "owner is required");
+        reservations.removeIf(reservation -> reservation.isOwnedBy(owner));
     }
 }

@@ -20,6 +20,7 @@ import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
 import ar.edu.itba.dps.fieldops.business.models.validation.AcceptedWarning;
 import ar.edu.itba.dps.fieldops.business.models.validation.Severity;
+import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
 import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.reports.ExpeditionReporter;
@@ -61,8 +62,6 @@ class ExpeditionLifecycleIntegrationTest {
 
     private final Zone reef = new Zone("z-1", "Protected reef", java.util.Set.of(MARINE_RESERVE));
     private final Person leader = person("p-1", DIVING);
-    private final Person secondDiver = person("p-2", DIVING);
-    private final Person fieldWorker = person("p-3");
     private final Depletable fuel = supply("d-1", "Fuel", Quantity.of("100", LITERS));
     private final Depletable jars = supply("d-2", "Sample container", Quantity.of("20", UNITS));
 
@@ -84,7 +83,9 @@ class ExpeditionLifecycleIntegrationTest {
 
     ExpeditionLifecycleIntegrationTest() {
         catalog.addStaff(leader);
+        Person secondDiver = person("p-2", DIVING);
         catalog.addStaff(secondDiver);
+        Person fieldWorker = person("p-3");
         catalog.addStaff(fieldWorker);
         catalog.addEquipment(vehicle("v-1", "Boat"));
         catalog.addEquipment(instrument("i-1", "Oxygen tank"));
@@ -175,9 +176,9 @@ class ExpeditionLifecycleIntegrationTest {
         expedition.submitForReview();
 
         final var result = validator.validate(expedition);
-        final var messages = result.criticals().stream().map(critical -> critical.message()).toList();
-        assertTrue(messages.stream().anyMatch(message -> message.contains("Marine reserve access")), () -> messages.toString());
-        assertTrue(messages.stream().anyMatch(message -> message.contains("staff")), () -> messages.toString());
+        final var messages = result.criticals().stream().map(ValidationResult::message).toList();
+        assertTrue(messages.stream().anyMatch(message -> message.contains("Marine reserve access")), messages::toString);
+        assertTrue(messages.stream().anyMatch(message -> message.contains("staff")), messages::toString);
         assertFalse(result.canBeApproved());
 
         assertThrows(ExpeditionNotApprovableException.class, () -> expedition.approve(validator, List.of()));

@@ -4,6 +4,7 @@ import ar.edu.itba.dps.fieldops.business.interfaces.resources.Certifiable;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.Equipment;
 import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import lombok.Getter;
 
 import java.util.Objects;
@@ -47,5 +48,10 @@ public class Vehicle implements Equipment, Certifiable {
     @Override
     public void reserve(Reservation reservation) {
         calendar.book(reservation);
+    }
+
+    @Override
+    public void releaseAll(ExpeditionId owner) {
+        calendar.releaseAll(owner);
     }
 }

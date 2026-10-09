@@ -314,22 +314,20 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 
 ### D26 — El id de la expedición como value object (corrección de la Entrega 1)
 
-- **Origen:** corrección de la Entrega 1, punto 5 (el id de la expedición lo inventa el cliente). Evaluamos la sugerencia del informe (que el id lo genere el sistema) y vamos a seguirla. Este primer paso convierte el id en un value object, que es lo que D16 preveía cuando un id ganara reglas propias. La generación es el paso siguiente.
+- **Origen:** corrección de la Entrega 1, punto 5 (el id de la expedición lo inventa el cliente). Evaluamos el hallazgo y convertimos el id en un value object, que es lo que D16 preveía cuando un id ganara reglas propias.
 - **Patrón / principio:** value object (D8).
 - **Dónde:** `ExpeditionId`, usado por `Expedition`, `ExpeditionBuilder.withId` y `ExpeditionReplanner.planAlternative`.
-- **Por qué:** las próximas correcciones se apoyan en este id (una reserva sabe qué expedición la hizo, una alternativa sabe a cuál reemplaza). Con un `String` suelto se puede pasar el id de un recurso donde va el de una expedición; con `ExpeditionId` el compilador lo rechaza. Como `record`, compara por valor (D15). Un valor en blanco falla en el propio id y uno nulo en `Expedition`, con la división de excepciones de D16. `toString()` devuelve solo el valor, para que los mensajes digan `e-1`.
+- **Por qué:** las reservas usan este id para saber qué expedición las hizo (D27). Con un `String` suelto se puede pasar el id de un recurso donde va el de una expedición; con `ExpeditionId` el compilador lo rechaza. Como `record`, compara por valor (D15). Un valor en blanco falla en el propio id y uno nulo en `Expedition`, con la división de excepciones de D16. `toString()` devuelve solo el valor, para que los mensajes digan `e-1`.
 - **Alternativas descartadas:** dejar el `String` y controlar solo la unicidad — no evita confundirlo con otro id.
-- **Consecuencia:** el id todavía lo elige quien construye la expedición (`withId`), así que dos expediciones pueden repetirlo hasta el paso siguiente.
 
 
-### D27 — Una reserva sabe para qué expedición es (corrección de la Entrega 1)
+### D27 — Reservas con dueño, que se pueden liberar (corrección de la Entrega 1)
 
-- **Origen:** corrección de la Entrega 1, punto 1 (las reservas no tienen dueño y no se pueden liberar). Evaluamos la sugerencia del informe (`Reservation(expeditionId, period)`, liberar por expedición y reservar todo o nada) y la seguimos. Este primer paso le da dueño a la reserva; liberar y reservar todo o nada son los pasos siguientes.
-- **Patrón / principio:** value object (D8).
-- **Dónde:** `Reservation(ExpeditionId, TimePeriod)` en `business.models.resources`; `AvailabilityCalendar.book(Reservation)` y `ReusableResource.reserve(Reservation)`. Al aprobar, `Expedition` reserva a nombre de su propio id (D26).
-- **Por qué:** reservar es comprometer un recurso *para alguien*. El calendario guardaba `TimePeriod` sueltos, así que no podía responder de quién era una franja ni deshacerla cuando esa expedición ya no la necesitaba (aprobación fallida, cancelación, reemplazo). Con el dueño en la reserva, eso pasa a ser una pregunta que el calendario puede contestar. La regla de disponibilidad no cambia: una franja reservada no está libre para nadie, sin importar quién la reservó.
-- **Alternativas descartadas:** guardar en `Expedition` qué recursos reservó — repartiría el registro de compromisos entre dos objetos que se pueden desincronizar, y el informe señala justamente que el calendario tiene que ser ese registro.
-- **Consecuencia:** el dueño todavía no se usa para nada observable. Las reservas huérfanas que muestra el informe siguen pasando hasta que se pueda liberar (paso siguiente) y reservar todo o nada.
+- **Origen:** corrección de la Entrega 1, punto 1 (las reservas no tienen dueño y no se pueden liberar). Evaluamos la sugerencia del informe (que la reserva tenga dueño, `Reservation(expeditionId, period)`, y que se pueda liberar lo de una expedición) y la seguimos.
+- **Patrón / principio:** value object (D8) + Information Expert (el calendario es el registro de compromisos, así que es quien libera).
+- **Dónde:** `Reservation(ExpeditionId, TimePeriod)` en `business.models.resources`; `AvailabilityCalendar.book(Reservation)` y `releaseAll(ExpeditionId)`; `ReusableResource.reserve(Reservation)` y `releaseAll(ExpeditionId)`. Al aprobar, `Expedition` reserva a nombre de su propio id (D26).
+- **Por qué:** reservar es comprometer un recurso *para alguien*. El calendario guardaba `TimePeriod` sueltos, así que no podía responder de quién era una franja ni deshacerla cuando esa expedición ya no la necesitaba (aprobación fallida, cancelación, reemplazo). Con el dueño en la reserva, `releaseAll` libera exactamente lo de una expedición y deja intacto lo de las demás. La regla de disponibilidad no cambia: una franja reservada no está libre para nadie, sin importar quién la reservó. Liberar una expedición que no tiene reservas no es un error (mismo criterio que repetir una asignación, D19): quien libera no necesita consultar antes.
+- **Alternativas descartadas:** guardar en `Expedition` qué recursos reservó — repartiría el registro de compromisos entre dos objetos que se pueden desincronizar, y el informe señala justamente que el calendario tiene que ser ese registro. Liberar por período (`release(TimePeriod)`) — no distingue de quién es la franja, que es justamente lo que faltaba.
 
 ## Patrones que decidimos no aplicar
 

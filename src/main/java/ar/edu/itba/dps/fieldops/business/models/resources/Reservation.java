@@ -12,6 +12,10 @@ public record Reservation(ExpeditionId owner, TimePeriod period) {
         Objects.requireNonNull(period, "period is required");
     }
 
+    public boolean isOwnedBy(ExpeditionId expedition) {
+        return owner.equals(expedition);
+    }
+
     public boolean overlapsWith(TimePeriod other) {
         return period.overlapsWith(other);
     }

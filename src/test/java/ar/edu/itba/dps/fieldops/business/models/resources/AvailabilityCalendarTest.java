@@ -63,6 +63,28 @@ class AvailabilityCalendarTest {
     }
 
     @Test
+    void releasingAnExpeditionFreesThePeriodsItHadBooked() {
+        calendar.book(bookedByAnExpedition(8, 10));
+        calendar.book(bookedByAnExpedition(14, 16));
+
+        calendar.releaseAll(AN_EXPEDITION);
+
+        assertTrue(calendar.isFreeDuring(hours(8, 16)));
+    }
+
+    @Test
+    void releasingAnExpeditionKeepsThePeriodsBookedByOthers() {
+        final var anotherExpedition = new ExpeditionId("e-2");
+        calendar.book(bookedByAnExpedition(8, 10));
+        calendar.book(new Reservation(anotherExpedition, hours(14, 16)));
+
+        calendar.releaseAll(AN_EXPEDITION);
+
+        assertTrue(calendar.isFreeDuring(hours(8, 10)));
+        assertFalse(calendar.isFreeDuring(hours(14, 16)));
+    }
+
+    @Test
     void bookingAnOverlappingPeriodIsRejectedAndLeavesTheCalendarUntouched() {
         calendar.book(bookedByAnExpedition(8, 12));
 
