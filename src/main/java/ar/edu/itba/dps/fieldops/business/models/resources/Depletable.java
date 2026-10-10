@@ -55,11 +55,15 @@ public class Depletable implements DepletableResource {
     }
 
     @Override
+    public boolean canConsume(ExpeditionId owner, Quantity quantity) {
+        return usableBy(owner).isEnoughFor(quantity);
+    }
+
+    @Override
     public void consume(ExpeditionId owner, Quantity quantity) {
         Objects.requireNonNull(owner, "owner is required");
-        final var usable = availableStock().plus(reservedBy(owner));
-        if (!usable.isEnoughFor(quantity)) {
-            throw new InsufficientStockException(id, usable, quantity);
+        if (!canConsume(owner, quantity)) {
+            throw new InsufficientStockException(id, usableBy(owner), quantity);
         }
         final var fromReservation = reservedBy(owner).isEnoughFor(quantity) ? quantity : reservedBy(owner);
         reserved.computeIfPresent(owner, (expedition, reservation) -> reservation.minus(fromReservation));
@@ -73,6 +77,10 @@ public class Depletable implements DepletableResource {
 
     private Quantity availableStock() {
         return reserved.values().stream().reduce(stock, Quantity::minus);
+    }
+
+    private Quantity usableBy(ExpeditionId owner) {
+        return availableStock().plus(reservedBy(owner));
     }
 
     private Quantity reservedBy(ExpeditionId owner) {

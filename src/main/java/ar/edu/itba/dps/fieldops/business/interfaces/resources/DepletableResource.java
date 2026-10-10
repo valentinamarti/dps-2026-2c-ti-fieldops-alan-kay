@@ -12,6 +12,8 @@ public interface DepletableResource extends Resource, Categorized {
 
     void reserve(ExpeditionId owner, Quantity quantity);
 
+    boolean canConsume(ExpeditionId owner, Quantity quantity);
+
     void consume(ExpeditionId owner, Quantity quantity);
 
     void releaseAll(ExpeditionId owner);

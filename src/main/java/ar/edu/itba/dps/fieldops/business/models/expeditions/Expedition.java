@@ -3,6 +3,7 @@ package ar.edu.itba.dps.fieldops.business.models.expeditions;
 import ar.edu.itba.dps.fieldops.business.exceptions.ActivitiesInProgressException;
 import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotApprovableException;
 import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotEditableException;
+import ar.edu.itba.dps.fieldops.business.exceptions.InsufficientStockException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidTrackingException;
@@ -132,9 +133,10 @@ public class Expedition {
      * Closing an activity consumes what it actually used, so the supplies left reflect the field, not the plan.
      */
     public void finishActivity(ItineraryItem item, LocalDateTime at, String result) {
-        final var tracked = inExecution(item);
-        tracked.startedTracking().finish(at, result);
-        consumeAssignedSupplies(tracked);
+        final var tracking = inExecution(item).startedTracking();
+        tracking.requireCanFinish(at, result);
+        consumeAssignedSupplies(item);
+        tracking.finish(at, result);
     }
 
     public void recordObservation(ItineraryItem item, Observation observation) {
@@ -146,8 +148,15 @@ public class Expedition {
     }
 
     private void consumeAssignedSupplies(ItineraryItem item) {
-        item.getActivity().requiredSupplies().forEach(requirement ->
-                item.supplyFor(requirement).ifPresent(supply -> supply.consume(id, requirement.quantity())));
+        final var demands = item.supplyDemands();
+        demands.forEach(this::requireConsumable);
+        demands.forEach(demand -> demand.supply().consume(id, demand.total()));
+    }
+
+    private void requireConsumable(SupplyDemand demand) {
+        if (!demand.supply().canConsume(id, demand.total())) {
+            throw new InsufficientStockException(demand.supply().getId(), demand.total());
+        }
     }
 
     private ItineraryItem inExecution(ItineraryItem item) {

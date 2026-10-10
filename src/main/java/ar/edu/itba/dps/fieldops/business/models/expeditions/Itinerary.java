@@ -1,15 +1,12 @@
 package ar.edu.itba.dps.fieldops.business.models.expeditions;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
-import ar.edu.itba.dps.fieldops.business.interfaces.resources.DepletableResource;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
-import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
 
@@ -32,13 +29,7 @@ public class Itinerary {
     }
 
     public List<SupplyDemand> supplyDemands() {
-        final var demand = new LinkedHashMap<DepletableResource, List<Quantity>>();
-        items.forEach(item -> item.getActivity().requiredSupplies().forEach(requirement ->
-                item.supplyFor(requirement).ifPresent(supply ->
-                        demand.computeIfAbsent(supply, key -> new ArrayList<>()).add(requirement.quantity()))));
-        return demand.entrySet().stream()
-                .map(entry -> new SupplyDemand(entry.getKey(), entry.getValue()))
-                .toList();
+        return SupplyDemand.combine(items.stream().flatMap(item -> item.supplyDemands().stream()));
     }
 
     ItineraryItem add(Activity activity, TimePeriod scheduledPeriod) {

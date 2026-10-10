@@ -37,7 +37,7 @@ public class ActivityTracking {
         return Collections.unmodifiableList(incidents);
     }
 
-    void finish(LocalDateTime at, String result) {
+    void requireCanFinish(LocalDateTime at, String result) {
         Objects.requireNonNull(at, "finishedAt is required");
         if (isFinished()) {
             throw new InvalidTrackingException("the activity was already finished");
@@ -45,7 +45,12 @@ public class ActivityTracking {
         if (at.isBefore(startedAt)) {
             throw new InvalidTrackingException("an activity cannot finish before it starts");
         }
-        this.result = DomainArguments.requireText(result, "result");
+        DomainArguments.requireText(result, "result");
+    }
+
+    void finish(LocalDateTime at, String result) {
+        requireCanFinish(at, result);
+        this.result = result;
         this.finishedAt = at;
     }
 

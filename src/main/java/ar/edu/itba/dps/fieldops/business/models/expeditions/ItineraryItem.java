@@ -14,6 +14,7 @@ import lombok.Getter;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -68,6 +69,11 @@ public class ItineraryItem {
      */
     public Optional<DepletableResource> supplyFor(DepletableRequirement requirement) {
         return assignedSupplies.stream().filter(requirement::accepts).findFirst();
+    }
+
+    public List<SupplyDemand> supplyDemands() {
+        return SupplyDemand.combine(activity.requiredSupplies().stream().flatMap(requirement ->
+                supplyFor(requirement).stream().map(supply -> new SupplyDemand(supply, List.of(requirement.quantity())))));
     }
 
     public Optional<ActivityTracking> getTracking() {

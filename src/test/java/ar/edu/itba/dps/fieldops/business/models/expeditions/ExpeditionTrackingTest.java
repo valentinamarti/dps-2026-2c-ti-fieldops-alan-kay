@@ -1,15 +1,24 @@
 package ar.edu.itba.dps.fieldops.business.models.expeditions;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.ActivitiesInProgressException;
+import ar.edu.itba.dps.fieldops.business.exceptions.InsufficientStockException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidTrackingException;
+import ar.edu.itba.dps.fieldops.business.interfaces.activities.ActivityRules;
 import ar.edu.itba.dps.fieldops.business.interfaces.validation.ExpeditionValidator;
+import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
+import ar.edu.itba.dps.fieldops.business.models.activities.DepletableRequirement;
+import ar.edu.itba.dps.fieldops.business.models.activities.ReusableRequirement;
+import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
+import ar.edu.itba.dps.fieldops.business.models.activities.StaffRequirement;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
+import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
 import ar.edu.itba.dps.fieldops.business.models.validation.ApprovalResult;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -19,6 +28,7 @@ import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.pers
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.sampling;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.supply;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
+import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.LITERS;
 import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.UNITS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -173,5 +183,74 @@ class ExpeditionTrackingTest {
 
         expedition.startActivity(item, at(12, 0));
         assertTrue(item.startedOutOfSchedule());
+    }
+
+    @Test
+    void aFailedConsumptionLeavesTheActivityInProgressAndTheStockUntouched() {
+        final var scarceExpedition = expeditionIn(coast, person("p-1")).build();
+        final var scarceItem = scarceExpedition.schedule(sampling("a-1", coast, hours(0, 24)), hours(9, 11));
+        final var scarceJars = supply("d-2", "Sample container", Quantity.of("2", UNITS));
+        scarceExpedition.assignSupply(scarceItem, scarceJars);
+        scarceExpedition.submitForReview();
+        scarceExpedition.approve(WITHOUT_PROBLEMS, List.of());
+        scarceExpedition.start();
+        scarceExpedition.startActivity(scarceItem, at(9, 0));
+
+        assertThrows(InsufficientStockException.class,
+                () -> scarceExpedition.finishActivity(scarceItem, at(11, 0), "Samples taken"));
+
+        assertTrue(scarceItem.isInProgress());
+        assertEquals(Quantity.of("2", UNITS), scarceJars.getStock());
+    }
+
+    @Test
+    void anActivityThatCannotConsumeEverySupplyConsumesNone() {
+        final var multiSupplyExpedition = expeditionIn(coast, person("p-1")).build();
+        final var activity = new Activity("a-1", "Survey with boat", hours(0, 24), coast, List.of(), new FuelAndContainersRules());
+        final var multiSupplyItem = multiSupplyExpedition.schedule(activity, hours(9, 11));
+        final var fuel = supply("d-2", "Fuel", Quantity.of("50", LITERS));
+        final var scarceJars = supply("d-3", "Sample container", Quantity.of("2", UNITS));
+        multiSupplyExpedition.assignSupply(multiSupplyItem, fuel);
+        multiSupplyExpedition.assignSupply(multiSupplyItem, scarceJars);
+        multiSupplyExpedition.submitForReview();
+        multiSupplyExpedition.approve(WITHOUT_PROBLEMS, List.of());
+        multiSupplyExpedition.start();
+        multiSupplyExpedition.startActivity(multiSupplyItem, at(9, 0));
+
+        assertThrows(InsufficientStockException.class,
+                () -> multiSupplyExpedition.finishActivity(multiSupplyItem, at(11, 0), "Samples taken"));
+
+        assertEquals(Quantity.of("50", LITERS), fuel.getStock());
+        assertEquals(Quantity.of("2", UNITS), scarceJars.getStock());
+    }
+
+    private static final class FuelAndContainersRules implements ActivityRules {
+
+        @Override
+        public Duration estimatedDuration() {
+            return Duration.ofHours(2);
+        }
+
+        @Override
+        public RiskLevel estimatedRisk() {
+            return RiskLevel.LOW;
+        }
+
+        @Override
+        public List<ReusableRequirement> requiredEquipment() {
+            return List.of();
+        }
+
+        @Override
+        public List<DepletableRequirement> requiredSupplies() {
+            return List.of(
+                    new DepletableRequirement(new ResourceCategory("Fuel"), Quantity.of("20", LITERS)),
+                    new DepletableRequirement(new ResourceCategory("Sample container"), Quantity.of("3", UNITS)));
+        }
+
+        @Override
+        public List<StaffRequirement> requiredStaff() {
+            return List.of();
+        }
     }
 }
