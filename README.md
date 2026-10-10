@@ -42,7 +42,7 @@ src/main/java/ar/edu/itba/dps/fieldops
     │   ├── validation  # ValidationResult, Severity, ApprovalResult, AcceptedWarning
     │   └── zones       # zones and permits
     ├── rules           # ActivityRules implementations, one per activity type
-    ├── validations     # ValidationRule implementations and the ValidationOrchestrator
+    ├── validations     # ValidationRule implementations and the ApprovalPolicy, which always runs the mandatory ones
     ├── estimations     # ExpeditionEstimator
     ├── reports         # ExpeditionReporter
     ├── replanning      # ExpeditionReplanner, builds a draft alternative around an affected item

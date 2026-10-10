@@ -4,9 +4,11 @@ import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionBuilder;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionRestrictions;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.resources.Certification;
 import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
 import ar.edu.itba.dps.fieldops.business.models.resources.Instrument;
@@ -20,6 +22,8 @@ import ar.edu.itba.dps.fieldops.business.rules.SampleCollectionRules;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
+
+import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.UNITS;
 
 public final class ExpeditionFixtures {
 
@@ -60,6 +64,14 @@ public final class ExpeditionFixtures {
 
     public static Activity diving(String id, Zone zone, TimePeriod window, int maxDepthMeters) {
         return new Activity(id, "Diving " + id, window, zone, List.of(), new DivingRules(maxDepthMeters));
+    }
+
+    public static void assignCooler(Expedition expedition, ItineraryItem item) {
+        expedition.assignEquipment(item, instrument("c-" + item.getActivity().getId(), "Cooler"));
+    }
+
+    public static void assignContainers(Expedition expedition, ItineraryItem item) {
+        expedition.assignSupply(item, supply("j-" + item.getActivity().getId(), "Sample container", Quantity.of("10", UNITS)));
     }
 
     public static ExpeditionBuilder expeditionIn(Zone zone, Person responsible) {

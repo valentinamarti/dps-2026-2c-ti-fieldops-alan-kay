@@ -5,16 +5,17 @@ import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionExcep
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
-import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
-import ar.edu.itba.dps.fieldops.business.models.validation.ApprovalResult;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
+import ar.edu.itba.dps.fieldops.business.validations.ApprovalPolicy;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.assignContainers;
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.assignCooler;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
@@ -35,16 +36,20 @@ class FinishExpeditionTest {
     private final Expedition expedition = expeditionIn(coast, person("p-1")).build();
     private final Person worker = person("p-2");
 
-    private void approveWithWorkerFor(ItineraryItem item) {
-        expedition.assignStaff(item, worker);
+    private void approveEquipped() {
+        expedition.getItinerary().getItems().forEach(item -> {
+            expedition.assignStaff(item, worker);
+            assignCooler(expedition, item);
+            assignContainers(expedition, item);
+        });
         expedition.submitForReview();
-        new ApproveExpedition(anyExpedition -> new ApprovalResult(List.of()), reservations).approve(expedition, List.of());
+        new ApproveExpedition(new ApprovalPolicy(List.of()), reservations).approve(expedition, List.of());
     }
 
     @Test
     void finishingEarlyFreesTheReservationsOfTheActivitiesThatDidNotRun() {
-        final var laterItem = expedition.schedule(sampling("a-1", coast, hours(0, 24)), hours(14, 16));
-        approveWithWorkerFor(laterItem);
+        expedition.schedule(sampling("a-1", coast, hours(0, 24)), hours(14, 16));
+        approveEquipped();
         expedition.start();
 
         finishExpedition.finish(expedition);
@@ -55,8 +60,8 @@ class FinishExpeditionTest {
 
     @Test
     void anExpeditionThatCannotFinishKeepsItsReservations() {
-        final var item = expedition.schedule(sampling("a-1", coast, hours(0, 24)), hours(14, 16));
-        approveWithWorkerFor(item);
+        expedition.schedule(sampling("a-1", coast, hours(0, 24)), hours(14, 16));
+        approveEquipped();
 
         assertThrows(InvalidStatusTransitionException.class, () -> finishExpedition.finish(expedition));
 
@@ -67,9 +72,8 @@ class FinishExpeditionTest {
     @Test
     void anExpeditionWithAnActivityInProgressKeepsItsReservations() {
         final var item = expedition.schedule(sampling("a-1", coast, hours(0, 24)), hours(9, 11));
-        final var laterItem = expedition.schedule(sampling("a-2", coast, hours(0, 24)), hours(14, 16));
-        expedition.assignStaff(laterItem, worker);
-        approveWithWorkerFor(item);
+        expedition.schedule(sampling("a-2", coast, hours(0, 24)), hours(14, 16));
+        approveEquipped();
         expedition.start();
         expedition.startActivity(item, LocalDateTime.of(2026, 10, 1, 9, 0));
 
@@ -84,7 +88,7 @@ class FinishExpeditionTest {
         final var jars = supply("d-1", "Sample container", Quantity.of("10", UNITS));
         final var item = expedition.schedule(sampling("a-1", coast, hours(0, 24)), hours(14, 16));
         expedition.assignSupply(item, jars);
-        approveWithWorkerFor(item);
+        approveEquipped();
         expedition.start();
 
         finishExpedition.finish(expedition);

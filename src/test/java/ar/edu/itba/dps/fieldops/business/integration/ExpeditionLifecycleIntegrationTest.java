@@ -2,7 +2,6 @@ package ar.edu.itba.dps.fieldops.business.integration;
 
 import ar.edu.itba.dps.fieldops.business.estimations.ExpeditionEstimator;
 import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotApprovableException;
-import ar.edu.itba.dps.fieldops.business.interfaces.validation.ExpeditionValidator;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
@@ -27,14 +26,7 @@ import ar.edu.itba.dps.fieldops.business.reports.ExpeditionReporter;
 import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
 import ar.edu.itba.dps.fieldops.business.usecases.ApproveExpedition;
 import ar.edu.itba.dps.fieldops.business.usecases.FinishExpedition;
-import ar.edu.itba.dps.fieldops.business.validations.CapacityExceededValidation;
-import ar.edu.itba.dps.fieldops.business.validations.InsufficientSuppliesValidation;
-import ar.edu.itba.dps.fieldops.business.validations.MissingCertificationsValidation;
-import ar.edu.itba.dps.fieldops.business.validations.MissingPermitsValidation;
-import ar.edu.itba.dps.fieldops.business.validations.MissingResourcesValidation;
-import ar.edu.itba.dps.fieldops.business.validations.ResourceOverlapValidation;
-import ar.edu.itba.dps.fieldops.business.validations.RiskToleranceValidation;
-import ar.edu.itba.dps.fieldops.business.validations.ValidationOrchestrator;
+import ar.edu.itba.dps.fieldops.business.validations.ApprovalPolicy;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -69,16 +61,9 @@ class ExpeditionLifecycleIntegrationTest {
     private final Depletable jars = supply("d-2", "Sample container", Quantity.of("20", UNITS));
 
     private final ResourceCatalog catalog = new ResourceCatalog();
-    private final ExpeditionValidator validator = new ValidationOrchestrator(List.of(
-            new ResourceOverlapValidation(),
-            new MissingResourcesValidation(),
-            new InsufficientSuppliesValidation(),
-            new MissingCertificationsValidation(),
-            new MissingPermitsValidation(),
-            new CapacityExceededValidation(),
-            new RiskToleranceValidation()));
+    private final ApprovalPolicy policy = new ApprovalPolicy(List.of());
     private final ResourceReservations reservations = new ResourceReservations();
-    private final ApproveExpedition approveExpedition = new ApproveExpedition(validator, reservations);
+    private final ApproveExpedition approveExpedition = new ApproveExpedition(policy, reservations);
     private final FinishExpedition finishExpedition = new FinishExpedition(reservations);
     private final ExpeditionReporter reporter = new ExpeditionReporter(new ExpeditionEstimator());
 
@@ -136,7 +121,7 @@ class ExpeditionLifecycleIntegrationTest {
         assignFromCatalog(expedition, diveItem);
         assignFromCatalog(expedition, surveyItem);
 
-        final var result = validator.validate(expedition);
+        final var result = policy.validate(expedition);
         assertTrue(result.criticals().isEmpty(), () -> "unexpected criticals: " + result.criticals());
         assertEquals(1, result.warnings().size());
         assertEquals(Severity.WARNING, result.warnings().getFirst().severity());
@@ -182,7 +167,7 @@ class ExpeditionLifecycleIntegrationTest {
         expedition.schedule(dive, divePeriod);
         expedition.submitForReview();
 
-        final var result = validator.validate(expedition);
+        final var result = policy.validate(expedition);
         final var messages = result.criticals().stream().map(ValidationResult::message).toList();
         assertTrue(messages.stream().anyMatch(message -> message.contains("Marine reserve access")), messages::toString);
         assertTrue(messages.stream().anyMatch(message -> message.contains("staff")), messages::toString);

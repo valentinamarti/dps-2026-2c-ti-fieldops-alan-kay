@@ -16,13 +16,13 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 - **Alternativas descartadas:** herencia (subclases de `Activity` por tipo) — mezclaría campos comunes con comportamiento variable en la misma jerarquía. `enum` + `switch` por tipo — antipatrón señalado en clase, viola Open/Closed.
 
 
-### D2 — Validaciones como objetos con severidad (Policy) + orquestador
+### D2 — Validaciones como objetos con severidad (Policy) + política de aprobación
 
 - **Patrón / principio:** Policy (una regla por objeto) + Open/Closed.
-- **Dónde:** interfaz `ValidationRule` (en `business.interfaces.validation`); implementaciones en `business.validations`: `ResourceOverlapValidation`, `MissingResourcesValidation`, `InsufficientSuppliesValidation`, `MissingCertificationsValidation`, `MissingPermitsValidation`, `CapacityExceededValidation` y `RiskToleranceValidation`; `ValidationOrchestrator`; resultados en `business.models.validation`: `ValidationResult`, `Severity` y `ApprovalResult`.
+- **Dónde:** interfaz `ValidationRule` (en `business.interfaces.validation`); implementaciones en `business.validations`: `ResourceOverlapValidation`, `MissingResourcesValidation`, `InsufficientSuppliesValidation`, `MissingCertificationsValidation`, `MissingPermitsValidation`, `CapacityExceededValidation` y `RiskToleranceValidation`; `ApprovalPolicy` (D31); resultados en `business.models.validation`: `ValidationResult`, `Severity` y `ApprovalResult`.
 - **Por qué:**
-  - Cada regla es un objeto independiente que devuelve los problemas que encuentra, cada uno con su severidad (crítica o advertencia). El orquestador corre todas las reglas y arma un `ApprovalResult` que separa críticas de advertencias y responde `canBeApproved()`, que es exactamente lo que exige el enunciado para decidir si una expedición puede aprobarse.
-  - Agregar una regla es agregar una clase y sumarla a la lista del orquestador, sin modificar las reglas existentes ni el orquestador (Open/Closed). `RiskToleranceValidation` es el ejemplo: no está en la lista del enunciado y se sumó sin tocar las demás.
+  - Cada regla es un objeto independiente que devuelve los problemas que encuentra, cada uno con su severidad (crítica o advertencia). La política de aprobación corre todas las reglas y arma un `ApprovalResult` que separa críticas de advertencias y responde `canBeApproved()`, que es exactamente lo que exige el enunciado para decidir si una expedición puede aprobarse.
+  - Agregar una regla es agregar una clase y sumarla a la política (como obligatoria, o como adicional al construirla), sin modificar las reglas existentes (Open/Closed). `RiskToleranceValidation` es el ejemplo: no está en la lista del enunciado y se sumó sin tocar las demás.
   - Cada regla devuelve una **lista** de resultados y no uno solo: una misma regla puede encontrar varios problemas (ej. dos actividades sin buzos certificados), y la validación de un borrador tiene que juntarlos todos (D14).
   - La falta de recursos quedó en dos reglas: `MissingResourcesValidation` cuenta personal y equipos de cada ítem, e `InsufficientSuppliesValidation` suma lo que piden todas las actividades que usan un mismo consumible y lo compara con su stock disponible. Son cálculos distintos que cambian por motivos distintos (SRP). Lo que pide el itinerario de cada consumible lo calcula `Itinerary.supplyDemands()`, porque también lo usa la reserva de stock (D30).
   - Severidades elegidas: son críticas las que hacen imposible o no permitido ejecutar el plan (un recurso en dos lugares a la vez, personal, equipos o stock que no alcanzan, personal sin certificación, permisos faltantes, más participantes que los permitidos). Es advertencia una actividad con más riesgo que la tolerancia de la expedición: se puede ejecutar, pero un responsable tiene que aceptarlo (D22).
@@ -41,7 +41,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 - **Por qué:**
   - `Expedition` tiene muchos datos y colecciones (objetivos, zonas, responsables, permisos otorgados, restricciones, actividades), lo que hace ilegible un constructor tradicional. El constructor de `Expedition` es package-private: desde afuera del paquete, la única forma de crear una expedición es el builder.
   - El builder no repite validaciones. `build()` llama al constructor, que aplica los guards de D16 (textos obligatorios, colecciones obligatorias y no vacías), y agenda las actividades con el mismo `Expedition.schedule` que se usa después de crear la expedición. Así las reglas para agendar (D21) viven en un solo lugar, se agende desde el builder o después.
-  - La validación de negocio pesada corre aparte con el `ValidationOrchestrator` (D2) antes de permitir el paso a "Approved" — así el builder no termina siendo responsable de todo.
+  - La validación de negocio pesada corre aparte con la `ApprovalPolicy` (D2, D31) antes de permitir el paso a "Approved" — así el builder no termina siendo responsable de todo.
 - **Alternativas descartadas:**
   - Builder + Director — más estructura de la que hace falta para este caso.
   - Validar todas las reglas de negocio dentro de `build()` — mezclaría "está bien formado" con "es válido para operar", que tienen ciclos de vida distintos.
@@ -276,17 +276,17 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 ### D22 — La aprobación corre la validación y registra las advertencias aceptadas
 
 - **Patrón / principio:** Dependency Inversion + fail fast.
-- **Dónde:** `Expedition.approve(ExpeditionValidator, List<AcceptedWarning>)`; interfaz `ExpeditionValidator` (en `business.interfaces.validation`), implementada por `ValidationOrchestrator`; `AcceptedWarning`; `ExpeditionNotApprovableException` y `UnacceptedWarningException`.
+- **Dónde:** `Expedition.approve(ExpeditionValidator, List<AcceptedWarning>)`; interfaz `ExpeditionValidator` (en `business.interfaces.validation`), implementada por `ApprovalPolicy` (D31); `AcceptedWarning`; `ExpeditionNotApprovableException` y `UnacceptedWarningException`.
 - **Por qué:**
   - El enunciado exige que una expedición con errores críticos no pueda pasar a aprobada. Para que eso no dependa de que alguien se acuerde de validar antes, `approve` recibe el validador y lo corre en ese momento: no se puede aprobar con un resultado viejo o armado a mano.
   - Cada advertencia tiene que estar cubierta por un `AcceptedWarning` de alguien que sea responsable de la expedición, con una justificación no vacía. Las aceptaciones quedan registradas en la expedición (`getAcceptedWarnings`) para el informe. No se puede crear un `AcceptedWarning` sobre un resultado crítico: lo crítico no se acepta, se corrige.
-  - `Expedition` depende de la interfaz `ExpeditionValidator` y no del orquestador concreto, igual que `Activity` depende de `ActivityRules` (D1). Así los tests de aprobación usan un validador de prueba con resultados fijos, y el orquestador y cada regla se prueban por separado.
+  - `Expedition` depende de la interfaz `ExpeditionValidator` y no de la política concreta, igual que `Activity` depende de `ActivityRules` (D1). Así los tests de la entidad usan un validador de prueba con resultados fijos, y la política y cada regla se prueban por separado. Qué reglas son obligatorias lo garantiza el caso de uso de aprobación con la `ApprovalPolicy` (D31).
   - La transición se verifica antes de validar: una expedición que no está en revisión ni siquiera se valida.
   - Al aprobar se reservan los recursos reutilizables asignados, cada uno para el horario de su ítem. Recién ahí el plan compromete recursos: mientras es borrador se puede asignar y reasignar libremente, y las demás expediciones ven esos recursos ocupados recién cuando esta se aprueba. La reserva no la hace la expedición: la coordina el caso de uso `ApproveExpedition` (D28) con `ResourceReservations`, todo o nada (D27).
 - **Alternativas descartadas:**
   - `approve(ApprovalResult)` — permitiría aprobar con un resultado calculado antes de un cambio, o con uno vacío.
+  - Que `Expedition` dependa directamente de `ApprovalPolicy` — ataría la entidad a una implementación y a su lista concreta de reglas (ver D31).
   - `Map<ValidationResult, String>` de justificaciones (boceto inicial) — no registra quién aceptó cada advertencia, y el enunciado pide que la acepte un responsable.
-  - Que `Expedition` dependa directamente de `ValidationOrchestrator` — ataría la entidad a una implementación y a su lista concreta de reglas.
   - Reservar los recursos al asignarlos — la validación de superposición nunca encontraría nada, porque la segunda reserva fallaría con excepción en vez de reportarse junto con los demás problemas.
 - **Consecuencia:** si algún recurso no se puede reservar (tomado por otra expedición entre la validación y la aprobación, o compartido por dos ítems propios en horarios superpuestos), `ApproveExpedition` corta con `ResourceUnavailableException` sin aprobar, sin reservar nada y sin registrar advertencias (D27, D28).
 
@@ -354,11 +354,11 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 
 - **Origen:** corrección de la Entrega 1, punto 7 (dónde viven los casos de uso) y punto 1 (el servicio de reservas, "invocado desde el caso de uso de aprobación"). Evaluamos la sugerencia del informe y la seguimos con `ApproveExpedition` y `FinishExpedition`.
 - **Patrón / principio:** caso de uso (capa de aplicación) + inyección de dependencias por constructor.
-- **Dónde:** en `business.usecases`: `ApproveExpedition`, que recibe el `ExpeditionValidator` y el `ResourceReservations` en el constructor, y `FinishExpedition`, que recibe el `ResourceReservations`.
+- **Dónde:** en `business.usecases`: `ApproveExpedition`, que recibe la `ApprovalPolicy` y el `ResourceReservations` en el constructor, y `FinishExpedition`, que recibe el `ResourceReservations`.
 - **Por qué:**
   - Una operación es método de la entidad cuando toca un solo objeto y no necesita nada de afuera (`schedule`, `assign*`, `startActivity`). Aprobar no es así: cambia el estado de la expedición y el calendario de cada recurso que usa, y necesita un validador. Esa coordinación es un caso de uso.
   - El orden importa: primero `requireReservable` (verifica sin reservar), después `Expedition.approve` (valida, exige las advertencias aceptadas y pasa a aprobada) y recién al final `reserveFor`. Si falla la verificación o la validación, no cambió nada. Si se aprobara antes de verificar, una reserva fallida dejaría una expedición aprobada sin recursos.
-  - El validador y el servicio llegan por constructor: quien aprueba no elige con qué validar en cada llamada.
+  - La política y el servicio llegan por constructor: quien aprueba no elige con qué validar en cada llamada, y la política ya trae las reglas obligatorias (D31).
   - Terminar también cambia la expedición y los calendarios de sus recursos. `FinishExpedition` primero termina la expedición y después libera: si la transición no es válida, falla antes de liberar nada, y liberar no puede fallar.
 - **Alternativas descartadas:** que el caso de uso reserve primero y libere si la validación falla — es la vuelta atrás que D27 ya descartó.
 - **Consecuencia:** `Expedition.approve` y `Expedition.finish` siguen siendo públicos y no tocan los calendarios; la aprobación y la finalización completas son las de los casos de uso.
@@ -389,6 +389,20 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 - **Alternativas descartadas:**
   - Descontar el stock al aprobar — mezclaría lo previsto con lo usado, y el informe no podría contrastar consumo estimado contra real (D23, D24).
   - Exigir que todo consumo esté reservado antes — en el campo se puede usar más de lo previsto, y eso tiene que poder registrarse mientras haya stock libre.
+
+### D31 — Las reglas obligatorias de aprobación las define el dominio (corrección de la Entrega 1)
+
+- **Origen:** corrección de la Entrega 1, punto 3 (aprobar sin errores críticos dependía del validador que eligiera quien llama). `approve` aceptaba cualquier validador, y una inmersión sin buzos se aprobaba con uno vacío. Evaluamos la sugerencia del informe (que el dominio defina las reglas obligatorias y que quien llama solo pueda sumar reglas encima) y la seguimos.
+- **Patrón / principio:** Policy, con un mínimo fijo del dominio + Open/Closed para sumar reglas + Dependency Inversion (la entidad sigue dependiendo de la interfaz).
+- **Dónde:** `ApprovalPolicy` (en `business.validations`, antes `ValidationOrchestrator`), clase `final` que implementa `ExpeditionValidator`, con las siete reglas como obligatorias y un constructor que solo recibe reglas adicionales. `ApproveExpedition` recibe la `ApprovalPolicy` concreta (D28).
+- **Por qué:**
+  - "Una expedición con errores críticos no puede aprobarse" es la regla central del enunciado, y qué cuenta como crítico tiene que decidirlo el dominio, no quien llama. Las siete reglas viven dentro de la política y corren siempre; quien la arma puede agregar reglas (por ejemplo, más estrictas para un tipo de expedición), nunca sacar.
+  - Como sugiere el informe (punto 7), el dueño del armado del validador es el caso de uso: `ApproveExpedition` pide una `ApprovalPolicy` y no cualquier validador, y la política es `final`, así que quien aprueba por el caso de uso no puede saltear el mínimo.
+  - `Expedition.approve` sigue recibiendo la interfaz `ExpeditionValidator` (D22): la entidad no conoce la política concreta ni sus reglas, y no hay un ciclo de dependencias entre `models.expeditions` y `validations`.
+- **Alternativas descartadas:**
+  - Que `Expedition.approve` pida la `ApprovalPolicy` concreta — garantizaría el mínimo también al llamar directo a la entidad, pero ataría la entidad a la política y a sus siete reglas, y crearía un ciclo entre paquetes (las reglas leen la expedición y la expedición conocería la política).
+  - Que la política exponga sus reglas o permita quitar alguna — volvería a dejar la decisión en quien llama.
+- **Consecuencia:** `Expedition.approve` sigue aceptando cualquier `ExpeditionValidator`, así que llamarla directo con un validador vacío aprueba sin las reglas obligatorias. Es el mismo criterio que con las reservas (D28): la aprobación completa es la de `ApproveExpedition`.
 
 ## Patrones que decidimos no aplicar
 

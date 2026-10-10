@@ -1,26 +1,26 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
-import ar.edu.itba.dps.fieldops.business.interfaces.validation.ExpeditionValidator;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.validation.AcceptedWarning;
 import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
+import ar.edu.itba.dps.fieldops.business.validations.ApprovalPolicy;
 
 import java.util.List;
 import java.util.Objects;
 
 public class ApproveExpedition {
 
-    private final ExpeditionValidator validator;
+    private final ApprovalPolicy policy;
     private final ResourceReservations reservations;
 
-    public ApproveExpedition(ExpeditionValidator validator, ResourceReservations reservations) {
-        this.validator = Objects.requireNonNull(validator, "validator is required");
+    public ApproveExpedition(ApprovalPolicy policy, ResourceReservations reservations) {
+        this.policy = Objects.requireNonNull(policy, "policy is required");
         this.reservations = Objects.requireNonNull(reservations, "reservations are required");
     }
 
     public void approve(Expedition expedition, List<AcceptedWarning> acceptances) {
         reservations.requireReservable(expedition);
-        expedition.approve(validator, acceptances);
+        expedition.approve(policy, acceptances);
         reservations.reserveFor(expedition);
     }
 }
