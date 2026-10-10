@@ -45,7 +45,7 @@ public class ResourceReservations {
     }
 
     private List<PlannedReservation> plannedReservationsOf(Expedition expedition) {
-        return expedition.getItinerary().getItems().stream()
+        return expedition.getItinerary().pendingItems().stream()
                 .flatMap(item -> plannedReservationsOf(expedition, item))
                 .toList();
     }

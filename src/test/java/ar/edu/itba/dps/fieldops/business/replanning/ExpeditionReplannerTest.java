@@ -10,6 +10,7 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.validation.ApprovalResult;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
+import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -120,5 +121,52 @@ class ExpeditionReplannerTest {
         expedition.suspend();
 
         assertThrows(ActivitiesInProgressException.class, () -> replanner.planAlternative(expedition, ALTERNATIVE_ID, affectedItem));
+    }
+
+    @Test
+    void theAlternativeKeepsWhatAlreadyHappenedAndCanOnlyChangeWhatIsPending() {
+        final var done = sampling("a-1", coast, hours(0, 24));
+        final var pending = sampling("a-2", coast, hours(0, 24), done);
+        final var affected = sampling("a-3", coast, hours(0, 24));
+        final var doneItem = expedition.schedule(done, hours(9, 11));
+        expedition.schedule(pending, hours(12, 14));
+        final var affectedItem = expedition.schedule(affected, hours(15, 17));
+        final var worker = person("p-2");
+        expedition.assignStaff(doneItem, worker);
+        approve();
+        expedition.start();
+        expedition.startActivity(doneItem, LocalDateTime.of(2026, 10, 1, 9, 0));
+        expedition.finishActivity(doneItem, LocalDateTime.of(2026, 10, 1, 11, 0), "Samples taken");
+        expedition.suspend();
+
+        final var alternative = replanner.planAlternative(expedition, ALTERNATIVE_ID, affectedItem);
+
+        final var keptDone = alternative.getItinerary().itemFor(done).orElseThrow();
+        final var keptPending = alternative.getItinerary().itemFor(pending).orElseThrow();
+        assertTrue(keptDone.isFinished());
+        assertEquals("Samples taken", keptDone.getTracking().orElseThrow().getResult());
+        assertEquals(Set.of(worker), keptDone.getAssignedStaff());
+        assertEquals(List.of(keptPending), alternative.getItinerary().pendingItems());
+        assertThrows(InvalidScheduleException.class, () -> alternative.assignStaff(keptDone, person("p-3")));
+        alternative.assignStaff(keptPending, person("p-3"));
+        assertTrue(alternative.getItinerary().itemFor(affected).isEmpty());
+    }
+
+    @Test
+    void whatAlreadyHappenedIsNotReservedAgain() {
+        final var doneItem = expedition.schedule(sampling("a-1", coast, hours(0, 24)), hours(9, 11));
+        final var affectedItem = expedition.schedule(sampling("a-2", coast, hours(0, 24)), hours(12, 14));
+        final var worker = person("p-2");
+        expedition.assignStaff(doneItem, worker);
+        approve();
+        expedition.start();
+        expedition.startActivity(doneItem, LocalDateTime.of(2026, 10, 1, 9, 0));
+        expedition.finishActivity(doneItem, LocalDateTime.of(2026, 10, 1, 11, 0), "Samples taken");
+        expedition.suspend();
+        final var alternative = replanner.planAlternative(expedition, ALTERNATIVE_ID, affectedItem);
+
+        new ResourceReservations().reserveFor(alternative);
+
+        assertTrue(worker.isAvailableDuring(hours(9, 11)));
     }
 }

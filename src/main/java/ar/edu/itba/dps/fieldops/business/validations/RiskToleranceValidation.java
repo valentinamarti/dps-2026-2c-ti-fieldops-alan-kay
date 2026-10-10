@@ -16,7 +16,7 @@ public class RiskToleranceValidation implements ValidationRule {
     @Override
     public List<ValidationResult> validate(Expedition expedition) {
         final var tolerance = expedition.getRestrictions().riskTolerance();
-        return expedition.getItinerary().getItems().stream()
+        return expedition.getItinerary().pendingItems().stream()
                 .map(ItineraryItem::getActivity)
                 .filter(activity -> activity.estimatedRisk().isAbove(tolerance))
                 .map(activity -> ValidationResult.warning(ID, ValidationSubject.of(activity.getId()), "%s has %s risk, above the expedition tolerance of %s"

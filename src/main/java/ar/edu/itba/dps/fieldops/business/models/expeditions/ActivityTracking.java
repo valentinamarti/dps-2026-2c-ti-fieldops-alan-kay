@@ -25,6 +25,15 @@ public class ActivityTracking {
         this.startedAt = Objects.requireNonNull(startedAt, "startedAt is required");
     }
 
+    ActivityTracking copy() {
+        final var copy = new ActivityTracking(startedAt);
+        copy.finishedAt = finishedAt;
+        copy.result = result;
+        copy.observations.addAll(observations);
+        copy.incidents.addAll(incidents);
+        return copy;
+    }
+
     public boolean isFinished() {
         return finishedAt != null;
     }

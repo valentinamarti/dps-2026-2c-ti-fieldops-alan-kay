@@ -200,9 +200,18 @@ public class Expedition {
         }
     }
 
+    void addFinishedCopyOf(ItineraryItem finished) {
+        requireEditable();
+        itinerary.addFinishedCopyOf(finished);
+    }
+
     private ItineraryItem editable(ItineraryItem item) {
         requireEditable();
-        return requireOwnItem(item);
+        requireOwnItem(item);
+        if (item.isStarted()) {
+            throw new InvalidScheduleException("%s already happened and cannot change".formatted(item.getActivity().getName()));
+        }
+        return item;
     }
 
     private ItineraryItem requireOwnItem(ItineraryItem item) {

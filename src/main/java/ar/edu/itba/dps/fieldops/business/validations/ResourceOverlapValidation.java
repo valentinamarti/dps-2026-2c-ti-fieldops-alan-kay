@@ -16,7 +16,7 @@ public class ResourceOverlapValidation implements ValidationRule {
 
     @Override
     public List<ValidationResult> validate(Expedition expedition) {
-        final var items = expedition.getItinerary().getItems();
+        final var items = expedition.getItinerary().pendingItems();
         final var results = new ArrayList<ValidationResult>();
         for (int i = 0; i < items.size(); i++) {
             final var item = items.get(i);

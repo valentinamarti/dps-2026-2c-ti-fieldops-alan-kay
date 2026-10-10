@@ -24,7 +24,8 @@ public class ExpeditionReplanner {
         original.getZones().forEach(builder::addZone);
         original.getResponsibles().forEach(builder::addResponsible);
         original.getGrantedPermits().forEach(builder::addPermit);
-        unaffectedItemsOf(original, affectedItem)
+        finishedItemsOf(original).forEach(builder::addFinishedItem);
+        pendingItemsOf(original, affectedItem)
                 .forEach(item -> builder.addActivity(item.getActivity(), item.getScheduledPeriod()));
 
         final var alternative = builder.build(alternativeId);
@@ -33,7 +34,7 @@ public class ExpeditionReplanner {
     }
 
     private void copyAssignments(Expedition original, Expedition alternative, ItineraryItem affectedItem) {
-        unaffectedItemsOf(original, affectedItem).forEach(item -> {
+        pendingItemsOf(original, affectedItem).forEach(item -> {
             final var copy = alternative.getItinerary().itemFor(item.getActivity()).orElseThrow();
             item.getAssignedStaff().forEach(person -> alternative.assignStaff(copy, person));
             item.getAssignedEquipment().forEach(equipment -> alternative.assignEquipment(copy, equipment));
@@ -41,8 +42,13 @@ public class ExpeditionReplanner {
         });
     }
 
-    private Stream<ItineraryItem> unaffectedItemsOf(Expedition original, ItineraryItem affectedItem) {
-        return original.getItinerary().getItems().stream().filter(item -> !item.equals(affectedItem));
+    private Stream<ItineraryItem> pendingItemsOf(Expedition original, ItineraryItem affectedItem) {
+        return original.getItinerary().getItems().stream()
+                .filter(item -> !item.equals(affectedItem) && !item.isStarted());
+    }
+
+    private Stream<ItineraryItem> finishedItemsOf(Expedition original) {
+        return original.getItinerary().getItems().stream().filter(ItineraryItem::isFinished);
     }
 
     private void requireOwnItem(Expedition original, ItineraryItem affectedItem) {

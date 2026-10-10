@@ -38,6 +38,15 @@ public class ItineraryItem {
         }
     }
 
+    static ItineraryItem finishedCopyOf(ItineraryItem finished) {
+        final var copy = new ItineraryItem(finished.activity, finished.scheduledPeriod);
+        copy.assignedStaff.addAll(finished.assignedStaff);
+        copy.assignedEquipment.addAll(finished.assignedEquipment);
+        copy.assignedSupplies.addAll(finished.assignedSupplies);
+        copy.tracking = finished.finishedTracking().copy();
+        return copy;
+    }
+
     public boolean isFor(Activity activity) {
         return this.activity.equals(activity);
     }
@@ -109,6 +118,13 @@ public class ItineraryItem {
     ActivityTracking startedTracking() {
         if (!isStarted()) {
             throw new InvalidTrackingException("%s has not started yet".formatted(activity.getName()));
+        }
+        return tracking;
+    }
+
+    private ActivityTracking finishedTracking() {
+        if (!isFinished()) {
+            throw new InvalidTrackingException("%s has not finished yet".formatted(activity.getName()));
         }
         return tracking;
     }

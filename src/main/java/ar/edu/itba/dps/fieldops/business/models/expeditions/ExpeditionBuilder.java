@@ -18,6 +18,7 @@ public class ExpeditionBuilder {
     private final Set<Person> responsibles = new HashSet<>();
     private final Set<Permit> grantedPermits = new HashSet<>();
     private final List<PlannedActivity> plannedActivities = new ArrayList<>();
+    private final List<ItineraryItem> finishedItems = new ArrayList<>();
     private String name;
     private TimePeriod period;
     private ExpeditionRestrictions restrictions;
@@ -62,8 +63,13 @@ public class ExpeditionBuilder {
         return this;
     }
 
+    public void addFinishedItem(ItineraryItem finished) {
+        finishedItems.add(finished);
+    }
+
     public Expedition build(ExpeditionId id) {
         final var expedition = new Expedition(id, name, period, objectives, zones, responsibles, restrictions, grantedPermits);
+        finishedItems.forEach(expedition::addFinishedCopyOf);
         plannedActivities.forEach(planned -> expedition.schedule(planned.activity(), planned.scheduledPeriod()));
         return expedition;
     }
