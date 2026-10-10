@@ -4,6 +4,8 @@ import ar.edu.itba.dps.fieldops.business.interfaces.resources.ReusableResource;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 
+import java.util.Set;
+
 public abstract class ScheduledResource implements ReusableResource {
 
     private final AvailabilityCalendar calendar = new AvailabilityCalendar();
@@ -11,6 +13,11 @@ public abstract class ScheduledResource implements ReusableResource {
     @Override
     public boolean isAvailableDuring(TimePeriod period) {
         return calendar.isFreeDuring(period);
+    }
+
+    @Override
+    public boolean isAvailableDuring(TimePeriod period, Set<ExpeditionId> ignoredOwners) {
+        return calendar.isFreeDuring(period, ignoredOwners);
     }
 
     @Override

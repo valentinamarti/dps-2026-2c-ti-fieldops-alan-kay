@@ -11,6 +11,7 @@ import lombok.Getter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 public class Depletable implements DepletableResource {
 
@@ -42,7 +43,12 @@ public class Depletable implements DepletableResource {
 
     @Override
     public boolean hasStockFor(Quantity required) {
-        return availableStock().isEnoughFor(required);
+        return hasStockFor(required, Set.of());
+    }
+
+    @Override
+    public boolean hasStockFor(Quantity required, Set<ExpeditionId> ignoredOwners) {
+        return availableStockIgnoring(ignoredOwners).isEnoughFor(required);
     }
 
     @Override
@@ -76,7 +82,14 @@ public class Depletable implements DepletableResource {
     }
 
     private Quantity availableStock() {
-        return reserved.values().stream().reduce(stock, Quantity::minus);
+        return availableStockIgnoring(Set.of());
+    }
+
+    private Quantity availableStockIgnoring(Set<ExpeditionId> ignoredOwners) {
+        return reserved.entrySet().stream()
+                .filter(reservation -> !ignoredOwners.contains(reservation.getKey()))
+                .map(Map.Entry::getValue)
+                .reduce(stock, Quantity::minus);
     }
 
     private Quantity usableBy(ExpeditionId owner) {

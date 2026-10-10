@@ -19,7 +19,8 @@ public class ExpeditionReplanner {
         final var builder = new ExpeditionBuilder()
                 .withName(original.getName())
                 .withPeriod(original.getPeriod())
-                .withRestrictions(original.getRestrictions());
+                .withRestrictions(original.getRestrictions())
+                .withReplacedExpedition(original.getId());
         original.getObjectives().forEach(builder::addObjective);
         original.getZones().forEach(builder::addZone);
         original.getResponsibles().forEach(builder::addResponsible);

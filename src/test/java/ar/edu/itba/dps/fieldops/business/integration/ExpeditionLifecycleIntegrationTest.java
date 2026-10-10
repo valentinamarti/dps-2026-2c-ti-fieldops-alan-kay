@@ -27,6 +27,7 @@ import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
 import ar.edu.itba.dps.fieldops.business.usecases.ApproveExpedition;
 import ar.edu.itba.dps.fieldops.business.usecases.FinishExpedition;
 import ar.edu.itba.dps.fieldops.business.validations.ApprovalPolicy;
+import ar.edu.itba.dps.fieldops.providers.InMemoryExpeditionRepository;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -63,7 +64,8 @@ class ExpeditionLifecycleIntegrationTest {
     private final ResourceCatalog catalog = new ResourceCatalog();
     private final ApprovalPolicy policy = new ApprovalPolicy(List.of());
     private final ResourceReservations reservations = new ResourceReservations();
-    private final ApproveExpedition approveExpedition = new ApproveExpedition(policy, reservations);
+    private final InMemoryExpeditionRepository repository = new InMemoryExpeditionRepository();
+    private final ApproveExpedition approveExpedition = new ApproveExpedition(policy, reservations, repository);
     private final FinishExpedition finishExpedition = new FinishExpedition(reservations);
     private final ExpeditionReporter reporter = new ExpeditionReporter(new ExpeditionEstimator());
 

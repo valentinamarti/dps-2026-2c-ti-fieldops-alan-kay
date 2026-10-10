@@ -22,6 +22,7 @@ public class ExpeditionBuilder {
     private String name;
     private TimePeriod period;
     private ExpeditionRestrictions restrictions;
+    private ExpeditionId replacedExpedition;
 
     public ExpeditionBuilder withName(String name) {
         this.name = name;
@@ -63,12 +64,17 @@ public class ExpeditionBuilder {
         return this;
     }
 
+    public ExpeditionBuilder withReplacedExpedition(ExpeditionId original) {
+        this.replacedExpedition = original;
+        return this;
+    }
+
     public void addFinishedItem(ItineraryItem finished) {
         finishedItems.add(finished);
     }
 
     public Expedition build(ExpeditionId id) {
-        final var expedition = new Expedition(id, name, period, objectives, zones, responsibles, restrictions, grantedPermits);
+        final var expedition = new Expedition(id, name, period, objectives, zones, responsibles, restrictions, grantedPermits, replacedExpedition);
         finishedItems.forEach(expedition::addFinishedCopyOf);
         plannedActivities.forEach(planned -> expedition.schedule(planned.activity(), planned.scheduledPeriod()));
         return expedition;

@@ -7,6 +7,7 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 public class AvailabilityCalendar {
 
@@ -14,7 +15,11 @@ public class AvailabilityCalendar {
     private final List<Unavailability> unavailabilities = new ArrayList<>();
 
     public boolean isFreeDuring(TimePeriod period) {
-        return isNotReservedDuring(period) && isNotUnavailableDuring(period);
+        return isFreeDuring(period, Set.of());
+    }
+
+    public boolean isFreeDuring(TimePeriod period, Set<ExpeditionId> ignoredOwners) {
+        return isNotReservedDuring(period, ignoredOwners) && isNotUnavailableDuring(period);
     }
 
     public void book(Reservation reservation) {
@@ -34,8 +39,10 @@ public class AvailabilityCalendar {
         unavailabilities.add(Objects.requireNonNull(unavailability, "unavailability is required"));
     }
 
-    private boolean isNotReservedDuring(TimePeriod period) {
-        return reservations.stream().noneMatch(reservation -> reservation.overlapsWith(period));
+    private boolean isNotReservedDuring(TimePeriod period, Set<ExpeditionId> ignoredOwners) {
+        return reservations.stream()
+                .filter(reservation -> !ignoredOwners.contains(reservation.owner()))
+                .noneMatch(reservation -> reservation.overlapsWith(period));
     }
 
     private boolean isNotUnavailableDuring(TimePeriod period) {

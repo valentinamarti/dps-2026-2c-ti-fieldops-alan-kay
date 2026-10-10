@@ -4,11 +4,15 @@ import ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 
+import java.util.Set;
+
 public interface DepletableResource extends Resource, Categorized {
 
     MeasurementUnit unit();
 
     boolean hasStockFor(Quantity required);
+
+    boolean hasStockFor(Quantity required, Set<ExpeditionId> ignoredOwners);
 
     void reserve(ExpeditionId owner, Quantity quantity);
 

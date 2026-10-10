@@ -9,6 +9,7 @@ import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
 import ar.edu.itba.dps.fieldops.business.validations.ApprovalPolicy;
+import ar.edu.itba.dps.fieldops.providers.InMemoryExpeditionRepository;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -32,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class FinishExpeditionTest {
 
     private final ResourceReservations reservations = new ResourceReservations();
+    private final InMemoryExpeditionRepository repository = new InMemoryExpeditionRepository();
     private final FinishExpedition finishExpedition = new FinishExpedition(reservations);
     private final Zone coast = zone("z-1");
     private final Expedition expedition = expeditionIn(coast, person("p-1")).build(EXPEDITION_ID);
@@ -44,7 +46,7 @@ class FinishExpeditionTest {
             assignContainers(expedition, item);
         });
         expedition.submitForReview();
-        new ApproveExpedition(new ApprovalPolicy(List.of()), reservations).approve(expedition, List.of());
+        new ApproveExpedition(new ApprovalPolicy(List.of()), reservations, repository).approve(expedition, List.of());
     }
 
     @Test

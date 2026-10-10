@@ -2,6 +2,7 @@ package ar.edu.itba.dps.fieldops.business.validations;
 
 import ar.edu.itba.dps.fieldops.business.interfaces.validation.ValidationRule;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.SupplyDemand;
 import ar.edu.itba.dps.fieldops.business.models.validation.RuleId;
@@ -9,6 +10,7 @@ import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 
 public class InsufficientSuppliesValidation implements ValidationRule {
@@ -20,7 +22,7 @@ public class InsufficientSuppliesValidation implements ValidationRule {
         final var itinerary = expedition.getItinerary();
         return Stream.concat(
                 itinerary.getItems().stream().flatMap(this::uncoveredRequirements),
-                itinerary.supplyDemands().stream().flatMap(this::stockResults)).toList();
+                itinerary.supplyDemands().stream().flatMap(demand -> stockResults(demand, expedition.reservationsItTakesOver()))).toList();
     }
 
     private Stream<ValidationResult> uncoveredRequirements(ItineraryItem item) {
@@ -30,13 +32,13 @@ public class InsufficientSuppliesValidation implements ValidationRule {
                         .formatted(item.getActivity().getName(), requirement.quantity(), requirement.category().name())));
     }
 
-    private Stream<ValidationResult> stockResults(SupplyDemand demand) {
+    private Stream<ValidationResult> stockResults(SupplyDemand demand, Set<ExpeditionId> ignoredOwners) {
         final var supply = demand.supply();
         if (!demand.isInSupplyUnit()) {
             return Stream.of(ValidationResult.critical(ID, ValidationSubject.of(supply.getId()), "%s is measured in %s, but the itinerary asks for it in another unit"
                     .formatted(supply.getId(), supply.unit())));
         }
-        if (supply.hasStockFor(demand.total())) {
+        if (supply.hasStockFor(demand.total(), ignoredOwners)) {
             return Stream.empty();
         }
         return Stream.of(ValidationResult.critical(ID, ValidationSubject.of(supply.getId()), "%s does not have enough stock for the %s the itinerary needs"

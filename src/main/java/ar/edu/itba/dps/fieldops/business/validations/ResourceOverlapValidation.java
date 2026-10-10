@@ -2,6 +2,7 @@ package ar.edu.itba.dps.fieldops.business.validations;
 
 import ar.edu.itba.dps.fieldops.business.interfaces.validation.ValidationRule;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.validation.RuleId;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
@@ -9,6 +10,7 @@ import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 public class ResourceOverlapValidation implements ValidationRule {
 
@@ -21,7 +23,7 @@ public class ResourceOverlapValidation implements ValidationRule {
         for (int i = 0; i < items.size(); i++) {
             final var item = items.get(i);
             items.subList(i + 1, items.size()).forEach(later -> results.addAll(sharedResources(item, later)));
-            results.addAll(unavailableResources(item));
+            results.addAll(unavailableResources(item, expedition.reservationsItTakesOver()));
         }
         return results;
     }
@@ -37,9 +39,9 @@ public class ResourceOverlapValidation implements ValidationRule {
                 .toList();
     }
 
-    private List<ValidationResult> unavailableResources(ItineraryItem item) {
+    private List<ValidationResult> unavailableResources(ItineraryItem item, Set<ExpeditionId> ignoredOwners) {
         return item.getAssignedReusableResources().stream()
-                .filter(resource -> !resource.isAvailableDuring(item.getScheduledPeriod()))
+                .filter(resource -> !resource.isAvailableDuring(item.getScheduledPeriod(), ignoredOwners))
                 .map(resource -> ValidationResult.critical(ID, ValidationSubject.of(item.getActivity().getId(), resource.getId()), "%s is not available during %s"
                         .formatted(resource.getId(), item.getActivity().getName())))
                 .toList();

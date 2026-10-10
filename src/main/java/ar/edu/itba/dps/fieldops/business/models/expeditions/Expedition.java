@@ -24,6 +24,7 @@ import lombok.Getter;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -51,9 +52,12 @@ public class Expedition {
     private ExpeditionStatus status = ExpeditionStatus.DRAFT;
     @Getter
     private List<AcceptedWarning> acceptedWarnings = List.of();
+    private final ExpeditionId replacedExpedition;
+    private ExpeditionId replacement;
 
     Expedition(ExpeditionId id, String name, TimePeriod period, List<String> objectives, Set<Zone> zones,
-               Set<Person> responsibles, ExpeditionRestrictions restrictions, Set<Permit> grantedPermits) {
+               Set<Person> responsibles, ExpeditionRestrictions restrictions, Set<Permit> grantedPermits,
+               ExpeditionId replacedExpedition) {
         this.id = Objects.requireNonNull(id, "id is required");
         this.name = DomainArguments.requireText(name, "name");
         this.period = Objects.requireNonNull(period, "period is required");
@@ -63,6 +67,7 @@ public class Expedition {
         this.responsibles = DomainArguments.requireNonEmptySet(responsibles, "responsibles");
         this.restrictions = Objects.requireNonNull(restrictions, "restrictions are required");
         this.grantedPermits = DomainArguments.requireSet(grantedPermits, "grantedPermits");
+        this.replacedExpedition = replacedExpedition;
     }
 
     public ItineraryItem schedule(Activity activity, TimePeriod scheduledPeriod) {
@@ -123,6 +128,24 @@ public class Expedition {
     public void finish() {
         requireNoActivityInProgress();
         transitionTo(ExpeditionStatus.FINISHED);
+    }
+
+    public Optional<ExpeditionId> getReplacedExpedition() {
+        return Optional.ofNullable(replacedExpedition);
+    }
+
+    public Set<ExpeditionId> reservationsItTakesOver() {
+        return getReplacedExpedition().map(Set::of).orElse(Set.of());
+    }
+
+    public Optional<ExpeditionId> getReplacement() {
+        return Optional.ofNullable(replacement);
+    }
+
+    public void markReplacedBy(ExpeditionId alternative) {
+        requireReplaceable();
+        replacement = Objects.requireNonNull(alternative, "alternative is required");
+        status = ExpeditionStatus.REPLACED;
     }
 
     public void requireReplaceable() {

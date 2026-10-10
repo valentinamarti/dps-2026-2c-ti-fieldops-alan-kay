@@ -6,6 +6,7 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -110,6 +111,21 @@ class AvailabilityCalendarTest {
 
         assertTrue(calendar.isFreeDuring(hours(8, 10)));
         assertFalse(calendar.isFreeDuring(hours(14, 16)));
+    }
+
+    @Test
+    void aPeriodBookedOnlyByAnIgnoredExpeditionCountsAsFree() {
+        calendar.book(bookedByAnExpedition(8, 12));
+
+        assertTrue(calendar.isFreeDuring(hours(10, 11), Set.of(AN_EXPEDITION)));
+        assertFalse(calendar.isFreeDuring(hours(10, 11), Set.of(new ExpeditionId("e-2"))));
+    }
+
+    @Test
+    void anUnavailabilityIsNeverIgnored() {
+        calendar.markUnavailable(new Unavailability(hours(8, 12), "Maintenance"));
+
+        assertFalse(calendar.isFreeDuring(hours(10, 11), Set.of(AN_EXPEDITION)));
     }
 
     @Test

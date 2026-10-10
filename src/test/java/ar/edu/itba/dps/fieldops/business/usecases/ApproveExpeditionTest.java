@@ -16,6 +16,7 @@ import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
 import ar.edu.itba.dps.fieldops.business.validations.ApprovalPolicy;
+import ar.edu.itba.dps.fieldops.providers.InMemoryExpeditionRepository;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -45,9 +46,10 @@ class ApproveExpeditionTest {
     private final Person leader = person("p-1");
     private final Expedition expedition = expeditionIn(coast, leader).build(EXPEDITION_ID);
     private final ResourceReservations reservations = new ResourceReservations();
+    private final InMemoryExpeditionRepository repository = new InMemoryExpeditionRepository();
 
     private ApproveExpedition finding(ValidationResult... results) {
-        return new ApproveExpedition(new ApprovalPolicy(List.of(_ -> List.of(results))), reservations);
+        return new ApproveExpedition(new ApprovalPolicy(List.of(_ -> List.of(results))), reservations, repository);
     }
 
     @Test
@@ -112,7 +114,7 @@ class ApproveExpeditionTest {
     void aDiveWithoutDiversIsNotApprovedEvenWithoutAdditionalRules() {
         expedition.schedule(diving("a-1", coast, hours(0, 24), 30), hours(9, 11));
         expedition.submitForReview();
-        final var approveExpedition = new ApproveExpedition(new ApprovalPolicy(List.of()), reservations);
+        final var approveExpedition = new ApproveExpedition(new ApprovalPolicy(List.of()), reservations, repository);
 
         assertThrows(ExpeditionNotApprovableException.class, () -> approveExpedition.approve(expedition, List.of()));
         assertEquals(ExpeditionStatus.IN_REVIEW, expedition.getStatus());
@@ -137,7 +139,7 @@ class ApproveExpeditionTest {
     void aSecondExpeditionCannotBeApprovedWithStockAlreadyReserved() {
         final var jars = supply("d-1", "Sample container", Quantity.of("3", UNITS));
         final var policy = new ApprovalPolicy(List.of());
-        final var approveExpedition = new ApproveExpedition(policy, reservations);
+        final var approveExpedition = new ApproveExpedition(policy, reservations, repository);
         final var first = expeditionIn(coast, leader).build(new ExpeditionId("e-1"));
         final var firstItem = first.schedule(sampling("a-1", coast, hours(0, 24)), hours(9, 11));
         first.assignSupply(firstItem, jars);

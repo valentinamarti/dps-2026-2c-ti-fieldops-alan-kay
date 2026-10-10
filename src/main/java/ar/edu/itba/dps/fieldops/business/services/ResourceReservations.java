@@ -4,24 +4,26 @@ import ar.edu.itba.dps.fieldops.business.exceptions.InsufficientStockException;
 import ar.edu.itba.dps.fieldops.business.exceptions.ResourceUnavailableException;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.ReusableResource;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.SupplyDemand;
 import ar.edu.itba.dps.fieldops.business.models.resources.Reservation;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 public class ResourceReservations {
 
     public void requireReservable(Expedition expedition) {
-        requireReservable(plannedReservationsOf(expedition), reservableDemandsOf(expedition));
+        requireReservable(plannedReservationsOf(expedition), reservableDemandsOf(expedition), expedition.reservationsItTakesOver());
     }
 
     public void reserveFor(Expedition expedition) {
         final var plannedReservations = plannedReservationsOf(expedition);
         final var demands = reservableDemandsOf(expedition);
-        requireReservable(plannedReservations, demands);
+        requireReservable(plannedReservations, demands, expedition.reservationsItTakesOver());
         plannedReservations.forEach(PlannedReservation::book);
         demands.forEach(demand -> demand.supply().reserve(expedition.getId(), demand.total()));
     }
@@ -38,10 +40,11 @@ public class ResourceReservations {
                 .forEach(supply -> supply.releaseAll(expedition.getId()));
     }
 
-    private void requireReservable(List<PlannedReservation> plannedReservations, List<SupplyDemand> demands) {
-        plannedReservations.forEach(this::requireFree);
+    private void requireReservable(List<PlannedReservation> plannedReservations, List<SupplyDemand> demands,
+                                   Set<ExpeditionId> ignoredOwners) {
+        plannedReservations.forEach(plannedReservation -> requireFree(plannedReservation, ignoredOwners));
         requireNoClashesBetween(plannedReservations);
-        demands.forEach(this::requireInStock);
+        demands.forEach(demand -> requireInStock(demand, ignoredOwners));
     }
 
     private List<PlannedReservation> plannedReservationsOf(Expedition expedition) {
@@ -61,8 +64,8 @@ public class ResourceReservations {
                 .toList();
     }
 
-    private void requireFree(PlannedReservation plannedReservation) {
-        if (!plannedReservation.isFree()) {
+    private void requireFree(PlannedReservation plannedReservation, Set<ExpeditionId> ignoredOwners) {
+        if (!plannedReservation.isFree(ignoredOwners)) {
             throw new ResourceUnavailableException(plannedReservation.reservation().period());
         }
     }
@@ -77,16 +80,16 @@ public class ResourceReservations {
                         }));
     }
 
-    private void requireInStock(SupplyDemand demand) {
-        if (!demand.supply().hasStockFor(demand.total())) {
+    private void requireInStock(SupplyDemand demand, Set<ExpeditionId> ignoredOwners) {
+        if (!demand.supply().hasStockFor(demand.total(), ignoredOwners)) {
             throw new InsufficientStockException(demand.supply().getId(), demand.total());
         }
     }
 
     private record PlannedReservation(ReusableResource resource, Reservation reservation) {
 
-        boolean isFree() {
-            return resource.isAvailableDuring(reservation.period());
+        boolean isFree(Set<ExpeditionId> ignoredOwners) {
+            return resource.isAvailableDuring(reservation.period(), ignoredOwners);
         }
 
         boolean clashesWith(PlannedReservation other) {

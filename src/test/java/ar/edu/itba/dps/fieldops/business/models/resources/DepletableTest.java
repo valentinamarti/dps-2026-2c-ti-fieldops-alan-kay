@@ -5,6 +5,8 @@ import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import org.junit.jupiter.api.Test;
 
+import java.util.Set;
+
 import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.KILOGRAMS;
 import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.LITERS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -141,5 +143,14 @@ class DepletableTest {
 
         assertTrue(fuel.hasStockFor(Quantity.of("8", LITERS)));
         assertFalse(fuel.hasStockFor(Quantity.of("9", LITERS)));
+    }
+
+    @Test
+    void stockReservedByAnIgnoredExpeditionCountsAsAvailable() {
+        final var fuel = fuelWithLiters();
+        fuel.reserve(ANOTHER_EXPEDITION, Quantity.of("15", LITERS));
+
+        assertTrue(fuel.hasStockFor(Quantity.of("20", LITERS), Set.of(ANOTHER_EXPEDITION)));
+        assertFalse(fuel.hasStockFor(Quantity.of("20", LITERS), Set.of(AN_EXPEDITION)));
     }
 }
