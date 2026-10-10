@@ -2,6 +2,7 @@ package ar.edu.itba.dps.fieldops.business.usecases;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.ActivitiesInProgressException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
+import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
@@ -18,7 +19,9 @@ import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expe
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.sampling;
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.supply;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
+import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.UNITS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -74,5 +77,18 @@ class FinishExpeditionTest {
 
         assertEquals(ExpeditionStatus.IN_EXECUTION, expedition.getStatus());
         assertFalse(worker.isAvailableDuring(hours(14, 16)));
+    }
+
+    @Test
+    void finishingGivesBackTheStockThatWasReservedAndNotUsed() {
+        final var jars = supply("d-1", "Sample container", Quantity.of("10", UNITS));
+        final var item = expedition.schedule(sampling("a-1", coast, hours(0, 24)), hours(14, 16));
+        expedition.assignSupply(item, jars);
+        approveWithWorkerFor(item);
+        expedition.start();
+
+        finishExpedition.finish(expedition);
+
+        assertTrue(jars.hasStockFor(Quantity.of("10", UNITS)));
     }
 }

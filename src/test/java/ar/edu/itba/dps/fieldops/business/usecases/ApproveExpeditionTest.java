@@ -1,9 +1,12 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotApprovableException;
+import ar.edu.itba.dps.fieldops.business.exceptions.InsufficientStockException;
 import ar.edu.itba.dps.fieldops.business.exceptions.ResourceUnavailableException;
 import ar.edu.itba.dps.fieldops.business.interfaces.validation.ExpeditionValidator;
+import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.validation.AcceptedWarning;
@@ -11,6 +14,8 @@ import ar.edu.itba.dps.fieldops.business.models.validation.ApprovalResult;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
+import ar.edu.itba.dps.fieldops.business.validations.InsufficientSuppliesValidation;
+import ar.edu.itba.dps.fieldops.business.validations.ValidationOrchestrator;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -19,7 +24,9 @@ import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expe
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.sampling;
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.supply;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
+import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.UNITS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -103,5 +110,24 @@ class ApproveExpeditionTest {
 
         assertEquals(ExpeditionStatus.IN_REVIEW, expedition.getStatus());
         assertTrue(diver.isAvailableDuring(hours(9, 11)));
+    }
+
+    @Test
+    void aSecondExpeditionCannotBeApprovedWithStockAlreadyReserved() {
+        final var jars = supply("d-1", "Sample container", Quantity.of("3", UNITS));
+        final var suppliesOnly = new ValidationOrchestrator(List.of(new InsufficientSuppliesValidation()));
+        final var approveExpedition = new ApproveExpedition(suppliesOnly, reservations);
+        final var first = expeditionIn(coast, leader).withId(new ExpeditionId("e-1")).build();
+        first.assignSupply(first.schedule(sampling("a-1", coast, hours(0, 24)), hours(9, 11)), jars);
+        final var second = expeditionIn(coast, leader).withId(new ExpeditionId("e-2")).build();
+        second.assignSupply(second.schedule(sampling("a-2", coast, hours(0, 24)), hours(13, 15)), jars);
+        first.submitForReview();
+        approveExpedition.approve(first, List.of());
+        second.submitForReview();
+
+        assertFalse(suppliesOnly.validate(second).canBeApproved());
+        assertThrows(InsufficientStockException.class, () -> approveExpedition.approve(second, List.of()));
+        assertEquals(ExpeditionStatus.IN_REVIEW, second.getStatus());
+        assertEquals(Quantity.of("3", UNITS), jars.getStock());
     }
 }

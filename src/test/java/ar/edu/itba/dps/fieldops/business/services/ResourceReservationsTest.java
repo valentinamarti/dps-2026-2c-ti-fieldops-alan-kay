@@ -1,6 +1,8 @@
 package ar.edu.itba.dps.fieldops.business.services;
 
+import ar.edu.itba.dps.fieldops.business.exceptions.InsufficientStockException;
 import ar.edu.itba.dps.fieldops.business.exceptions.ResourceUnavailableException;
+import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
@@ -13,7 +15,11 @@ import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hour
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.instrument;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.sampling;
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.supply;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
+import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.LITERS;
+import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.UNITS;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -105,5 +111,50 @@ class ResourceReservationsTest {
         assertTrue(worker.isAvailableDuring(hours(9, 11)));
         assertTrue(cooler.isAvailableDuring(hours(9, 11)));
         assertFalse(worker.isAvailableDuring(hours(14, 16)));
+    }
+
+    @Test
+    void reservesTheStockTheItineraryNeedsWithoutConsumingIt() {
+        final var jars = supply("d-1", "Sample container", Quantity.of("10", UNITS));
+        expedition.assignSupply(expedition.schedule(sampling("a-1", coast, hours(0, 24)), hours(9, 11)), jars);
+
+        reservations.reserveFor(expedition);
+
+        assertTrue(jars.hasStockFor(Quantity.of("7", UNITS)));
+        assertFalse(jars.hasStockFor(Quantity.of("8", UNITS)));
+        assertEquals(Quantity.of("10", UNITS), jars.getStock());
+    }
+
+    @Test
+    void aSupplyWithoutEnoughStockReservesNothing() {
+        final var jars = supply("d-1", "Sample container", Quantity.of("2", UNITS));
+        final var item = expedition.schedule(sampling("a-1", coast, hours(0, 24)), hours(9, 11));
+        expedition.assignStaff(item, worker);
+        expedition.assignSupply(item, jars);
+
+        assertThrows(InsufficientStockException.class, () -> reservations.reserveFor(expedition));
+        assertTrue(worker.isAvailableDuring(hours(9, 11)));
+        assertTrue(jars.hasStockFor(Quantity.of("2", UNITS)));
+    }
+
+    @Test
+    void aSupplyAskedForInAnotherUnitIsLeftToTheValidation() {
+        final var jars = supply("d-1", "Sample container", Quantity.of("10", LITERS));
+        expedition.assignSupply(expedition.schedule(sampling("a-1", coast, hours(0, 24)), hours(9, 11)), jars);
+
+        reservations.reserveFor(expedition);
+
+        assertTrue(jars.hasStockFor(Quantity.of("10", LITERS)));
+    }
+
+    @Test
+    void releasingAnExpeditionGivesBackTheStockItReserved() {
+        final var jars = supply("d-1", "Sample container", Quantity.of("10", UNITS));
+        expedition.assignSupply(expedition.schedule(sampling("a-1", coast, hours(0, 24)), hours(9, 11)), jars);
+        reservations.reserveFor(expedition);
+
+        reservations.releaseFor(expedition);
+
+        assertTrue(jars.hasStockFor(Quantity.of("10", UNITS)));
     }
 }
