@@ -373,6 +373,20 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - Cerrar en cascada — habría que inventar la hora de fin y el resultado, y consumir como si la actividad se hubiera completado.
   - Registrarla como abandonada — suma un estado nuevo al seguimiento que ninguna regla ni el informe usan hoy.
 
+### D30 — Stock reservado por expedición (corrección de la Entrega 1)
+
+- **Origen:** corrección de la Entrega 1, punto 2 (los consumibles no se reservan). Dos expediciones aprobadas podían contar con el mismo stock porque los consumibles solo tenían stock actual. Evaluamos la sugerencia del informe (reservar el consumible con dueño, consumir contra esa reserva y liberar el sobrante) y la seguimos.
+- **Patrón / principio:** Information Expert (el consumible lleva la cuenta de su stock y de lo reservado) + mismo criterio de dueño que las reservas de recursos reutilizables (D27).
+- **Dónde:** `Depletable` guarda lo reservado por cada `ExpeditionId`; `DepletableResource.reserve(ExpeditionId, Quantity)`, `consume(ExpeditionId, Quantity)` y `releaseAll(ExpeditionId)`; `hasStockFor` responde por el stock disponible.
+- **Por qué:**
+  - Reservar no es consumir: el stock real (`getStock()`) baja recién cuando se usa (D23), pero lo reservado ya no está disponible para nadie más. `hasStockFor` mira el disponible (stock menos todo lo reservado), así que el catálogo y la validación de consumibles ven lo que otras expediciones ya tienen tomado sin cambiar su código.
+  - Consumir toma primero de lo que esa expedición reservó y, si hace falta más, del stock libre. Nunca toca lo reservado por otra expedición. Si no alcanza, falla sin modificar nada.
+  - `releaseAll` devuelve lo reservado que no se usó, que es el "sobrante" del informe. Igual que con las reservas de recursos reutilizables, liberar lo que no existe no es un error.
+  - El nombre es el mismo que en los recursos reutilizables (`reserve`), porque es la misma idea: apartar algo para una expedición. Lo que cambia es la medida, una franja horaria o una cantidad.
+- **Alternativas descartadas:**
+  - Descontar el stock al aprobar — mezclaría lo previsto con lo usado, y el informe no podría contrastar consumo estimado contra real (D23, D24).
+  - Exigir que todo consumo esté reservado antes — en el campo se puede usar más de lo previsto, y eso tiene que poder registrarse mientras haya stock libre.
+
 ## Patrones que decidimos no aplicar
 
 | Patrón | Por qué no                                                                                                                                                                                              | Consecuencias |

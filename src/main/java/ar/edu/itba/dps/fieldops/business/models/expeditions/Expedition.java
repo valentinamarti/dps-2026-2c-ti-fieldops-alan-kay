@@ -147,7 +147,7 @@ public class Expedition {
 
     private void consumeAssignedSupplies(ItineraryItem item) {
         item.getActivity().requiredSupplies().forEach(requirement ->
-                item.supplyFor(requirement).ifPresent(supply -> supply.consume(requirement.quantity())));
+                item.supplyFor(requirement).ifPresent(supply -> supply.consume(id, requirement.quantity())));
     }
 
     private ItineraryItem inExecution(ItineraryItem item) {
