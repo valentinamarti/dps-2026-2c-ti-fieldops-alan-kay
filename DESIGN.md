@@ -362,7 +362,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 ### D28 — Casos de uso para las operaciones que coordinan varios objetos (corrección de la Entrega 1)
 
 - **Origen:** corrección de la Entrega 1, punto 7 (dónde viven los casos de uso) y punto 1 (el servicio de reservas, "invocado desde el caso de uso de aprobación"). Evaluamos la sugerencia del informe y la seguimos con `ApproveExpedition`, `FinishExpedition`, `CreateExpedition` y `ReplanExpedition`.
-- **Patrón / principio:** caso de uso (capa de aplicación) + inyección de dependencias por constructor.
+- **Patrón / principio:** caso de uso (capa de aplicación) + inyección de dependencias por constructor + composition root (`Main`, Clase 3).
 - **Dónde:** en `business.usecases`: `ApproveExpedition`, que recibe la `ApprovalPolicy` y el `ResourceReservations` en el constructor; `FinishExpedition`, que recibe el `ResourceReservations`; `CreateExpedition`, que recibe el `ExpeditionRepository`; y `ReplanExpedition`, que recibe el `ExpeditionRepository` y el `ExpeditionReplanner`.
 - **Por qué:**
   - Una operación es método de la entidad cuando toca un solo objeto y no necesita nada de afuera (`schedule`, `assign*`, `startActivity`). Aprobar no es así: cambia el estado de la expedición y el calendario de cada recurso que usa, y necesita un validador. Esa coordinación es un caso de uso.
@@ -371,6 +371,8 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - Terminar también cambia la expedición y los calendarios de sus recursos. `FinishExpedition` primero termina la expedición y después libera: si la transición no es válida, falla antes de liberar nada, y liberar no puede fallar.
   - Crear una expedición necesita algo de afuera: su id, que lo da el repositorio (D26). `CreateExpedition` es el dueño de esa decisión, como pide el informe: pide el id, construye con el builder y guarda. `ReplanExpedition` hace lo mismo para la alternativa: le pide el id al repositorio, le pide la alternativa al replanificador y la guarda.
 - **Alternativas descartadas:** que el caso de uso reserve primero y libere si la validación falla — es la vuelta atrás que D27 ya descartó.
+  - Alguien tiene que armar el grafo: `Main.wire()` (en el paquete raíz) crea el repositorio en memoria, el servicio de reservas, la política de aprobación, el replanificador y los casos de uso, y los entrega juntos en `FieldOps`. Es el único lugar que conoce las implementaciones concretas, como `InMemoryExpeditionRepository`; el negocio solo conoce la interfaz `ExpeditionRepository`. Como esta entrega no tiene interfaz de usuario, `main` solo arma el grafo.
+  - El test de integración usa `Main.wire()` y recorre el ciclo a través de los casos de uso: crear, aprobar, ejecutar y terminar; y también replanificar en el campo (suspender, replanificar con un retraso, aprobar la alternativa y terminarla).
 - **Consecuencia:** `Expedition.approve` y `Expedition.finish` siguen siendo públicos y no tocan los calendarios; la aprobación y la finalización completas son las de los casos de uso.
 
 ### D29 — No se termina una expedición con actividades en curso (corrección de la Entrega 1)

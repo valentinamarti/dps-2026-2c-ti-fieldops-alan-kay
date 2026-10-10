@@ -18,30 +18,41 @@ public class ExpeditionReplanner {
 
     public Expedition planAlternative(Expedition original, ExpeditionId alternativeId, ItineraryItem affectedItem,
                                       ReplanReason reason) {
+        requireReplannable(original, affectedItem, reason);
+        final var carried = carriedItemsOf(original, affectedItem, reason);
+        final var alternative = draftReplacing(original, reason, carried).build(alternativeId);
+        carried.forEach(item -> copyAssignments(item, alternative));
+        return alternative;
+    }
+
+    private void requireReplannable(Expedition original, ItineraryItem affectedItem, ReplanReason reason) {
         Objects.requireNonNull(original, "original is required");
         Objects.requireNonNull(affectedItem, "affectedItem is required");
         Objects.requireNonNull(reason, "reason is required");
         original.requireReplaceable();
         requireOwnItem(original, affectedItem);
         requirePending(affectedItem);
+    }
 
+    private ExpeditionBuilder draftReplacing(Expedition original, ReplanReason reason, List<CarriedItem> carried) {
+        final var builder = sameGeneralDataAs(original)
+                .withReplacedExpedition(original.getId())
+                .withReplanReason(reason);
+        finishedItemsOf(original).forEach(builder::addFinishedItem);
+        carried.forEach(item -> builder.addActivity(item.source().getActivity(), item.period()));
+        return builder;
+    }
+
+    private ExpeditionBuilder sameGeneralDataAs(Expedition original) {
         final var builder = new ExpeditionBuilder()
                 .withName(original.getName())
                 .withPeriod(original.getPeriod())
-                .withRestrictions(original.getRestrictions())
-                .withReplacedExpedition(original.getId())
-                .withReplanReason(reason);
+                .withRestrictions(original.getRestrictions());
         original.getObjectives().forEach(builder::addObjective);
         original.getZones().forEach(builder::addZone);
         original.getResponsibles().forEach(builder::addResponsible);
         original.getGrantedPermits().forEach(builder::addPermit);
-        finishedItemsOf(original).forEach(builder::addFinishedItem);
-        final var carried = carriedItemsOf(original, affectedItem, reason);
-        carried.forEach(item -> builder.addActivity(item.source().getActivity(), item.period()));
-
-        final var alternative = builder.build(alternativeId);
-        carried.forEach(item -> copyAssignments(item, alternative));
-        return alternative;
+        return builder;
     }
 
     private List<CarriedItem> carriedItemsOf(Expedition original, ItineraryItem affectedItem, ReplanReason reason) {

@@ -51,15 +51,11 @@ src/main/java/ar/edu/itba/dps/fieldops
 │   ├── services        # ResourceReservations, books every resource of an expedition or none, and releases them
 │   ├── usecases        # CreateExpedition, ApproveExpedition, ReplanExpedition and FinishExpedition: operations that coordinate several objects
 │   └── exceptions      # domain exceptions
-└── providers           # implementations of business/providers (details): InMemoryExpeditionRepository
+├── providers           # implementations of business/providers (details): InMemoryExpeditionRepository
+├── FieldOps.java       # the use cases, already wired
+└── Main.java           # composition root: the only place that knows the concrete implementations
 src/test/java/...       # unit tests mirroring the main tree, an end-to-end integration test and shared fixtures
 DESIGN.md               # design decisions (in Spanish)
-```
-
-Planned — does not exist yet:
-
-```
-Main.java               # composition root: instantiates and wires everything
 ```
 
 ## Build and test
