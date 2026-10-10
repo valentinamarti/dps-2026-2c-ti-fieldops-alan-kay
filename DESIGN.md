@@ -254,7 +254,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
     - en ejecución → suspendida o finalizada
     - suspendida → en ejecución o finalizada
     - finalizada → ninguna
-  - `Expedition` le pregunta al enum antes de cada cambio y falla con excepción si la transición no es válida: cambiar de estado es un comando (D14).
+  - `Expedition` le pregunta al enum antes de cada cambio y falla con excepción si la transición no es válida: cambiar de estado es un comando (D14). Terminar exige además que no quede ninguna actividad en curso (D29).
   - Una expedición aprobada no vuelve a borrador: si hay que cambiarla, se construye una alternativa (replanificación).
 - **Alternativas descartadas:** un `switch` sobre el estado en cada método de `Expedition` — repetiría el flujo en varios lugares y cada estado nuevo obligaría a tocarlos todos. Una clase por estado — ver la tabla de patrones no aplicados.
 
@@ -362,6 +362,16 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - Terminar también cambia la expedición y los calendarios de sus recursos. `FinishExpedition` primero termina la expedición y después libera: si la transición no es válida, falla antes de liberar nada, y liberar no puede fallar.
 - **Alternativas descartadas:** que el caso de uso reserve primero y libere si la validación falla — es la vuelta atrás que D27 ya descartó.
 - **Consecuencia:** `Expedition.approve` y `Expedition.finish` siguen siendo públicos y no tocan los calendarios; la aprobación y la finalización completas son las de los casos de uso.
+
+### D29 — No se termina una expedición con actividades en curso (corrección de la Entrega 1)
+
+- **Origen:** corrección de la Entrega 1, pregunta abierta "¿qué pasa con una actividad en curso cuando la expedición finaliza?". Hasta ahora `finish()` solo consultaba la tabla de estados: con una actividad iniciada y sin cerrar, la expedición quedaba terminada, el consumible no se descontaba y el informe quedaba incompleto. El informe plantea tres opciones (cerrar en cascada, exigir cerrar antes o registrarla como abandonada); elegimos exigir cerrar antes.
+- **Patrón / principio:** fail fast + Information Expert (el ítem sabe si está en curso).
+- **Dónde:** `Expedition.finish()`, `ItineraryItem.isInProgress()` y `ActivitiesInProgressException`. Vale tanto desde `IN_EXECUTION` como desde `SUSPENDED`.
+- **Por qué:** cerrar una actividad es registrar cuándo terminó y con qué resultado, y consumir lo que usó (D23). Ninguna de las dos cosas se puede inventar al terminar la expedición: solo las sabe quien la ejecutó. Exigir que se cierre antes mantiene el seguimiento y el stock fieles a lo que pasó. El chequeo va antes de la transición de siempre (`transitionTo`): solo puede haber actividades en curso en `IN_EXECUTION` o `SUSPENDED`, desde donde terminar es válido, así que el orden no cambia qué error se reporta. La excepción nombra las actividades en curso para que se sepa qué falta cerrar.
+- **Alternativas descartadas:**
+  - Cerrar en cascada — habría que inventar la hora de fin y el resultado, y consumir como si la actividad se hubiera completado.
+  - Registrarla como abandonada — suma un estado nuevo al seguimiento que ninguna regla ni el informe usan hoy.
 
 ## Patrones que decidimos no aplicar
 

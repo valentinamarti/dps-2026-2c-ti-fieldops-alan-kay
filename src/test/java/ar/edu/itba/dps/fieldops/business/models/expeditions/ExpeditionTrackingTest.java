@@ -1,5 +1,6 @@
 package ar.edu.itba.dps.fieldops.business.models.expeditions;
 
+import ar.edu.itba.dps.fieldops.business.exceptions.ActivitiesInProgressException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidTrackingException;
 import ar.edu.itba.dps.fieldops.business.interfaces.validation.ExpeditionValidator;
@@ -58,6 +59,33 @@ class ExpeditionTrackingTest {
         assertEquals(ExpeditionStatus.IN_EXECUTION, expedition.getStatus());
 
         expedition.finish();
+        assertEquals(ExpeditionStatus.FINISHED, expedition.getStatus());
+    }
+
+    @Test
+    void anExpeditionCannotFinishWithAnActivityInProgress() {
+        inExecution().startActivity(item, at(9, 0));
+
+        assertThrows(ActivitiesInProgressException.class, expedition::finish);
+        assertEquals(ExpeditionStatus.IN_EXECUTION, expedition.getStatus());
+    }
+
+    @Test
+    void aSuspendedExpeditionCannotFinishWithAnActivityInProgressEither() {
+        inExecution().startActivity(item, at(9, 0));
+        expedition.suspend();
+
+        assertThrows(ActivitiesInProgressException.class, expedition::finish);
+        assertEquals(ExpeditionStatus.SUSPENDED, expedition.getStatus());
+    }
+
+    @Test
+    void anExpeditionFinishesOnceItsActivityInProgressIsClosed() {
+        inExecution().startActivity(item, at(9, 0));
+        expedition.finishActivity(item, at(11, 0), "Samples taken");
+
+        expedition.finish();
+
         assertEquals(ExpeditionStatus.FINISHED, expedition.getStatus());
     }
 

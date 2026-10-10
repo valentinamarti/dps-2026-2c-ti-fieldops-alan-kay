@@ -82,6 +82,10 @@ public class ItineraryItem {
         return tracking != null && tracking.isFinished();
     }
 
+    public boolean isInProgress() {
+        return isStarted() && !isFinished();
+    }
+
     /**
      * True when the activity did not run inside the period it was scheduled for.
      */

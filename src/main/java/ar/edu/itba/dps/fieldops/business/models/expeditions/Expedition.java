@@ -1,5 +1,6 @@
 package ar.edu.itba.dps.fieldops.business.models.expeditions;
 
+import ar.edu.itba.dps.fieldops.business.exceptions.ActivitiesInProgressException;
 import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotApprovableException;
 import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotEditableException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
@@ -119,6 +120,7 @@ public class Expedition {
     }
 
     public void finish() {
+        requireNoActivityInProgress();
         transitionTo(ExpeditionStatus.FINISHED);
     }
 
@@ -161,6 +163,16 @@ public class Expedition {
                 .filter(acceptance -> acceptance.covers(warning) && responsibles.contains(acceptance.responsible()))
                 .findFirst()
                 .orElseThrow(() -> new UnacceptedWarningException(warning));
+    }
+
+    private void requireNoActivityInProgress() {
+        final var inProgress = itinerary.getItems().stream()
+                .filter(ItineraryItem::isInProgress)
+                .map(item -> item.getActivity().getName())
+                .toList();
+        if (!inProgress.isEmpty()) {
+            throw new ActivitiesInProgressException(inProgress);
+        }
     }
 
     private void transitionTo(ExpeditionStatus next) {

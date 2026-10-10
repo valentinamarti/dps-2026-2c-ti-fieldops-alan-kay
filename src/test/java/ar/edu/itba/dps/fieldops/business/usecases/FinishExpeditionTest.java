@@ -1,5 +1,6 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
+import ar.edu.itba.dps.fieldops.business.exceptions.ActivitiesInProgressException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
@@ -10,6 +11,7 @@ import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
@@ -56,6 +58,21 @@ class FinishExpeditionTest {
         assertThrows(InvalidStatusTransitionException.class, () -> finishExpedition.finish(expedition));
 
         assertEquals(ExpeditionStatus.APPROVED, expedition.getStatus());
+        assertFalse(worker.isAvailableDuring(hours(14, 16)));
+    }
+
+    @Test
+    void anExpeditionWithAnActivityInProgressKeepsItsReservations() {
+        final var item = expedition.schedule(sampling("a-1", coast, hours(0, 24)), hours(9, 11));
+        final var laterItem = expedition.schedule(sampling("a-2", coast, hours(0, 24)), hours(14, 16));
+        expedition.assignStaff(laterItem, worker);
+        approveWithWorkerFor(item);
+        expedition.start();
+        expedition.startActivity(item, LocalDateTime.of(2026, 10, 1, 9, 0));
+
+        assertThrows(ActivitiesInProgressException.class, () -> finishExpedition.finish(expedition));
+
+        assertEquals(ExpeditionStatus.IN_EXECUTION, expedition.getStatus());
         assertFalse(worker.isAvailableDuring(hours(14, 16)));
     }
 }
