@@ -8,6 +8,7 @@ import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidTrackingException;
 import ar.edu.itba.dps.fieldops.business.exceptions.UnacceptedWarningException;
+import ar.edu.itba.dps.fieldops.business.interfaces.replanning.ReplanReason;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.DepletableResource;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.Equipment;
 import ar.edu.itba.dps.fieldops.business.interfaces.validation.ExpeditionValidator;
@@ -53,11 +54,12 @@ public class Expedition {
     @Getter
     private List<AcceptedWarning> acceptedWarnings = List.of();
     private final ExpeditionId replacedExpedition;
+    private final ReplanReason replanReason;
     private ExpeditionId replacement;
 
     Expedition(ExpeditionId id, String name, TimePeriod period, List<String> objectives, Set<Zone> zones,
                Set<Person> responsibles, ExpeditionRestrictions restrictions, Set<Permit> grantedPermits,
-               ExpeditionId replacedExpedition) {
+               ExpeditionId replacedExpedition, ReplanReason replanReason) {
         this.id = Objects.requireNonNull(id, "id is required");
         this.name = DomainArguments.requireText(name, "name");
         this.period = Objects.requireNonNull(period, "period is required");
@@ -68,6 +70,7 @@ public class Expedition {
         this.restrictions = Objects.requireNonNull(restrictions, "restrictions are required");
         this.grantedPermits = DomainArguments.requireSet(grantedPermits, "grantedPermits");
         this.replacedExpedition = replacedExpedition;
+        this.replanReason = replanReason;
     }
 
     public ItineraryItem schedule(Activity activity, TimePeriod scheduledPeriod) {
@@ -136,6 +139,10 @@ public class Expedition {
 
     public Set<ExpeditionId> reservationsItTakesOver() {
         return getReplacedExpedition().map(Set::of).orElse(Set.of());
+    }
+
+    public Optional<ReplanReason> getReplanReason() {
+        return Optional.ofNullable(replanReason);
     }
 
     public Optional<ExpeditionId> getReplacement() {

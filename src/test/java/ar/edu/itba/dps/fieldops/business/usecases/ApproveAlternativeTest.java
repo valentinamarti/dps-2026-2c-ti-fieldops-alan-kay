@@ -7,6 +7,7 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
+import ar.edu.itba.dps.fieldops.business.replanning.Cancellation;
 import ar.edu.itba.dps.fieldops.business.replanning.ExpeditionReplanner;
 import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
 import ar.edu.itba.dps.fieldops.business.validations.ApprovalPolicy;
@@ -52,7 +53,7 @@ class ApproveAlternativeTest {
     private Expedition approvedAlternative() {
         original.submitForReview();
         approveExpedition.approve(original, List.of());
-        final var alternative = replanExpedition.replan(original, affectedItem);
+        final var alternative = replanExpedition.replan(original, affectedItem, new Cancellation());
         alternative.submitForReview();
         return alternative;
     }
@@ -74,7 +75,7 @@ class ApproveAlternativeTest {
     @Test
     void anOriginalThatWasAlreadyReplacedCannotBeReplacedAgain() {
         final var first = approvedAlternative();
-        final var second = replanExpedition.replan(original, keptItem);
+        final var second = replanExpedition.replan(original, keptItem, new Cancellation());
         second.submitForReview();
         approveExpedition.approve(first, List.of());
 

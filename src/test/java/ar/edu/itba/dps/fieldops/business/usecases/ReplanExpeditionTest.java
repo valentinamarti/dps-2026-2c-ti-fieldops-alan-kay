@@ -4,6 +4,7 @@ import ar.edu.itba.dps.fieldops.business.interfaces.validation.ExpeditionValidat
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
 import ar.edu.itba.dps.fieldops.business.models.validation.ApprovalResult;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
+import ar.edu.itba.dps.fieldops.business.replanning.Cancellation;
 import ar.edu.itba.dps.fieldops.business.replanning.ExpeditionReplanner;
 import ar.edu.itba.dps.fieldops.providers.InMemoryExpeditionRepository;
 import org.junit.jupiter.api.Test;
@@ -35,7 +36,7 @@ class ReplanExpeditionTest {
         original.submitForReview();
         original.approve(WITHOUT_PROBLEMS, List.of());
 
-        final var alternative = replanExpedition.replan(original, affectedItem);
+        final var alternative = replanExpedition.replan(original, affectedItem, new Cancellation());
 
         assertNotEquals(original.getId(), alternative.getId());
         assertEquals(ExpeditionStatus.DRAFT, alternative.getStatus());

@@ -1,5 +1,6 @@
 package ar.edu.itba.dps.fieldops.business.models.expeditions;
 
+import ar.edu.itba.dps.fieldops.business.interfaces.replanning.ReplanReason;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
@@ -23,6 +24,7 @@ public class ExpeditionBuilder {
     private TimePeriod period;
     private ExpeditionRestrictions restrictions;
     private ExpeditionId replacedExpedition;
+    private ReplanReason replanReason;
 
     public ExpeditionBuilder withName(String name) {
         this.name = name;
@@ -69,12 +71,17 @@ public class ExpeditionBuilder {
         return this;
     }
 
+    public ExpeditionBuilder withReplanReason(ReplanReason replanReason) {
+        this.replanReason = replanReason;
+        return this;
+    }
+
     public void addFinishedItem(ItineraryItem finished) {
         finishedItems.add(finished);
     }
 
     public Expedition build(ExpeditionId id) {
-        final var expedition = new Expedition(id, name, period, objectives, zones, responsibles, restrictions, grantedPermits, replacedExpedition);
+        final var expedition = new Expedition(id, name, period, objectives, zones, responsibles, restrictions, grantedPermits, replacedExpedition, replanReason);
         finishedItems.forEach(expedition::addFinishedCopyOf);
         plannedActivities.forEach(planned -> expedition.schedule(planned.activity(), planned.scheduledPeriod()));
         return expedition;

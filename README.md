@@ -30,6 +30,7 @@ src/main/java/ar/edu/itba/dps/fieldops
 ├── business            # business rules (policies): never depends on providers
 │   ├── interfaces      # domain contracts, apart from the classes implementing them
 │   │   ├── activities  # ActivityRules
+│   │   ├── replanning  # ReplanReason
 │   │   ├── resources   # Resource, ReusableResource, Equipment, DepletableResource, Certifiable, Categorized
 │   │   └── validation  # ValidationRule, ExpeditionValidator
 │   ├── models          # entities and value objects
@@ -46,7 +47,7 @@ src/main/java/ar/edu/itba/dps/fieldops
 │   ├── validations     # ValidationRule implementations and the ApprovalPolicy, which always runs the mandatory ones
 │   ├── estimations     # ExpeditionEstimator
 │   ├── reports         # ExpeditionReporter
-│   ├── replanning      # ExpeditionReplanner, builds a draft alternative around an affected item
+│   ├── replanning      # ExpeditionReplanner and the replan reasons: Cancellation, Delay, ResourceUnavailability
 │   ├── services        # ResourceReservations, books every resource of an expedition or none, and releases them
 │   ├── usecases        # CreateExpedition, ApproveExpedition, ReplanExpedition and FinishExpedition: operations that coordinate several objects
 │   └── exceptions      # domain exceptions
