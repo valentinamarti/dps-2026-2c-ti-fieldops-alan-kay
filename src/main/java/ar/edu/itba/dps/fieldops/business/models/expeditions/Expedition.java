@@ -125,6 +125,11 @@ public class Expedition {
         transitionTo(ExpeditionStatus.FINISHED);
     }
 
+    public void requireReplaceable() {
+        requireNoActivityInProgress();
+        requireCanTransitionTo(ExpeditionStatus.REPLACED);
+    }
+
     public void startActivity(ItineraryItem item, LocalDateTime at) {
         inExecution(item).start(at);
     }

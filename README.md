@@ -48,7 +48,7 @@ src/main/java/ar/edu/itba/dps/fieldops
 │   ├── reports         # ExpeditionReporter
 │   ├── replanning      # ExpeditionReplanner, builds a draft alternative around an affected item
 │   ├── services        # ResourceReservations, books every resource of an expedition or none, and releases them
-│   ├── usecases        # CreateExpedition, ApproveExpedition and FinishExpedition: operations that coordinate several objects
+│   ├── usecases        # CreateExpedition, ApproveExpedition, ReplanExpedition and FinishExpedition: operations that coordinate several objects
 │   └── exceptions      # domain exceptions
 └── providers           # implementations of business/providers (details): InMemoryExpeditionRepository
 src/test/java/...       # unit tests mirroring the main tree, an end-to-end integration test and shared fixtures

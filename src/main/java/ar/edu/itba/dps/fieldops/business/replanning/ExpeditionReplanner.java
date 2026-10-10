@@ -13,6 +13,7 @@ public class ExpeditionReplanner {
     public Expedition planAlternative(Expedition original, ExpeditionId alternativeId, ItineraryItem affectedItem) {
         Objects.requireNonNull(original, "original is required");
         Objects.requireNonNull(affectedItem, "affectedItem is required");
+        original.requireReplaceable();
         requireOwnItem(original, affectedItem);
 
         final var builder = new ExpeditionBuilder()

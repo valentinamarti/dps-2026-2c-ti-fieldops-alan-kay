@@ -17,7 +17,9 @@ class ExpeditionStatusTest {
             "IN_EXECUTION, SUSPENDED",
             "IN_EXECUTION, FINISHED",
             "SUSPENDED, IN_EXECUTION",
-            "SUSPENDED, FINISHED"
+            "SUSPENDED, FINISHED",
+            "APPROVED, REPLACED",
+            "SUSPENDED, REPLACED"
     })
     void followsTheApprovalAndExecutionFlow(ExpeditionStatus from, ExpeditionStatus to) {
         assertTrue(from.canTransitionTo(to));
@@ -30,7 +32,13 @@ class ExpeditionStatusTest {
             "IN_REVIEW, IN_EXECUTION",
             "APPROVED, DRAFT",
             "IN_EXECUTION, DRAFT",
-            "FINISHED, IN_EXECUTION"
+            "FINISHED, IN_EXECUTION",
+            "DRAFT, REPLACED",
+            "IN_REVIEW, REPLACED",
+            "IN_EXECUTION, REPLACED",
+            "FINISHED, REPLACED",
+            "REPLACED, IN_EXECUTION",
+            "REPLACED, APPROVED"
     })
     void cannotSkipStepsOrGoBackOnceApproved(ExpeditionStatus from, ExpeditionStatus to) {
         assertFalse(from.canTransitionTo(to));

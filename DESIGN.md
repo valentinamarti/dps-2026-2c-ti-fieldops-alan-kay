@@ -248,13 +248,14 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 - **Patrón / principio:** encapsulamiento de la regla en el tipo, sin patrón State (ver tabla de patrones no aplicados).
 - **Dónde:** `ExpeditionStatus.canTransitionTo`, `Expedition.submitForReview` y `returnToDraft`; `InvalidStatusTransitionException`.
 - **Por qué:**
-  - El enunciado define seis estados. Si el enum solo los listara, nada impediría pasar de borrador a en ejecución sin revisión ni aprobación. Las transiciones válidas son una tabla dentro del propio enum, así hay un único lugar donde leer el flujo completo:
+  - El enunciado define seis estados; el séptimo, reemplazada, lo agrega la replanificación (D33). Si el enum solo los listara, nada impediría pasar de borrador a en ejecución sin revisión ni aprobación. Las transiciones válidas son una tabla dentro del propio enum, así hay un único lugar donde leer el flujo completo:
     - borrador → revisión
     - revisión → borrador (se devuelve para corregir) o aprobada
-    - aprobada → en ejecución
+    - aprobada → en ejecución o reemplazada (D33)
     - en ejecución → suspendida o finalizada
-    - suspendida → en ejecución o finalizada
+    - suspendida → en ejecución, finalizada o reemplazada (D33)
     - finalizada → ninguna
+    - reemplazada → ninguna
   - `Expedition` le pregunta al enum antes de cada cambio y falla con excepción si la transición no es válida: cambiar de estado es un comando (D14). Terminar exige además que no quede ninguna actividad en curso (D29).
   - Una expedición aprobada no vuelve a borrador: si hay que cambiarla, se construye una alternativa (replanificación).
 - **Alternativas descartadas:** un `switch` sobre el estado en cada método de `Expedition` — repetiría el flujo en varios lugares y cada estado nuevo obligaría a tocarlos todos. Una clase por estado — ver la tabla de patrones no aplicados.
@@ -309,7 +310,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 ### D25 — Replanificación: reutilizar el builder para construir una alternativa en borrador
 
 - **Patrón / principio:** reutilización de Builder (D3) y de las puertas ya existentes (D19, D21) en vez de una regla nueva.
-- **Dónde:** `ExpeditionReplanner` (en `business.replanning`), único método `planAlternative(Expedition original, ExpeditionId alternativeId, ItineraryItem affectedItem)`.
+- **Dónde:** `ExpeditionReplanner` (en `business.replanning`), único método `planAlternative(Expedition original, ExpeditionId alternativeId, ItineraryItem affectedItem)`. Lo invoca el caso de uso `ReplanExpedition`, que le pide el id de la alternativa al repositorio (D26, D28). Solo replanifica una original que puede pasar a reemplazada (D33).
 - **Por qué:**
   - D20 ya había decidido que una expedición aprobada no vuelve a borrador: si hay que cambiarla, se construye una alternativa. Esta clase es esa construcción: arma un `ExpeditionBuilder` con los datos generales de la original (objetivos, zonas, responsables, restricciones, permisos), agenda de nuevo cada ítem salvo el afectado y copia sus asignaciones. El resultado es una `Expedition` nueva en borrador.
   - Cancelación, indisponibilidad y retraso —los tres motivos que pide el enunciado— no necesitan un método por caso: las tres se resuelven con el mismo primitivo, "sacar el ítem afectado del plan y dejarlo en borrador". Para una cancelación, el responsable no vuelve a agendar esa actividad; para un retraso, la reagenda en otro horario con `schedule` (D21); para una indisponibilidad, la reagenda y asigna otro recurso con `assignStaff`/`assignEquipment`/`assignSupply` (D19). Ningún caso pide una heurística de reprogramación automática, así que no hace falta una por motivo.
@@ -329,7 +330,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 - **Dónde:** `ExpeditionId`; interfaz `ExpeditionRepository` (en `business.providers`: `nextId`, `add`, `findById`) e implementación `InMemoryExpeditionRepository` (en `providers`); `DuplicateExpeditionException`; `ExpeditionBuilder.build(ExpeditionId)`; el caso de uso `CreateExpedition` (D28).
 - **Por qué:**
   - Las reservas y el stock reservado usan este id para saber de qué expedición son (D27, D30). Si el id pudiera repetirse, "liberar lo de e-1" sería ambiguo.
-  - No es el mismo caso que los recursos: el id de un recurso es **natural** (una patente, un documento), viene de afuera y el catálogo garantiza que no se repita (D18). El de una expedición es **sustituto**: no significa nada fuera del sistema, así que lo genera el sistema. `CreateExpedition` le pide el id al repositorio, construye la expedición y la guarda; `add` rechaza un id que ya existe, con el mismo criterio que el catálogo.
+  - No es el mismo caso que los recursos: el id de un recurso es **natural** (una patente, un documento), viene de afuera y el catálogo garantiza que no se repita (D18). El de una expedición es **sustituto**: no significa nada fuera del sistema, así que lo genera el sistema. `CreateExpedition` le pide el id al repositorio, construye la expedición y la guarda; `ReplanExpedition` hace lo mismo con la alternativa de una replanificación, así que tampoco `planAlternative` recibe un id inventado por el cliente. `add` rechaza un id que ya existe, con el mismo criterio que el catálogo.
   - El builder ya no tiene `withId`: recibe el id recién en `build(ExpeditionId)`. Arma la expedición con los datos de negocio, pero no invita a inventarle la identidad.
   - El repositorio es una interfaz de `business.providers` porque dónde se guardan las expediciones es un detalle (Clase 3). La implementación en memoria usa UUID, así que dos ids generados no coinciden aunque haya expediciones cargadas de otro lado.
   - Como value object, `ExpeditionId` compara por valor (D15), falla en blanco o nulo con la división de D16 y su `toString()` devuelve solo el valor.
@@ -361,15 +362,15 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 
 ### D28 — Casos de uso para las operaciones que coordinan varios objetos (corrección de la Entrega 1)
 
-- **Origen:** corrección de la Entrega 1, punto 7 (dónde viven los casos de uso) y punto 1 (el servicio de reservas, "invocado desde el caso de uso de aprobación"). Evaluamos la sugerencia del informe y la seguimos con `ApproveExpedition`, `FinishExpedition` y `CreateExpedition`.
+- **Origen:** corrección de la Entrega 1, punto 7 (dónde viven los casos de uso) y punto 1 (el servicio de reservas, "invocado desde el caso de uso de aprobación"). Evaluamos la sugerencia del informe y la seguimos con `ApproveExpedition`, `FinishExpedition`, `CreateExpedition` y `ReplanExpedition`.
 - **Patrón / principio:** caso de uso (capa de aplicación) + inyección de dependencias por constructor.
-- **Dónde:** en `business.usecases`: `ApproveExpedition`, que recibe la `ApprovalPolicy` y el `ResourceReservations` en el constructor; `FinishExpedition`, que recibe el `ResourceReservations`; y `CreateExpedition`, que recibe el `ExpeditionRepository`.
+- **Dónde:** en `business.usecases`: `ApproveExpedition`, que recibe la `ApprovalPolicy` y el `ResourceReservations` en el constructor; `FinishExpedition`, que recibe el `ResourceReservations`; `CreateExpedition`, que recibe el `ExpeditionRepository`; y `ReplanExpedition`, que recibe el `ExpeditionRepository` y el `ExpeditionReplanner`.
 - **Por qué:**
   - Una operación es método de la entidad cuando toca un solo objeto y no necesita nada de afuera (`schedule`, `assign*`, `startActivity`). Aprobar no es así: cambia el estado de la expedición y el calendario de cada recurso que usa, y necesita un validador. Esa coordinación es un caso de uso.
   - El orden importa: primero `requireReservable` (verifica sin reservar), después `Expedition.approve` (valida, exige las advertencias aceptadas y pasa a aprobada) y recién al final `reserveFor`. Si falla la verificación o la validación, no cambió nada. Si se aprobara antes de verificar, una reserva fallida dejaría una expedición aprobada sin recursos.
   - La política y el servicio llegan por constructor: quien aprueba no elige con qué validar en cada llamada, y la política ya trae las reglas obligatorias (D31).
   - Terminar también cambia la expedición y los calendarios de sus recursos. `FinishExpedition` primero termina la expedición y después libera: si la transición no es válida, falla antes de liberar nada, y liberar no puede fallar.
-  - Crear una expedición necesita algo de afuera: su id, que lo da el repositorio (D26). `CreateExpedition` es el dueño de esa decisión, como pide el informe: pide el id, construye con el builder y guarda.
+  - Crear una expedición necesita algo de afuera: su id, que lo da el repositorio (D26). `CreateExpedition` es el dueño de esa decisión, como pide el informe: pide el id, construye con el builder y guarda. `ReplanExpedition` hace lo mismo para la alternativa: le pide el id al repositorio, le pide la alternativa al replanificador y la guarda.
 - **Alternativas descartadas:** que el caso de uso reserve primero y libere si la validación falla — es la vuelta atrás que D27 ya descartó.
 - **Consecuencia:** `Expedition.approve` y `Expedition.finish` siguen siendo públicos y no tocan los calendarios; la aprobación y la finalización completas son las de los casos de uso.
 
@@ -430,6 +431,17 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - Que la aceptación guarde solo la clave (regla y sujeto) en vez del resultado — el informe de la expedición necesita mostrar qué advertencia se aceptó.
 - **Consecuencia:** dos resultados críticos de una misma regla sobre la misma actividad (por ejemplo, faltan personas y falta equipo) pueden tener el mismo sujeto. No es un problema, porque lo crítico no se acepta; las advertencias sí son una por actividad. El id de `Zone` queda como `String`: ninguna regla lo usa.
 
+### D33 — El ciclo de vida de la replanificación (corrección de la Entrega 1)
+
+- **Origen:** corrección de la Entrega 1, punto 6 (el ciclo de vida de la replanificación no estaba definido). `planAlternative` no miraba el estado de la original: aceptaba un borrador, que se puede editar directamente, y una expedición en ejecución. El informe propone un camino y pide elegir uno y documentarlo; seguimos el suyo.
+- **Patrón / principio:** la regla vive en la tabla de transiciones (D20) + caso de uso para la operación (D28).
+- **Dónde:** estado `REPLACED` en `ExpeditionStatus` (aprobada → reemplazada, suspendida → reemplazada, reemplazada → ninguna); `Expedition.requireReplaceable()`; `ExpeditionReplanner.planAlternative`; caso de uso `ReplanExpedition`.
+- **Por qué:**
+  - Solo se replanifica una expedición aprobada o suspendida. Un borrador se corrige directamente, y una en ejecución primero se suspende. La regla es "se puede replanificar si la expedición puede pasar a reemplazada", así que vive en la misma tabla de transiciones que los demás estados y no en un `if` aparte.
+  - Tampoco se replanifica con actividades en curso: primero se cierran, igual que para terminar (D29). Si no, la actividad en curso no quedaría ni en la original ni en la alternativa.
+  - `ReplanExpedition` le pide el id de la alternativa al repositorio y la guarda (D26), así que el id de la alternativa tampoco lo inventa quien llama.
+- **Alternativas descartadas:** una lista de estados permitidos dentro del replanificador — repetiría en otro lugar una regla que ya expresa la tabla de transiciones.
+
 ## Patrones que decidimos no aplicar
 
 | Patrón | Por qué no                                                                                                                                                                                              | Consecuencias |
@@ -456,3 +468,4 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 - Un consumible se mide en una sola unidad, la de su stock (`DepletableResource.unit()`). Si el itinerario lo pide en otra, `InsufficientSuppliesValidation` lo reporta como crítica en vez de fallar: es un catálogo mal cargado, no un faltante, pero tiene que salir junto con los demás problemas y no cortar la validación (D14).
 - Las validaciones de personal evalúan cada requisito por separado: una misma persona asignada puede contar para dos requisitos distintos de la misma actividad. Con dos requisitos de un buzo cada uno y un solo buzo asignado, los dos se dan por cubiertos. Resolverlo con exactitud es un problema de asignación uno a uno (matching) que el enunciado no justifica; si hiciera falta, la regla viviría en `StaffRequirement` y no en la validación.
 - La validación de superposición también compara contra las reservas de otras expediciones ya aprobadas, así que tiene sentido correrla antes de aprobar: una vez aprobada, la expedición tiene sus propias reservas.
+- El enunciado nombra seis estados de una expedición. Agregamos un séptimo, reemplazada (`REPLACED`), para la expedición original cuando se aprueba la alternativa de una replanificación (D33): no es una cancelación ni una finalización, y necesitaba su propio estado terminal.
