@@ -13,7 +13,7 @@ import java.util.Objects;
 public class Activity {
 
     @Getter
-    private final String id;
+    private final ActivityId id;
     @Getter
     private final String name;
     @Getter
@@ -24,8 +24,8 @@ public class Activity {
     private final List<Activity> dependencies;
     private final ActivityRules rules;
 
-    public Activity(String id, String name, TimePeriod timeWindow, Zone zone, List<Activity> dependencies, ActivityRules rules) {
-        this.id = DomainArguments.requireText(id, "id");
+    public Activity(ActivityId id, String name, TimePeriod timeWindow, Zone zone, List<Activity> dependencies, ActivityRules rules) {
+        this.id = Objects.requireNonNull(id, "id is required");
         this.name = DomainArguments.requireText(name, "name");
         this.timeWindow = Objects.requireNonNull(timeWindow, "timeWindow is required");
         this.zone = Objects.requireNonNull(zone, "zone is required");

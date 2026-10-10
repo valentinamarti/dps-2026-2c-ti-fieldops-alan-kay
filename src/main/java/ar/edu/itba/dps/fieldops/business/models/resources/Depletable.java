@@ -15,7 +15,7 @@ import java.util.Objects;
 public class Depletable implements DepletableResource {
 
     @Getter
-    private final String id;
+    private final ResourceId id;
     @Getter
     private final String name;
     private final ResourceCategory category;
@@ -23,8 +23,8 @@ public class Depletable implements DepletableResource {
     private Quantity stock;
     private final Map<ExpeditionId, Quantity> reserved = new HashMap<>();
 
-    public Depletable(String id, String name, ResourceCategory category, Quantity initialStock) {
-        this.id = DomainArguments.requireText(id, "id");
+    public Depletable(ResourceId id, String name, ResourceCategory category, Quantity initialStock) {
+        this.id = Objects.requireNonNull(id, "id is required");
         this.name = DomainArguments.requireText(name, "name");
         this.category = Objects.requireNonNull(category, "category is required");
         this.stock = Objects.requireNonNull(initialStock, "initial stock is required");

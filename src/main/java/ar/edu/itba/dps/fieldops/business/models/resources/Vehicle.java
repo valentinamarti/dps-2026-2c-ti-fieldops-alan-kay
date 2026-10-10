@@ -11,7 +11,7 @@ import java.util.Set;
 public class Vehicle extends ScheduledResource implements Equipment, Certifiable {
 
     @Getter
-    private final String id;
+    private final ResourceId id;
     @Getter
     private final String name;
     @Getter
@@ -19,8 +19,8 @@ public class Vehicle extends ScheduledResource implements Equipment, Certifiable
     private final ResourceCategory category;
     private final Certifications certifications;
 
-    public Vehicle(String id, String name, ResourceCategory category, String licensePlate, Set<Certification> certifications) {
-        this.id = DomainArguments.requireText(id, "id");
+    public Vehicle(ResourceId id, String name, ResourceCategory category, String licensePlate, Set<Certification> certifications) {
+        this.id = Objects.requireNonNull(id, "id is required");
         this.name = DomainArguments.requireText(name, "name");
         this.category = Objects.requireNonNull(category, "category is required");
         this.licensePlate = DomainArguments.requireText(licensePlate, "licensePlate");

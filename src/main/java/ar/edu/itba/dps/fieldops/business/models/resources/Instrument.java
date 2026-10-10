@@ -11,14 +11,14 @@ import java.util.Set;
 public class Instrument extends ScheduledResource implements Equipment, Certifiable {
 
     @Getter
-    private final String id;
+    private final ResourceId id;
     @Getter
     private final String name;
     private final ResourceCategory category;
     private final Certifications certifications;
 
-    public Instrument(String id, String name, ResourceCategory category, Set<Certification> certifications) {
-        this.id = DomainArguments.requireText(id, "id");
+    public Instrument(ResourceId id, String name, ResourceCategory category, Set<Certification> certifications) {
+        this.id = Objects.requireNonNull(id, "id is required");
         this.name = DomainArguments.requireText(name, "name");
         this.category = Objects.requireNonNull(category, "category is required");
         this.certifications = new Certifications(certifications);

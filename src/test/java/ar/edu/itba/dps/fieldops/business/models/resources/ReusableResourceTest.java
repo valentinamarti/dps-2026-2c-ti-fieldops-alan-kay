@@ -32,9 +32,9 @@ class ReusableResourceTest {
 
     static Stream<ReusableResource> resources() {
         return Stream.of(
-                new Person("p-1", "Ana", Set.of()),
-                new Vehicle("v-1", "Hilux", PICKUP, "ABC 123", Set.of()),
-                new Instrument("i-1", "Sonar 3000", SONAR, Set.of())
+                new Person(new ResourceId("p-1"), "Ana", Set.of()),
+                new Vehicle(new ResourceId("v-1"), "Hilux", PICKUP, "ABC 123", Set.of()),
+                new Instrument(new ResourceId("i-1"), "Sonar 3000", SONAR, Set.of())
         );
     }
 

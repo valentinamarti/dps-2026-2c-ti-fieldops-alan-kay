@@ -8,6 +8,7 @@ import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
 import ar.edu.itba.dps.fieldops.business.models.resources.Instrument;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
+import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import org.junit.jupiter.api.Test;
 
@@ -54,8 +55,8 @@ class ExpeditionTest {
     void assignsResourcesToAnItemOfItsItinerary() {
         final var item = expedition.schedule(sampling("a-1", coast, hours(8, 18)), hours(9, 11));
         final var worker = person("p-2");
-        final var cooler = new Instrument("i-1", "Cooler 40L", new ResourceCategory("Cooler"), Set.of());
-        final var containers = new Depletable("d-1", "Jars", new ResourceCategory("Sample container"), Quantity.of("10", UNITS));
+        final var cooler = new Instrument(new ResourceId("i-1"), "Cooler 40L", new ResourceCategory("Cooler"), Set.of());
+        final var containers = new Depletable(new ResourceId("d-1"), "Jars", new ResourceCategory("Sample container"), Quantity.of("10", UNITS));
 
         expedition.assignStaff(item, worker);
         expedition.assignEquipment(item, cooler);

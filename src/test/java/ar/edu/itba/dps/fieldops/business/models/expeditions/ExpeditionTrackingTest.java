@@ -7,6 +7,7 @@ import ar.edu.itba.dps.fieldops.business.exceptions.InvalidTrackingException;
 import ar.edu.itba.dps.fieldops.business.interfaces.activities.ActivityRules;
 import ar.edu.itba.dps.fieldops.business.interfaces.validation.ExpeditionValidator;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
+import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.activities.DepletableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.ReusableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
@@ -206,7 +207,7 @@ class ExpeditionTrackingTest {
     @Test
     void anActivityThatCannotConsumeEverySupplyConsumesNone() {
         final var multiSupplyExpedition = expeditionIn(coast, person("p-1")).build();
-        final var activity = new Activity("a-1", "Survey with boat", hours(0, 24), coast, List.of(), new FuelAndContainersRules());
+        final var activity = new Activity(new ActivityId("a-1"), "Survey with boat", hours(0, 24), coast, List.of(), new FuelAndContainersRules());
         final var multiSupplyItem = multiSupplyExpedition.schedule(activity, hours(9, 11));
         final var fuel = supply("d-2", "Fuel", Quantity.of("50", LITERS));
         final var scarceJars = supply("d-3", "Sample container", Quantity.of("2", UNITS));

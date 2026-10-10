@@ -19,7 +19,7 @@ class DepletableTest {
     private static final ExpeditionId ANOTHER_EXPEDITION = new ExpeditionId("e-2");
 
     private static Depletable fuelWithLiters(String liters) {
-        return new Depletable("c-1", "Diesel", FUEL, Quantity.of(liters, LITERS));
+        return new Depletable(new ResourceId("c-1"), "Diesel", FUEL, Quantity.of(liters, LITERS));
     }
 
     @Test

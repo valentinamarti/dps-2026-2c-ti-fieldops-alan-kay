@@ -2,6 +2,7 @@ package ar.edu.itba.dps.fieldops.business.models.expeditions;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
+import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.rules.SampleCollectionRules;
@@ -29,7 +30,7 @@ class ItineraryTest {
     }
 
     private static Activity sampling(String name, TimePeriod window, Activity... dependencies) {
-        return new Activity("a-" + name, name, window, COAST, List.of(dependencies), new SampleCollectionRules(3));
+        return new Activity(new ActivityId("a-" + name), name, window, COAST, List.of(dependencies), new SampleCollectionRules(3));
     }
 
     @Test

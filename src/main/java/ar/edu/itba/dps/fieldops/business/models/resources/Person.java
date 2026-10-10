@@ -4,18 +4,19 @@ import ar.edu.itba.dps.fieldops.business.interfaces.resources.Certifiable;
 import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
 import lombok.Getter;
 
+import java.util.Objects;
 import java.util.Set;
 
 public class Person extends ScheduledResource implements Certifiable {
 
     @Getter
-    private final String id;
+    private final ResourceId id;
     @Getter
     private final String name;
     private final Certifications certifications;
 
-    public Person(String id, String name, Set<Certification> certifications) {
-        this.id = DomainArguments.requireText(id, "id");
+    public Person(ResourceId id, String name, Set<Certification> certifications) {
+        this.id = Objects.requireNonNull(id, "id is required");
         this.name = DomainArguments.requireText(name, "name");
         this.certifications = new Certifications(certifications);
     }

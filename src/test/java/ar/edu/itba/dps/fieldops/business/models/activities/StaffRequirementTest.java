@@ -2,6 +2,7 @@ package ar.edu.itba.dps.fieldops.business.models.activities;
 
 import ar.edu.itba.dps.fieldops.business.models.resources.Certification;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
+import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;
@@ -19,14 +20,14 @@ class StaffRequirementTest {
 
     @Test
     void candidateWithEveryRequiredCertificationQualifies() {
-        final var candidate = new Person("p-1", "Ana", Set.of(DIVING, FIRST_AID));
+        final var candidate = new Person(new ResourceId("p-1"), "Ana", Set.of(DIVING, FIRST_AID));
 
         assertTrue(rescueDivers.qualifies(candidate));
     }
 
     @Test
     void candidateMissingOneRequiredCertificationDoesNotQualify() {
-        final var candidate = new Person("p-1", "Ana", Set.of(DIVING));
+        final var candidate = new Person(new ResourceId("p-1"), "Ana", Set.of(DIVING));
 
         assertFalse(rescueDivers.qualifies(candidate));
     }
@@ -35,7 +36,7 @@ class StaffRequirementTest {
     void requirementWithoutCertificationsAcceptsAnyCandidate() {
         final var anyone = new StaffRequirement(1, Set.of());
 
-        assertTrue(anyone.qualifies(new Person("p-1", "Ana", Set.of())));
+        assertTrue(anyone.qualifies(new Person(new ResourceId("p-1"), "Ana", Set.of())));
     }
 
     @Test

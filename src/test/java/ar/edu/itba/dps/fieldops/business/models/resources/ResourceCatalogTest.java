@@ -36,24 +36,24 @@ class ResourceCatalogTest {
 
     @Test
     void rejectsASecondResourceWithTheSameId() {
-        catalog.addStaff(new Person("r-1", "Ana", Set.of()));
+        catalog.addStaff(new Person(new ResourceId("r-1"), "Ana", Set.of()));
 
-        assertThrows(DuplicateResourceException.class, () -> catalog.addStaff(new Person("r-1", "Ana", Set.of())));
+        assertThrows(DuplicateResourceException.class, () -> catalog.addStaff(new Person(new ResourceId("r-1"), "Ana", Set.of())));
     }
 
     @Test
     void idsAreUniqueAcrossResourceKinds() {
-        catalog.addStaff(new Person("r-1", "Ana", Set.of()));
+        catalog.addStaff(new Person(new ResourceId("r-1"), "Ana", Set.of()));
 
         assertThrows(DuplicateResourceException.class,
-                () -> catalog.addEquipment(new Vehicle("r-1", "Albatros", BOAT, "ABC 123", Set.of())));
+                () -> catalog.addEquipment(new Vehicle(new ResourceId("r-1"), "Albatros", BOAT, "ABC 123", Set.of())));
     }
 
     @Test
     void offersOnlyStaffThatIsCertifiedAndFreeDuringThePeriod() {
-        final var certifiedAndFree = new Person("p-1", "Ana", Set.of(DIVING));
-        final var certifiedButBusy = new Person("p-2", "Bruno", Set.of(DIVING));
-        final var freeButNotCertified = new Person("p-3", "Carla", Set.of());
+        final var certifiedAndFree = new Person(new ResourceId("p-1"), "Ana", Set.of(DIVING));
+        final var certifiedButBusy = new Person(new ResourceId("p-2"), "Bruno", Set.of(DIVING));
+        final var freeButNotCertified = new Person(new ResourceId("p-3"), "Carla", Set.of());
         certifiedButBusy.reserve(new Reservation(ANOTHER_EXPEDITION, MORNING));
         catalog.addStaff(certifiedAndFree);
         catalog.addStaff(certifiedButBusy);
@@ -66,9 +66,9 @@ class ResourceCatalogTest {
 
     @Test
     void offersOnlyEquipmentOfTheRequiredCategoryThatIsFreeDuringThePeriod() {
-        final var freeBoat = new Vehicle("v-1", "Albatros", BOAT, "ABC 123", Set.of());
-        final var busyBoat = new Vehicle("v-2", "Petrel", BOAT, "DEF 456", Set.of());
-        final var freeSonar = new Instrument("i-1", "Sonar 3000", SONAR, Set.of());
+        final var freeBoat = new Vehicle(new ResourceId("v-1"), "Albatros", BOAT, "ABC 123", Set.of());
+        final var busyBoat = new Vehicle(new ResourceId("v-2"), "Petrel", BOAT, "DEF 456", Set.of());
+        final var freeSonar = new Instrument(new ResourceId("i-1"), "Sonar 3000", SONAR, Set.of());
         busyBoat.reserve(new Reservation(ANOTHER_EXPEDITION, hours(10, 11)));
         catalog.addEquipment(freeBoat);
         catalog.addEquipment(busyBoat);
@@ -81,9 +81,9 @@ class ResourceCatalogTest {
 
     @Test
     void offersOnlySuppliesOfTheRequiredCategoryWithEnoughStock() {
-        final var fullTank = new Depletable("d-1", "Diesel", FUEL, Quantity.of("50", LITERS));
-        final var almostEmptyTank = new Depletable("d-2", "Diesel reserve", FUEL, Quantity.of("5", LITERS));
-        final var water = new Depletable("d-3", "Drinking water", WATER, Quantity.of("100", LITERS));
+        final var fullTank = new Depletable(new ResourceId("d-1"), "Diesel", FUEL, Quantity.of("50", LITERS));
+        final var almostEmptyTank = new Depletable(new ResourceId("d-2"), "Diesel reserve", FUEL, Quantity.of("5", LITERS));
+        final var water = new Depletable(new ResourceId("d-3"), "Drinking water", WATER, Quantity.of("100", LITERS));
         catalog.addSupply(fullTank);
         catalog.addSupply(almostEmptyTank);
         catalog.addSupply(water);

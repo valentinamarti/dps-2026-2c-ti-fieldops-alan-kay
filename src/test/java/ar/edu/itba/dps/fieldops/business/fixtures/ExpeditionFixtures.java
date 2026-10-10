@@ -1,6 +1,7 @@
 package ar.edu.itba.dps.fieldops.business.fixtures;
 
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
+import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
@@ -14,6 +15,7 @@ import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
 import ar.edu.itba.dps.fieldops.business.models.resources.Instrument;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
+import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.resources.Vehicle;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.rules.DivingRules;
@@ -43,27 +45,27 @@ public final class ExpeditionFixtures {
     }
 
     public static Person person(String id, Certification... certifications) {
-        return new Person(id, "Person " + id, Set.of(certifications));
+        return new Person(new ResourceId(id), "Person " + id, Set.of(certifications));
     }
 
     public static Vehicle vehicle(String id, String category) {
-        return new Vehicle(id, category + " " + id, new ResourceCategory(category), "AA " + id, Set.of());
+        return new Vehicle(new ResourceId(id), category + " " + id, new ResourceCategory(category), "AA " + id, Set.of());
     }
 
     public static Instrument instrument(String id, String category) {
-        return new Instrument(id, category + " " + id, new ResourceCategory(category), Set.of());
+        return new Instrument(new ResourceId(id), category + " " + id, new ResourceCategory(category), Set.of());
     }
 
     public static Depletable supply(String id, String category, Quantity stock) {
-        return new Depletable(id, category + " " + id, new ResourceCategory(category), stock);
+        return new Depletable(new ResourceId(id), category + " " + id, new ResourceCategory(category), stock);
     }
 
     public static Activity sampling(String id, Zone zone, TimePeriod window, Activity... dependencies) {
-        return new Activity(id, "Sampling " + id, window, zone, List.of(dependencies), new SampleCollectionRules(3));
+        return new Activity(new ActivityId(id), "Sampling " + id, window, zone, List.of(dependencies), new SampleCollectionRules(3));
     }
 
     public static Activity diving(String id, Zone zone, TimePeriod window, int maxDepthMeters) {
-        return new Activity(id, "Diving " + id, window, zone, List.of(), new DivingRules(maxDepthMeters));
+        return new Activity(new ActivityId(id), "Diving " + id, window, zone, List.of(), new DivingRules(maxDepthMeters));
     }
 
     public static void assignCooler(Expedition expedition, ItineraryItem item) {
