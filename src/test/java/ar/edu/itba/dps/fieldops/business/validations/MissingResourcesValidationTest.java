@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.EXPEDITION_ID;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.instrument;
@@ -23,7 +24,7 @@ class MissingResourcesValidationTest {
 
     private final MissingResourcesValidation validation = new MissingResourcesValidation();
     private final Zone coast = zone("z-1");
-    private final Expedition expedition = expeditionIn(coast, person("p-1")).build();
+    private final Expedition expedition = expeditionIn(coast, person("p-1")).build(EXPEDITION_ID);
     private final ItineraryItem item = expedition.schedule(sampling("a-1", coast, hours(8, 18)), hours(9, 11));
 
     @Test

@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Set;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.EXPEDITION_ID;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -24,7 +25,7 @@ class MissingPermitsValidationTest {
 
     @Test
     void flagsEachPermitAZoneRequiresThatWasNotGranted() {
-        final var expedition = expeditionIn(reserve, person("p-1")).addPermit(NATIONAL_PARK).build();
+        final var expedition = expeditionIn(reserve, person("p-1")).addPermit(NATIONAL_PARK).build(EXPEDITION_ID);
 
         final var expected = ValidationResult.critical(MissingPermitsValidation.ID, ValidationSubject.expedition(), "Marine reserve requires the permit Marine reserve access, which was not granted");
         assertEquals(List.of(expected), validation.validate(expedition));
@@ -32,7 +33,7 @@ class MissingPermitsValidationTest {
 
     @Test
     void acceptsAnExpeditionWithEveryPermitItsZonesRequire() {
-        final var expedition = expeditionIn(reserve, person("p-1")).addPermit(NATIONAL_PARK).addPermit(MARINE_RESERVE).build();
+        final var expedition = expeditionIn(reserve, person("p-1")).addPermit(NATIONAL_PARK).addPermit(MARINE_RESERVE).build(EXPEDITION_ID);
 
         assertTrue(validation.validate(expedition).isEmpty());
     }

@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.EXPEDITION_ID;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.assignContainers;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.assignCooler;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
@@ -33,7 +34,7 @@ class FinishExpeditionTest {
     private final ResourceReservations reservations = new ResourceReservations();
     private final FinishExpedition finishExpedition = new FinishExpedition(reservations);
     private final Zone coast = zone("z-1");
-    private final Expedition expedition = expeditionIn(coast, person("p-1")).build();
+    private final Expedition expedition = expeditionIn(coast, person("p-1")).build(EXPEDITION_ID);
     private final Person worker = person("p-2");
 
     private void approveEquipped() {

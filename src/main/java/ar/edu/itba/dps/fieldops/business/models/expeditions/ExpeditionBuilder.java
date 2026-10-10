@@ -18,15 +18,9 @@ public class ExpeditionBuilder {
     private final Set<Person> responsibles = new HashSet<>();
     private final Set<Permit> grantedPermits = new HashSet<>();
     private final List<PlannedActivity> plannedActivities = new ArrayList<>();
-    private ExpeditionId id;
     private String name;
     private TimePeriod period;
     private ExpeditionRestrictions restrictions;
-
-    public ExpeditionBuilder withId(ExpeditionId id) {
-        this.id = id;
-        return this;
-    }
 
     public ExpeditionBuilder withName(String name) {
         this.name = name;
@@ -68,7 +62,7 @@ public class ExpeditionBuilder {
         return this;
     }
 
-    public Expedition build() {
+    public Expedition build(ExpeditionId id) {
         final var expedition = new Expedition(id, name, period, objectives, zones, responsibles, restrictions, grantedPermits);
         plannedActivities.forEach(planned -> expedition.schedule(planned.activity(), planned.scheduledPeriod()));
         return expedition;

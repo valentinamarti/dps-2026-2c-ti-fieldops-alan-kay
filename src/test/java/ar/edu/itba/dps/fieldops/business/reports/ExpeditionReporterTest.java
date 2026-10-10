@@ -24,6 +24,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.EXPEDITION_ID;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
@@ -43,7 +44,7 @@ class ExpeditionReporterTest {
     private final ExpeditionReporter reporter = new ExpeditionReporter(new ExpeditionEstimator());
     private final Zone coast = zone("z-1");
     private final Person leader = person("p-1");
-    private final Expedition expedition = expeditionIn(coast, leader).build();
+    private final Expedition expedition = expeditionIn(coast, leader).build(EXPEDITION_ID);
     private final Depletable jars = supply("d-1", "Sample container", Quantity.of("20", UNITS));
     private final ItineraryItem morning = expedition.schedule(sampling("a-1", coast, hours(0, 24)), hours(9, 11));
     private final ItineraryItem afternoon = expedition.schedule(sampling("a-2", coast, hours(0, 24)), hours(14, 16));

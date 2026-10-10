@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.DIVING;
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.EXPEDITION_ID;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.diving;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
@@ -23,7 +24,7 @@ class MissingCertificationsValidationTest {
 
     private final MissingCertificationsValidation validation = new MissingCertificationsValidation();
     private final Zone reef = zone("z-1");
-    private final Expedition expedition = expeditionIn(reef, person("p-1")).build();
+    private final Expedition expedition = expeditionIn(reef, person("p-1")).build(EXPEDITION_ID);
     private final ItineraryItem dive = expedition.schedule(diving("a-1", reef, hours(8, 18), 10), hours(9, 11));
 
     @Test

@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.EXPEDITION_ID;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.diving;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
@@ -26,7 +27,7 @@ class ApprovalPolicyTest {
     private static final ValidationResult RISKY_DIVE = ValidationResult.warning(new RuleId("risk-tolerance"), ValidationSubject.of(new ActivityId("a-1")), "Diving a-1 has HIGH risk");
 
     private final Zone coast = zone("z-1");
-    private final Expedition expedition = expeditionIn(coast, person("p-1")).build();
+    private final Expedition expedition = expeditionIn(coast, person("p-1")).build(EXPEDITION_ID);
 
     private static ApprovalPolicy policyAdding(ValidationRule... rules) {
         return new ApprovalPolicy(List.of(rules));

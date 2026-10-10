@@ -16,7 +16,6 @@ public class ExpeditionReplanner {
         requireOwnItem(original, affectedItem);
 
         final var builder = new ExpeditionBuilder()
-                .withId(alternativeId)
                 .withName(original.getName())
                 .withPeriod(original.getPeriod())
                 .withRestrictions(original.getRestrictions());
@@ -27,7 +26,7 @@ public class ExpeditionReplanner {
         unaffectedItemsOf(original, affectedItem)
                 .forEach(item -> builder.addActivity(item.getActivity(), item.getScheduledPeriod()));
 
-        final var alternative = builder.build();
+        final var alternative = builder.build(alternativeId);
         copyAssignments(original, alternative, affectedItem);
         return alternative;
     }

@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.EXPEDITION_ID;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
@@ -26,7 +27,7 @@ class CapacityExceededValidationTest {
     private final Zone coast = zone("z-1");
     private final Expedition expedition = expeditionIn(coast, person("p-1"))
             .withRestrictions(new ExpeditionRestrictions(1, RiskLevel.MEDIUM))
-            .build();
+            .build(EXPEDITION_ID);
 
     private ItineraryItem scheduleSampling(String activityId, TimePeriod period) {
         return expedition.schedule(sampling(activityId, coast, hours(0, 24)), period);

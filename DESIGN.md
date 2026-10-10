@@ -40,7 +40,8 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 - **Dónde:** `ExpeditionBuilder` + `Expedition` (en `business.models.expeditions`).
 - **Por qué:**
   - `Expedition` tiene muchos datos y colecciones (objetivos, zonas, responsables, permisos otorgados, restricciones, actividades), lo que hace ilegible un constructor tradicional. El constructor de `Expedition` es package-private: desde afuera del paquete, la única forma de crear una expedición es el builder.
-  - El builder no repite validaciones. `build()` llama al constructor, que aplica los guards de D16 (textos obligatorios, colecciones obligatorias y no vacías), y agenda las actividades con el mismo `Expedition.schedule` que se usa después de crear la expedición. Así las reglas para agendar (D21) viven en un solo lugar, se agende desde el builder o después.
+  - El builder no elige la identidad de la expedición: el id llega en `build(ExpeditionId)` y lo genera el sistema (D26).
+  - El builder no repite validaciones. `build(ExpeditionId)` llama al constructor, que aplica los guards de D16 (textos obligatorios, colecciones obligatorias y no vacías), y agenda las actividades con el mismo `Expedition.schedule` que se usa después de crear la expedición. Así las reglas para agendar (D21) viven en un solo lugar, se agende desde el builder o después.
   - La validación de negocio pesada corre aparte con la `ApprovalPolicy` (D2, D31) antes de permitir el paso a "Approved" — así el builder no termina siendo responsable de todo.
 - **Alternativas descartadas:**
   - Builder + Director — más estructura de la que hace falta para este caso.
@@ -225,7 +226,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - Detectar duplicados recién en la validación de la expedición: llega tarde, el mismo recurso real ya pudo reservarse en dos instancias distintas.
   - Un catálogo por tipo de recurso: repetiría la regla de unicidad y permitiría repetir un `id` entre tipos.
   - Exponer las listas con getters y filtrar afuera: cada cliente reimplementaría "cumple el requisito y está libre".
-- **Consecuencia:** es una clase concreta en memoria. Si más adelante hay persistencia, el contrato se extrae a `business/providers` con estas mismas consultas y esta clase pasa a ser un detalle.
+- **Consecuencia:** es una clase concreta en memoria. Si más adelante hay persistencia, el contrato se extrae a `business/providers` con estas mismas consultas y esta clase pasa a ser un detalle, como ya se hizo con las expediciones (D26).
 
 
 ### D19 — La expedición es la única puerta para modificar su itinerario
@@ -321,13 +322,21 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 - **Consecuencia:** si el ítem afectado tiene dependientes ya agendados, `planAlternative` falla en vez de dejarlos huérfanos o quitarlos en cascada; quien replanifica tiene que decidir explícitamente qué hacer con ellos primero.
 
 
-### D26 — El id de la expedición como value object (corrección de la Entrega 1)
+### D26 — El id de la expedición es un value object y lo genera el sistema (corrección de la Entrega 1)
 
-- **Origen:** corrección de la Entrega 1, punto 5 (el id de la expedición lo inventa el cliente). Evaluamos el hallazgo y convertimos el id en un value object, que es lo que D16 preveía cuando un id ganara reglas propias.
-- **Patrón / principio:** value object (D8).
-- **Dónde:** `ExpeditionId`, usado por `Expedition`, `ExpeditionBuilder.withId` y `ExpeditionReplanner.planAlternative`.
-- **Por qué:** las reservas usan este id para saber qué expedición las hizo (D27). Con un `String` suelto se puede pasar el id de un recurso donde va el de una expedición; con `ExpeditionId` el compilador lo rechaza. Como `record`, compara por valor (D15). Un valor en blanco falla en el propio id y uno nulo en `Expedition`, con la división de excepciones de D16. `toString()` devuelve solo el valor, para que los mensajes digan `e-1`.
-- **Alternativas descartadas:** dejar el `String` y controlar solo la unicidad — no evita confundirlo con otro id.
+- **Origen:** corrección de la Entrega 1, punto 5 (el id de la expedición lo inventa el cliente). Se construían dos expediciones con el mismo id sin ningún error. Evaluamos la sugerencia del informe (que la expedición obtenga su id de un `nextId()` en un repositorio) y la seguimos.
+- **Patrón / principio:** value object (D8) + Dependency Inversion (el negocio define el contrato del repositorio y la implementación es un detalle).
+- **Dónde:** `ExpeditionId`; interfaz `ExpeditionRepository` (en `business.providers`: `nextId`, `add`, `findById`) e implementación `InMemoryExpeditionRepository` (en `providers`); `DuplicateExpeditionException`; `ExpeditionBuilder.build(ExpeditionId)`; el caso de uso `CreateExpedition` (D28).
+- **Por qué:**
+  - Las reservas y el stock reservado usan este id para saber de qué expedición son (D27, D30). Si el id pudiera repetirse, "liberar lo de e-1" sería ambiguo.
+  - No es el mismo caso que los recursos: el id de un recurso es **natural** (una patente, un documento), viene de afuera y el catálogo garantiza que no se repita (D18). El de una expedición es **sustituto**: no significa nada fuera del sistema, así que lo genera el sistema. `CreateExpedition` le pide el id al repositorio, construye la expedición y la guarda; `add` rechaza un id que ya existe, con el mismo criterio que el catálogo.
+  - El builder ya no tiene `withId`: recibe el id recién en `build(ExpeditionId)`. Arma la expedición con los datos de negocio, pero no invita a inventarle la identidad.
+  - El repositorio es una interfaz de `business.providers` porque dónde se guardan las expediciones es un detalle (Clase 3). La implementación en memoria usa UUID, así que dos ids generados no coinciden aunque haya expediciones cargadas de otro lado.
+  - Como value object, `ExpeditionId` compara por valor (D15), falla en blanco o nulo con la división de D16 y su `toString()` devuelve solo el valor.
+- **Alternativas descartadas:**
+  - Dejar el `String` y controlar solo la unicidad — no evita confundirlo con otro id.
+  - Un `IdGenerator` aparte del repositorio — generar el id y garantizar que no se repita quedarían en lugares distintos, y la unicidad depende de lo que ya está guardado.
+  - Dejar `withId` y validar la unicidad recién al guardar — el builder seguiría invitando a inventar el id.
 
 
 ### D27 — Reservas con dueño, liberables y todo o nada; indisponibilidades aparte (corrección de la Entrega 1)
@@ -352,14 +361,15 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 
 ### D28 — Casos de uso para las operaciones que coordinan varios objetos (corrección de la Entrega 1)
 
-- **Origen:** corrección de la Entrega 1, punto 7 (dónde viven los casos de uso) y punto 1 (el servicio de reservas, "invocado desde el caso de uso de aprobación"). Evaluamos la sugerencia del informe y la seguimos con `ApproveExpedition` y `FinishExpedition`.
+- **Origen:** corrección de la Entrega 1, punto 7 (dónde viven los casos de uso) y punto 1 (el servicio de reservas, "invocado desde el caso de uso de aprobación"). Evaluamos la sugerencia del informe y la seguimos con `ApproveExpedition`, `FinishExpedition` y `CreateExpedition`.
 - **Patrón / principio:** caso de uso (capa de aplicación) + inyección de dependencias por constructor.
-- **Dónde:** en `business.usecases`: `ApproveExpedition`, que recibe la `ApprovalPolicy` y el `ResourceReservations` en el constructor, y `FinishExpedition`, que recibe el `ResourceReservations`.
+- **Dónde:** en `business.usecases`: `ApproveExpedition`, que recibe la `ApprovalPolicy` y el `ResourceReservations` en el constructor; `FinishExpedition`, que recibe el `ResourceReservations`; y `CreateExpedition`, que recibe el `ExpeditionRepository`.
 - **Por qué:**
   - Una operación es método de la entidad cuando toca un solo objeto y no necesita nada de afuera (`schedule`, `assign*`, `startActivity`). Aprobar no es así: cambia el estado de la expedición y el calendario de cada recurso que usa, y necesita un validador. Esa coordinación es un caso de uso.
   - El orden importa: primero `requireReservable` (verifica sin reservar), después `Expedition.approve` (valida, exige las advertencias aceptadas y pasa a aprobada) y recién al final `reserveFor`. Si falla la verificación o la validación, no cambió nada. Si se aprobara antes de verificar, una reserva fallida dejaría una expedición aprobada sin recursos.
   - La política y el servicio llegan por constructor: quien aprueba no elige con qué validar en cada llamada, y la política ya trae las reglas obligatorias (D31).
   - Terminar también cambia la expedición y los calendarios de sus recursos. `FinishExpedition` primero termina la expedición y después libera: si la transición no es válida, falla antes de liberar nada, y liberar no puede fallar.
+  - Crear una expedición necesita algo de afuera: su id, que lo da el repositorio (D26). `CreateExpedition` es el dueño de esa decisión, como pide el informe: pide el id, construye con el builder y guarda.
 - **Alternativas descartadas:** que el caso de uso reserve primero y libere si la validación falla — es la vuelta atrás que D27 ya descartó.
 - **Consecuencia:** `Expedition.approve` y `Expedition.finish` siguen siendo públicos y no tocan los calendarios; la aprobación y la finalización completas son las de los casos de uso.
 

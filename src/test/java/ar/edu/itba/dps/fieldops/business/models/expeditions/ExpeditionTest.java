@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Set;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.EXPEDITION_ID;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
@@ -28,7 +29,7 @@ class ExpeditionTest {
 
     private final Zone coast = zone("z-1");
     private final Person leader = person("p-1");
-    private final Expedition expedition = expeditionIn(coast, leader).build();
+    private final Expedition expedition = expeditionIn(coast, leader).build(EXPEDITION_ID);
 
     @Test
     void schedulesAnActivityOfOneOfItsZonesWithinItsPeriod() {
@@ -80,7 +81,7 @@ class ExpeditionTest {
 
     @Test
     void rejectsAssignmentsToAnItemOfAnotherExpedition() {
-        final var otherExpedition = expeditionIn(coast, leader).build();
+        final var otherExpedition = expeditionIn(coast, leader).build(EXPEDITION_ID);
         final var foreignItem = otherExpedition.schedule(sampling("a-1", coast, hours(8, 18)), hours(9, 11));
 
         assertThrows(IllegalArgumentException.class, () -> expedition.assignStaff(foreignItem, person("p-2")));

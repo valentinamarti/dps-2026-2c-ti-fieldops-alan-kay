@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.EXPEDITION_ID;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.assignContainers;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.assignCooler;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.diving;
@@ -42,7 +43,7 @@ class ApproveExpeditionTest {
 
     private final Zone coast = zone("z-1");
     private final Person leader = person("p-1");
-    private final Expedition expedition = expeditionIn(coast, leader).build();
+    private final Expedition expedition = expeditionIn(coast, leader).build(EXPEDITION_ID);
     private final ResourceReservations reservations = new ResourceReservations();
 
     private ApproveExpedition finding(ValidationResult... results) {
@@ -82,7 +83,7 @@ class ApproveExpeditionTest {
     void aResourceTakenAfterTheValidationStopsTheApprovalWithoutReservingAnything() {
         final var takenWorker = person("p-2");
         final var freeWorker = person("p-3");
-        final var otherExpedition = expeditionIn(coast, leader).build();
+        final var otherExpedition = expeditionIn(coast, leader).build(EXPEDITION_ID);
         final var otherItem = otherExpedition.schedule(sampling("a-9", coast, hours(8, 18)), hours(9, 11));
         otherExpedition.assignStaff(otherItem, takenWorker);
         assignCooler(otherExpedition, otherItem);
@@ -137,12 +138,12 @@ class ApproveExpeditionTest {
         final var jars = supply("d-1", "Sample container", Quantity.of("3", UNITS));
         final var policy = new ApprovalPolicy(List.of());
         final var approveExpedition = new ApproveExpedition(policy, reservations);
-        final var first = expeditionIn(coast, leader).withId(new ExpeditionId("e-1")).build();
+        final var first = expeditionIn(coast, leader).build(new ExpeditionId("e-1"));
         final var firstItem = first.schedule(sampling("a-1", coast, hours(0, 24)), hours(9, 11));
         first.assignSupply(firstItem, jars);
         first.assignStaff(firstItem, person("p-2"));
         assignCooler(first, firstItem);
-        final var second = expeditionIn(coast, leader).withId(new ExpeditionId("e-2")).build();
+        final var second = expeditionIn(coast, leader).build(new ExpeditionId("e-2"));
         final var secondItem = second.schedule(sampling("a-2", coast, hours(0, 24)), hours(13, 15));
         second.assignSupply(secondItem, jars);
         second.assignStaff(secondItem, person("p-3"));

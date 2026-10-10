@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Set;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.EXPEDITION_ID;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
@@ -26,7 +27,7 @@ class ExpeditionReplannerTest {
 
     @Test
     void keepsUnaffectedItemsWithTheirAssignmentsAndDropsTheAffectedOne() {
-        final var expedition = expeditionIn(coast, leader).build();
+        final var expedition = expeditionIn(coast, leader).build(EXPEDITION_ID);
         final var keptActivity = sampling("a-1", coast, hours(8, 18));
         final var affectedActivity = sampling("a-2", coast, hours(8, 18));
         final var keptItem = expedition.schedule(keptActivity, hours(9, 11));
@@ -45,8 +46,8 @@ class ExpeditionReplannerTest {
 
     @Test
     void rejectsAnItemThatDoesNotBelongToTheOriginalExpedition() {
-        final var expedition = expeditionIn(coast, leader).build();
-        final var otherExpedition = expeditionIn(coast, leader).build();
+        final var expedition = expeditionIn(coast, leader).build(EXPEDITION_ID);
+        final var otherExpedition = expeditionIn(coast, leader).build(EXPEDITION_ID);
         final var foreignItem = otherExpedition.schedule(sampling("a-1", coast, hours(8, 18)), hours(9, 11));
 
         assertThrows(IllegalArgumentException.class,
@@ -55,7 +56,7 @@ class ExpeditionReplannerTest {
 
     @Test
     void failsWhenAScheduledActivityDependsOnTheAffectedOne() {
-        final var expedition = expeditionIn(coast, leader).build();
+        final var expedition = expeditionIn(coast, leader).build(EXPEDITION_ID);
         final var dependency = sampling("a-1", coast, hours(8, 18));
         final var dependent = sampling("a-2", coast, hours(8, 18), dependency);
         final var affectedItem = expedition.schedule(dependency, hours(9, 11));

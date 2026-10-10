@@ -10,6 +10,7 @@ import ar.edu.itba.dps.fieldops.business.models.resources.Reservation;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import org.junit.jupiter.api.Test;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.EXPEDITION_ID;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.instrument;
@@ -28,7 +29,7 @@ class ResourceReservationsTest {
 
     private final ResourceReservations reservations = new ResourceReservations();
     private final Zone coast = zone("z-1");
-    private final Expedition expedition = expeditionIn(coast, person("p-1")).build();
+    private final Expedition expedition = expeditionIn(coast, person("p-1")).build(EXPEDITION_ID);
     private final Person worker = person("p-2");
 
     @Test

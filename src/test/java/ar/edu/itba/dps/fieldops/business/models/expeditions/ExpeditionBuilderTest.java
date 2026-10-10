@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Set;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.EXPEDITION_ID;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
@@ -27,7 +28,7 @@ class ExpeditionBuilderTest {
 
     @Test
     void buildsADraftWithTheGivenData() {
-        final var expedition = expeditionIn(coast, leader).build();
+        final var expedition = expeditionIn(coast, leader).build(EXPEDITION_ID);
 
         assertEquals(ExpeditionStatus.DRAFT, expedition.getStatus());
         assertEquals(List.of("Map the coastal reef"), expedition.getObjectives());
@@ -40,7 +41,7 @@ class ExpeditionBuilderTest {
     void schedulesTheActivitiesAddedToIt() {
         final var survey = sampling("a-1", coast, hours(8, 18));
 
-        final var expedition = expeditionIn(coast, leader).addActivity(survey, hours(9, 11)).build();
+        final var expedition = expeditionIn(coast, leader).addActivity(survey, hours(9, 11)).build(EXPEDITION_ID);
 
         assertTrue(expedition.getItinerary().itemFor(survey).isPresent());
     }
@@ -50,32 +51,32 @@ class ExpeditionBuilderTest {
         final var morningSurvey = sampling("a-1", coast, hours(8, 12));
 
         assertThrows(InvalidScheduleException.class,
-                () -> expeditionIn(coast, leader).addActivity(morningSurvey, hours(11, 13)).build());
+                () -> expeditionIn(coast, leader).addActivity(morningSurvey, hours(11, 13)).build(EXPEDITION_ID));
     }
 
     @Test
     void rejectsAnExpeditionWithoutId() {
-        assertThrows(NullPointerException.class, () -> expeditionIn(coast, leader).withId(null).build());
+        assertThrows(NullPointerException.class, () -> expeditionIn(coast, leader).build(null));
     }
 
     @Test
     void rejectsAnExpeditionWithoutNamePeriodOrRestrictions() {
-        assertThrows(IllegalArgumentException.class, () -> expeditionIn(coast, leader).withName(" ").build());
-        assertThrows(NullPointerException.class, () -> expeditionIn(coast, leader).withPeriod(null).build());
-        assertThrows(NullPointerException.class, () -> expeditionIn(coast, leader).withRestrictions(null).build());
+        assertThrows(IllegalArgumentException.class, () -> expeditionIn(coast, leader).withName(" ").build(EXPEDITION_ID));
+        assertThrows(NullPointerException.class, () -> expeditionIn(coast, leader).withPeriod(null).build(EXPEDITION_ID));
+        assertThrows(NullPointerException.class, () -> expeditionIn(coast, leader).withRestrictions(null).build(EXPEDITION_ID));
     }
 
     @Test
     void rejectsAnExpeditionWithoutObjectivesZonesOrResponsibles() {
-        final var withoutObjectives = new ExpeditionBuilder().withId(new ExpeditionId("e-1")).withName("Survey").withPeriod(hours(0, 24))
+        final var withoutObjectives = new ExpeditionBuilder().withName("Survey").withPeriod(hours(0, 24))
                 .withRestrictions(RESTRICTIONS).addZone(coast).addResponsible(leader);
-        final var withoutZones = new ExpeditionBuilder().withId(new ExpeditionId("e-1")).withName("Survey").withPeriod(hours(0, 24))
+        final var withoutZones = new ExpeditionBuilder().withName("Survey").withPeriod(hours(0, 24))
                 .withRestrictions(RESTRICTIONS).addObjective("Map the reef").addResponsible(leader);
-        final var withoutResponsibles = new ExpeditionBuilder().withId(new ExpeditionId("e-1")).withName("Survey").withPeriod(hours(0, 24))
+        final var withoutResponsibles = new ExpeditionBuilder().withName("Survey").withPeriod(hours(0, 24))
                 .withRestrictions(RESTRICTIONS).addObjective("Map the reef").addZone(coast);
 
-        assertThrows(IllegalArgumentException.class, withoutObjectives::build);
-        assertThrows(IllegalArgumentException.class, withoutZones::build);
-        assertThrows(IllegalArgumentException.class, withoutResponsibles::build);
+        assertThrows(IllegalArgumentException.class, () -> withoutObjectives.build(EXPEDITION_ID));
+        assertThrows(IllegalArgumentException.class, () -> withoutZones.build(EXPEDITION_ID));
+        assertThrows(IllegalArgumentException.class, () -> withoutResponsibles.build(EXPEDITION_ID));
     }
 }

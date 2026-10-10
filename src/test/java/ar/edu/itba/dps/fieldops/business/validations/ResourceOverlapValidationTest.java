@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.EXPEDITION_ID;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
@@ -29,7 +30,7 @@ class ResourceOverlapValidationTest {
 
     private final ResourceOverlapValidation validation = new ResourceOverlapValidation();
     private final Zone coast = zone("z-1");
-    private final Expedition expedition = expeditionIn(coast, person("p-1")).build();
+    private final Expedition expedition = expeditionIn(coast, person("p-1")).build(EXPEDITION_ID);
     private final Person worker = person("p-2");
 
     private void scheduleWithWorker(String activityId, TimePeriod period) {

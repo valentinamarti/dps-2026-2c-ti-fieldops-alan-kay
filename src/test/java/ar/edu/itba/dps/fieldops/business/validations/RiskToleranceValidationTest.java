@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.EXPEDITION_ID;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.diving;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
@@ -21,7 +22,7 @@ class RiskToleranceValidationTest {
 
     private final RiskToleranceValidation validation = new RiskToleranceValidation();
     private final Zone reef = zone("z-1");
-    private final Expedition expedition = expeditionIn(reef, person("p-1")).build();
+    private final Expedition expedition = expeditionIn(reef, person("p-1")).build(EXPEDITION_ID);
 
     @Test
     void warnsAboutAnActivityRiskierThanTheExpeditionTolerance() {

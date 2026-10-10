@@ -88,7 +88,6 @@ class ExpeditionLifecycleIntegrationTest {
 
     private Expedition draft() {
         return new ExpeditionBuilder()
-                .withId(new ExpeditionId("e-1"))
                 .withName("Reef survey")
                 .withPeriod(hours(0, 24))
                 .addObjective("Map the reef and collect water samples")
@@ -96,7 +95,7 @@ class ExpeditionLifecycleIntegrationTest {
                 .addResponsible(leader)
                 .addPermit(MARINE_RESERVE)
                 .withRestrictions(new ExpeditionRestrictions(10, RiskLevel.MEDIUM))
-                .build();
+                .build(new ExpeditionId("e-1"));
     }
 
 
@@ -156,14 +155,13 @@ class ExpeditionLifecycleIntegrationTest {
     @Test
     void anExpeditionMissingPermitsAndResourcesCannotBeApproved() {
         final var expedition = new ExpeditionBuilder()
-                .withId(new ExpeditionId("e-2"))
                 .withName("Unprepared dive")
                 .withPeriod(hours(0, 24))
                 .addObjective("Dive without a permit")
                 .addZone(reef)
                 .addResponsible(leader)
                 .withRestrictions(new ExpeditionRestrictions(10, RiskLevel.HIGH))
-                .build();
+                .build(new ExpeditionId("e-2"));
         expedition.schedule(dive, divePeriod);
         expedition.submitForReview();
 

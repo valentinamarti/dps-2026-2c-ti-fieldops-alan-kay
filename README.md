@@ -27,37 +27,37 @@ What exists today:
 
 ```
 src/main/java/ar/edu/itba/dps/fieldops
-└── business            # business rules (policies): never depends on providers
-    ├── interfaces      # domain contracts, apart from the classes implementing them
-    │   ├── activities  # ActivityRules
-    │   ├── resources   # Resource, ReusableResource, Equipment, DepletableResource, Certifiable, Categorized
-    │   └── validation  # ValidationRule, ExpeditionValidator
-    ├── models          # entities and value objects
-    │   ├── activities  # Activity and its requirements
-    │   ├── common      # TimePeriod, Quantity, MeasurementUnit, DomainArguments
-    │   ├── estimation  # ExpeditionEstimate
-    │   ├── expeditions # Expedition, its builder, statuses, itinerary and tracking
-    │   ├── report      # ExpeditionReport
-    │   ├── resources   # people, vehicles, instruments, consumables and the ResourceCatalog
-    │   ├── validation  # ValidationResult, Severity, ApprovalResult, AcceptedWarning
-    │   └── zones       # zones and permits
-    ├── rules           # ActivityRules implementations, one per activity type
-    ├── validations     # ValidationRule implementations and the ApprovalPolicy, which always runs the mandatory ones
-    ├── estimations     # ExpeditionEstimator
-    ├── reports         # ExpeditionReporter
-    ├── replanning      # ExpeditionReplanner, builds a draft alternative around an affected item
-    ├── services        # ResourceReservations, books every resource of an expedition or none, and releases them
-    ├── usecases        # ApproveExpedition and FinishExpedition, coordinate the expedition with its reservations
-    └── exceptions      # domain exceptions
+├── business            # business rules (policies): never depends on providers
+│   ├── interfaces      # domain contracts, apart from the classes implementing them
+│   │   ├── activities  # ActivityRules
+│   │   ├── resources   # Resource, ReusableResource, Equipment, DepletableResource, Certifiable, Categorized
+│   │   └── validation  # ValidationRule, ExpeditionValidator
+│   ├── models          # entities and value objects
+│   │   ├── activities  # Activity and its requirements
+│   │   ├── common      # TimePeriod, Quantity, MeasurementUnit, DomainArguments
+│   │   ├── estimation  # ExpeditionEstimate
+│   │   ├── expeditions # Expedition, its builder, statuses, itinerary and tracking
+│   │   ├── report      # ExpeditionReport
+│   │   ├── resources   # people, vehicles, instruments, consumables and the ResourceCatalog
+│   │   ├── validation  # ValidationResult, RuleId, ValidationSubject, Severity, ApprovalResult, AcceptedWarning
+│   │   └── zones       # zones and permits
+│   ├── providers       # interfaces the business needs from the outside world: ExpeditionRepository
+│   ├── rules           # ActivityRules implementations, one per activity type
+│   ├── validations     # ValidationRule implementations and the ApprovalPolicy, which always runs the mandatory ones
+│   ├── estimations     # ExpeditionEstimator
+│   ├── reports         # ExpeditionReporter
+│   ├── replanning      # ExpeditionReplanner, builds a draft alternative around an affected item
+│   ├── services        # ResourceReservations, books every resource of an expedition or none, and releases them
+│   ├── usecases        # CreateExpedition, ApproveExpedition and FinishExpedition: operations that coordinate several objects
+│   └── exceptions      # domain exceptions
+└── providers           # implementations of business/providers (details): InMemoryExpeditionRepository
 src/test/java/...       # unit tests mirroring the main tree, an end-to-end integration test and shared fixtures
 DESIGN.md               # design decisions (in Spanish)
 ```
 
-Planned for when the project grows past a pure domain module — none of this exists yet:
+Planned — does not exist yet:
 
 ```
-business/providers      # interfaces the business needs from the outside world
-providers               # implementations of those interfaces (details)
 Main.java               # composition root: instantiates and wires everything
 ```
 

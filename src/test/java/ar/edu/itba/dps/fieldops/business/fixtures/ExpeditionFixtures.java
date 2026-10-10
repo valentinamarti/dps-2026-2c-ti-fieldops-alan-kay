@@ -30,6 +30,7 @@ import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.UN
 public final class ExpeditionFixtures {
 
     public static final Certification DIVING = new Certification("Diving");
+    public static final ExpeditionId EXPEDITION_ID = new ExpeditionId("e-1");
 
     private static final LocalDateTime FIRST_DAY = LocalDateTime.of(2026, 10, 1, 0, 0);
 
@@ -78,7 +79,6 @@ public final class ExpeditionFixtures {
 
     public static ExpeditionBuilder expeditionIn(Zone zone, Person responsible) {
         return new ExpeditionBuilder()
-                .withId(new ExpeditionId("e-1"))
                 .withName("Coastal survey")
                 .withPeriod(hours(0, 24))
                 .addObjective("Map the coastal reef")
