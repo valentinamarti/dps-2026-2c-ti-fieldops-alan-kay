@@ -18,28 +18,28 @@ class DepletableTest {
     private static final ExpeditionId AN_EXPEDITION = new ExpeditionId("e-1");
     private static final ExpeditionId ANOTHER_EXPEDITION = new ExpeditionId("e-2");
 
-    private static Depletable fuelWithLiters(String liters) {
-        return new Depletable(new ResourceId("c-1"), "Diesel", FUEL, Quantity.of(liters, LITERS));
+    private static Depletable fuelWithLiters() {
+        return new Depletable(new ResourceId("c-1"), "Diesel", FUEL, Quantity.of("20", LITERS));
     }
 
     @Test
     void hasStockWhenTheRequirementMatchesExactly() {
-        assertTrue(fuelWithLiters("20").hasStockFor(Quantity.of("20", LITERS)));
+        assertTrue(fuelWithLiters().hasStockFor(Quantity.of("20", LITERS)));
     }
 
     @Test
     void hasStockWhenThereIsMoreThanRequired() {
-        assertTrue(fuelWithLiters("20").hasStockFor(Quantity.of("5", LITERS)));
+        assertTrue(fuelWithLiters().hasStockFor(Quantity.of("5", LITERS)));
     }
 
     @Test
     void lacksStockWhenThereIsLessThanRequired() {
-        assertFalse(fuelWithLiters("20").hasStockFor(Quantity.of("25", LITERS)));
+        assertFalse(fuelWithLiters().hasStockFor(Quantity.of("25", LITERS)));
     }
 
     @Test
     void consumingReducesTheStock() {
-        final var fuel = fuelWithLiters("20");
+        final var fuel = fuelWithLiters();
 
         fuel.consume(AN_EXPEDITION, Quantity.of("7.5", LITERS));
 
@@ -48,7 +48,7 @@ class DepletableTest {
 
     @Test
     void consumingTheWholeStockLeavesItEmpty() {
-        final var fuel = fuelWithLiters("20");
+        final var fuel = fuelWithLiters();
 
         fuel.consume(AN_EXPEDITION, Quantity.of("20", LITERS));
 
@@ -57,7 +57,7 @@ class DepletableTest {
 
     @Test
     void cannotConsumeMoreThanTheStockAndTheStockStaysUntouched() {
-        final var fuel = fuelWithLiters("20");
+        final var fuel = fuelWithLiters();
 
         assertThrows(InsufficientStockException.class, () -> fuel.consume(AN_EXPEDITION, Quantity.of("25", LITERS)));
         assertEquals(Quantity.of("20", LITERS), fuel.getStock());
@@ -65,12 +65,12 @@ class DepletableTest {
 
     @Test
     void cannotConsumeInADifferentUnit() {
-        assertThrows(IllegalArgumentException.class, () -> fuelWithLiters("20").consume(AN_EXPEDITION, Quantity.of("1", KILOGRAMS)));
+        assertThrows(IllegalArgumentException.class, () -> fuelWithLiters().consume(AN_EXPEDITION, Quantity.of("1", KILOGRAMS)));
     }
 
     @Test
     void reservedStockIsNotAvailableToOthersButIsStillInStock() {
-        final var fuel = fuelWithLiters("20");
+        final var fuel = fuelWithLiters();
 
         fuel.reserve(AN_EXPEDITION, Quantity.of("15", LITERS));
 
@@ -81,7 +81,7 @@ class DepletableTest {
 
     @Test
     void cannotReserveMoreThanIsAvailable() {
-        final var fuel = fuelWithLiters("20");
+        final var fuel = fuelWithLiters();
         fuel.reserve(ANOTHER_EXPEDITION, Quantity.of("15", LITERS));
 
         assertThrows(InsufficientStockException.class, () -> fuel.reserve(AN_EXPEDITION, Quantity.of("6", LITERS)));
@@ -90,7 +90,7 @@ class DepletableTest {
 
     @Test
     void theReservationsOfAnExpeditionAddUp() {
-        final var fuel = fuelWithLiters("20");
+        final var fuel = fuelWithLiters();
 
         fuel.reserve(AN_EXPEDITION, Quantity.of("10", LITERS));
         fuel.reserve(AN_EXPEDITION, Quantity.of("10", LITERS));
@@ -100,7 +100,7 @@ class DepletableTest {
 
     @Test
     void consumingUsesUpTheReservationOfTheExpedition() {
-        final var fuel = fuelWithLiters("20");
+        final var fuel = fuelWithLiters();
         fuel.reserve(AN_EXPEDITION, Quantity.of("10", LITERS));
 
         fuel.consume(AN_EXPEDITION, Quantity.of("7", LITERS));
@@ -112,7 +112,7 @@ class DepletableTest {
 
     @Test
     void consumingMoreThanWasReservedTakesTheRestFromTheFreeStock() {
-        final var fuel = fuelWithLiters("20");
+        final var fuel = fuelWithLiters();
         fuel.reserve(AN_EXPEDITION, Quantity.of("5", LITERS));
 
         fuel.consume(AN_EXPEDITION, Quantity.of("8", LITERS));
@@ -123,7 +123,7 @@ class DepletableTest {
 
     @Test
     void cannotConsumeWhatAnotherExpeditionReservedAndTheStockStaysUntouched() {
-        final var fuel = fuelWithLiters("20");
+        final var fuel = fuelWithLiters();
         fuel.reserve(ANOTHER_EXPEDITION, Quantity.of("15", LITERS));
 
         assertThrows(InsufficientStockException.class, () -> fuel.consume(AN_EXPEDITION, Quantity.of("10", LITERS)));
@@ -132,7 +132,7 @@ class DepletableTest {
 
     @Test
     void releasingAnExpeditionGivesBackWhatItReservedAndDidNotUse() {
-        final var fuel = fuelWithLiters("20");
+        final var fuel = fuelWithLiters();
         fuel.reserve(AN_EXPEDITION, Quantity.of("10", LITERS));
         fuel.reserve(ANOTHER_EXPEDITION, Quantity.of("5", LITERS));
         fuel.consume(AN_EXPEDITION, Quantity.of("7", LITERS));

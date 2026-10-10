@@ -6,6 +6,7 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionRestrictions;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
+import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import org.junit.jupiter.api.Test;
 
@@ -36,7 +37,7 @@ class CapacityExceededValidationTest {
         expedition.assignStaff(scheduleSampling("a-1", hours(9, 11)), person("p-2"));
         expedition.assignStaff(scheduleSampling("a-2", hours(12, 14)), person("p-3"));
 
-        final var expected = ValidationResult.critical("The expedition has 2 participants but allows at most 1");
+        final var expected = ValidationResult.critical(CapacityExceededValidation.ID, ValidationSubject.expedition(), "The expedition has 2 participants but allows at most 1");
         assertEquals(List.of(expected), validation.validate(expedition));
     }
 

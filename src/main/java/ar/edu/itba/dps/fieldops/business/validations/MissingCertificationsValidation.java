@@ -5,13 +5,17 @@ import ar.edu.itba.dps.fieldops.business.models.activities.StaffRequirement;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.resources.Certification;
+import ar.edu.itba.dps.fieldops.business.models.validation.RuleId;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
+import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
 
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class MissingCertificationsValidation implements ValidationRule {
+
+    public static final RuleId ID = new RuleId("missing-certifications");
 
     @Override
     public List<ValidationResult> validate(Expedition expedition) {
@@ -25,7 +29,7 @@ public class MissingCertificationsValidation implements ValidationRule {
                 .filter(requirement -> !requirement.certifications().isEmpty())
                 .map(requirement -> new Shortage(requirement, qualified(item, requirement)))
                 .filter(Shortage::isShortage)
-                .map(shortage -> ValidationResult.critical("%s needs %d people certified in %s but only %d qualify".formatted(
+                .map(shortage -> ValidationResult.critical(ID, ValidationSubject.of(item.getActivity().getId()), "%s needs %d people certified in %s but only %d qualify".formatted(
                         item.getActivity().getName(), shortage.requirement().headcount(),
                         names(shortage.requirement()), shortage.qualified())));
     }

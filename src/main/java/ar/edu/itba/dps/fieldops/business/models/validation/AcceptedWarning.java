@@ -17,6 +17,6 @@ public record AcceptedWarning(ValidationResult warning, Person responsible, Stri
     }
 
     public boolean covers(ValidationResult result) {
-        return warning.equals(result);
+        return warning.isSameFindingAs(result);
     }
 }

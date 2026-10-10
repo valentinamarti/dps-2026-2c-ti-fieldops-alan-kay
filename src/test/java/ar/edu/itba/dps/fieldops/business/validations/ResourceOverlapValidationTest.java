@@ -1,12 +1,15 @@
 package ar.edu.itba.dps.fieldops.business.validations;
 
+import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.resources.Reservation;
+import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.resources.Unavailability;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
+import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import org.junit.jupiter.api.Test;
 
@@ -39,7 +42,7 @@ class ResourceOverlapValidationTest {
         scheduleWithWorker("a-1", hours(9, 11));
         scheduleWithWorker("a-2", hours(10, 12));
 
-        final var expected = ValidationResult.critical("p-2 is assigned to Sampling a-1 and Sampling a-2 at the same time");
+        final var expected = ValidationResult.critical(ResourceOverlapValidation.ID, ValidationSubject.of(new ActivityId("a-1"), new ResourceId("p-2")), "p-2 is assigned to Sampling a-1 and Sampling a-2 at the same time");
         assertEquals(List.of(expected), validation.validate(expedition));
     }
 
@@ -56,7 +59,7 @@ class ResourceOverlapValidationTest {
         worker.reserve(new Reservation(ANOTHER_EXPEDITION, hours(10, 11)));
         scheduleWithWorker("a-1", hours(9, 11));
 
-        final var expected = ValidationResult.critical("p-2 is not available during Sampling a-1");
+        final var expected = ValidationResult.critical(ResourceOverlapValidation.ID, ValidationSubject.of(new ActivityId("a-1"), new ResourceId("p-2")), "p-2 is not available during Sampling a-1");
         assertEquals(List.of(expected), validation.validate(expedition));
     }
 
@@ -65,7 +68,7 @@ class ResourceOverlapValidationTest {
         worker.markUnavailable(new Unavailability(hours(10, 11), "Medical leave"));
         scheduleWithWorker("a-1", hours(9, 11));
 
-        final var expected = ValidationResult.critical("p-2 is not available during Sampling a-1");
+        final var expected = ValidationResult.critical(ResourceOverlapValidation.ID, ValidationSubject.of(new ActivityId("a-1"), new ResourceId("p-2")), "p-2 is not available during Sampling a-1");
         assertEquals(List.of(expected), validation.validate(expedition));
     }
 }

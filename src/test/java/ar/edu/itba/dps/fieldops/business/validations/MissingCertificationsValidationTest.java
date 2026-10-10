@@ -1,8 +1,10 @@
 package ar.edu.itba.dps.fieldops.business.validations;
 
+import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
+import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import org.junit.jupiter.api.Test;
 
@@ -37,7 +39,7 @@ class MissingCertificationsValidationTest {
         expedition.assignStaff(dive, person("p-2", DIVING));
         expedition.assignStaff(dive, person("p-3"));
 
-        final var expected = ValidationResult.critical("Diving a-1 needs 2 people certified in Diving but only 1 qualify");
+        final var expected = ValidationResult.critical(MissingCertificationsValidation.ID, ValidationSubject.of(new ActivityId("a-1")), "Diving a-1 needs 2 people certified in Diving but only 1 qualify");
         assertEquals(List.of(expected), validation.validate(expedition));
     }
 }

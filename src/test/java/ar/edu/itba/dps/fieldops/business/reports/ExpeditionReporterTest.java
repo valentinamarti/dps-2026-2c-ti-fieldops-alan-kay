@@ -2,6 +2,7 @@ package ar.edu.itba.dps.fieldops.business.reports;
 
 import ar.edu.itba.dps.fieldops.business.estimations.ExpeditionEstimator;
 import ar.edu.itba.dps.fieldops.business.interfaces.validation.ExpeditionValidator;
+import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
@@ -13,7 +14,9 @@ import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
 import ar.edu.itba.dps.fieldops.business.models.validation.AcceptedWarning;
 import ar.edu.itba.dps.fieldops.business.models.validation.ApprovalResult;
+import ar.edu.itba.dps.fieldops.business.models.validation.RuleId;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
+import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import org.junit.jupiter.api.Test;
 
@@ -35,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ExpeditionReporterTest {
 
     private static final ResourceCategory SAMPLE_CONTAINER = new ResourceCategory("Sample container");
-    private static final ValidationResult RISKY = ValidationResult.warning("Sampling a-1 is risky");
+    private static final ValidationResult RISKY = ValidationResult.warning(new RuleId("risk-tolerance"), ValidationSubject.of(new ActivityId("a-1")), "Sampling a-1 is risky");
 
     private final ExpeditionReporter reporter = new ExpeditionReporter(new ExpeditionEstimator());
     private final Zone coast = zone("z-1");

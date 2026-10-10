@@ -66,7 +66,7 @@ public class Depletable implements DepletableResource {
             throw new InsufficientStockException(id, usableBy(owner), quantity);
         }
         final var fromReservation = reservedBy(owner).isEnoughFor(quantity) ? quantity : reservedBy(owner);
-        reserved.computeIfPresent(owner, (expedition, reservation) -> reservation.minus(fromReservation));
+        reserved.computeIfPresent(owner, (_, reservation) -> reservation.minus(fromReservation));
         stock = stock.minus(quantity);
     }
 

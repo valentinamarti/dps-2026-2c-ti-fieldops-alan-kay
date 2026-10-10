@@ -3,13 +3,16 @@ package ar.edu.itba.dps.fieldops.business.usecases;
 import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotApprovableException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InsufficientStockException;
 import ar.edu.itba.dps.fieldops.business.exceptions.ResourceUnavailableException;
+import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.validation.AcceptedWarning;
+import ar.edu.itba.dps.fieldops.business.models.validation.RuleId;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
+import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
 import ar.edu.itba.dps.fieldops.business.validations.ApprovalPolicy;
@@ -34,8 +37,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ApproveExpeditionTest {
 
-    private static final ValidationResult MISSING_PERMIT = ValidationResult.critical("Zone z-1 requires a permit");
-    private static final ValidationResult RISKY_DIVE = ValidationResult.warning("Diving a-1 has HIGH risk");
+    private static final ValidationResult MISSING_PERMIT = ValidationResult.critical(new RuleId("missing-permits"), ValidationSubject.expedition(), "Zone z-1 requires a permit");
+    private static final ValidationResult RISKY_DIVE = ValidationResult.warning(new RuleId("risk-tolerance"), ValidationSubject.of(new ActivityId("a-1")), "Diving a-1 has HIGH risk");
 
     private final Zone coast = zone("z-1");
     private final Person leader = person("p-1");
@@ -43,7 +46,7 @@ class ApproveExpeditionTest {
     private final ResourceReservations reservations = new ResourceReservations();
 
     private ApproveExpedition finding(ValidationResult... results) {
-        return new ApproveExpedition(new ApprovalPolicy(List.of(anyExpedition -> List.of(results))), reservations);
+        return new ApproveExpedition(new ApprovalPolicy(List.of(_ -> List.of(results))), reservations);
     }
 
     @Test

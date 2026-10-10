@@ -38,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ExpeditionTrackingTest {
 
-    private static final ExpeditionValidator WITHOUT_PROBLEMS = expedition -> new ApprovalResult(List.of());
+    private static final ExpeditionValidator WITHOUT_PROBLEMS = _ -> new ApprovalResult(List.of());
 
     private final Zone coast = zone("z-1");
     private final Expedition expedition = expeditionIn(coast, person("p-1")).build();

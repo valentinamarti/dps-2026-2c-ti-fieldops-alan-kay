@@ -28,7 +28,7 @@ public record SupplyDemand(DepletableResource supply, List<Quantity> quantities)
     public static List<SupplyDemand> combine(Stream<SupplyDemand> demands) {
         final var quantitiesPerSupply = new LinkedHashMap<DepletableResource, List<Quantity>>();
         demands.forEach(demand ->
-                quantitiesPerSupply.computeIfAbsent(demand.supply(), key -> new ArrayList<>()).addAll(demand.quantities()));
+                quantitiesPerSupply.computeIfAbsent(demand.supply(), _ -> new ArrayList<>()).addAll(demand.quantities()));
         return quantitiesPerSupply.entrySet().stream()
                 .map(entry -> new SupplyDemand(entry.getKey(), entry.getValue()))
                 .toList();

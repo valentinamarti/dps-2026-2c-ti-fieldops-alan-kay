@@ -1,8 +1,10 @@
 package ar.edu.itba.dps.fieldops.business.validations;
 
+import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
+import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import org.junit.jupiter.api.Test;
 
@@ -36,7 +38,7 @@ class MissingResourcesValidationTest {
     void flagsAnActivityWithoutEnoughStaff() {
         expedition.assignEquipment(item, instrument("i-1", "Cooler"));
 
-        final var expected = ValidationResult.critical("Sampling a-1 has 0 of the 1 staff members it needs");
+        final var expected = ValidationResult.critical(MissingResourcesValidation.ID, ValidationSubject.of(new ActivityId("a-1")), "Sampling a-1 has 0 of the 1 staff members it needs");
         assertEquals(List.of(expected), validation.validate(expedition));
     }
 
@@ -45,7 +47,7 @@ class MissingResourcesValidationTest {
         expedition.assignStaff(item, person("p-2"));
         expedition.assignEquipment(item, instrument("i-1", "Sonar"));
 
-        final var expected = ValidationResult.critical("Sampling a-1 has 0 of the 1 Cooler it needs");
+        final var expected = ValidationResult.critical(MissingResourcesValidation.ID, ValidationSubject.of(new ActivityId("a-1")), "Sampling a-1 has 0 of the 1 Cooler it needs");
         assertEquals(List.of(expected), validation.validate(expedition));
     }
 }

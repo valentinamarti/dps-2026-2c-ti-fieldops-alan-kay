@@ -1,10 +1,13 @@
 package ar.edu.itba.dps.fieldops.business.validations;
 
+import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
+import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
+import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import org.junit.jupiter.api.Test;
 
@@ -44,7 +47,7 @@ class InsufficientSuppliesValidationTest {
     void flagsAnActivityWithoutASupplyOfTheRequiredCategory() {
         expedition.assignSupply(scheduleSampling("a-1", hours(9, 11)), supply("d-1", "Fuel", Quantity.of("50", LITERS)));
 
-        final var expected = ValidationResult.critical("Sampling a-1 needs 3 UNITS of Sample container but has no supply of that category assigned");
+        final var expected = ValidationResult.critical(InsufficientSuppliesValidation.ID, ValidationSubject.of(new ActivityId("a-1")), "Sampling a-1 needs 3 UNITS of Sample container but has no supply of that category assigned");
         assertEquals(List.of(expected), validation.validate(expedition));
     }
 
@@ -53,7 +56,7 @@ class InsufficientSuppliesValidationTest {
         final var jarsByTheLiter = supply("d-1", "Sample container", Quantity.of("50", LITERS));
         expedition.assignSupply(scheduleSampling("a-1", hours(9, 11)), jarsByTheLiter);
 
-        final var expected = ValidationResult.critical("d-1 is measured in LITERS, but the itinerary asks for it in another unit");
+        final var expected = ValidationResult.critical(InsufficientSuppliesValidation.ID, ValidationSubject.of(new ResourceId("d-1")), "d-1 is measured in LITERS, but the itinerary asks for it in another unit");
         assertEquals(List.of(expected), validation.validate(expedition));
     }
 
@@ -63,7 +66,7 @@ class InsufficientSuppliesValidationTest {
         expedition.assignSupply(scheduleSampling("a-1", hours(9, 11)), jars);
         expedition.assignSupply(scheduleSampling("a-2", hours(12, 14)), jars);
 
-        final var expected = ValidationResult.critical("d-1 does not have enough stock for the 6 UNITS the itinerary needs");
+        final var expected = ValidationResult.critical(InsufficientSuppliesValidation.ID, ValidationSubject.of(new ResourceId("d-1")), "d-1 does not have enough stock for the 6 UNITS the itinerary needs");
         assertEquals(List.of(expected), validation.validate(expedition));
     }
 }
