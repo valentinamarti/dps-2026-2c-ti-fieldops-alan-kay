@@ -1,5 +1,6 @@
 package ar.edu.itba.dps.fieldops.business.validations;
 
+import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
@@ -9,7 +10,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.EXPEDITION_ID;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.diving;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
@@ -20,9 +20,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RiskToleranceValidationTest {
 
+    private final SequentialExpeditionRepository repository = new SequentialExpeditionRepository();
     private final RiskToleranceValidation validation = new RiskToleranceValidation();
     private final Zone reef = zone("z-1");
-    private final Expedition expedition = expeditionIn(reef, person("p-1")).build(EXPEDITION_ID);
+    private final Expedition expedition = expeditionIn(reef, person("p-1")).build(repository);
 
     @Test
     void warnsAboutAnActivityRiskierThanTheExpeditionTolerance() {

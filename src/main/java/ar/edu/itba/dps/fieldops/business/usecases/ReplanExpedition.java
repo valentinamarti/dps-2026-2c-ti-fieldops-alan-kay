@@ -19,7 +19,7 @@ public class ReplanExpedition {
     }
 
     public Expedition replan(Expedition original, ItineraryItem affectedItem, ReplanReason reason) {
-        final var alternative = replanner.planAlternative(original, repository.nextId(), affectedItem, reason);
+        final var alternative = replanner.planAlternative(original, affectedItem, reason);
         repository.add(alternative);
         return alternative;
     }

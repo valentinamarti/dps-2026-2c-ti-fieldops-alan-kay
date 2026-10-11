@@ -3,10 +3,10 @@ package ar.edu.itba.dps.fieldops.business.usecases;
 import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotApprovableException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InsufficientStockException;
 import ar.edu.itba.dps.fieldops.business.exceptions.ResourceUnavailableException;
+import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
-import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.validation.AcceptedWarning;
@@ -16,12 +16,10 @@ import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
 import ar.edu.itba.dps.fieldops.business.validations.ApprovalPolicy;
-import ar.edu.itba.dps.fieldops.providers.InMemoryExpeditionRepository;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.EXPEDITION_ID;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.assignContainers;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.assignCooler;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.diving;
@@ -42,11 +40,11 @@ class ApproveExpeditionTest {
     private static final ValidationResult MISSING_PERMIT = ValidationResult.critical(new RuleId("missing-permits"), ValidationSubject.expedition(), "Zone z-1 requires a permit");
     private static final ValidationResult RISKY_DIVE = ValidationResult.warning(new RuleId("risk-tolerance"), ValidationSubject.of(new ActivityId("a-1")), "Diving a-1 has HIGH risk");
 
+    private final SequentialExpeditionRepository repository = new SequentialExpeditionRepository();
     private final Zone coast = zone("z-1");
     private final Person leader = person("p-1");
-    private final Expedition expedition = expeditionIn(coast, leader).build(EXPEDITION_ID);
+    private final Expedition expedition = expeditionIn(coast, leader).build(repository);
     private final ResourceReservations reservations = new ResourceReservations();
-    private final InMemoryExpeditionRepository repository = new InMemoryExpeditionRepository();
 
     private ApproveExpedition finding(ValidationResult... results) {
         return new ApproveExpedition(new ApprovalPolicy(List.of(_ -> List.of(results))), reservations, repository);
@@ -85,7 +83,7 @@ class ApproveExpeditionTest {
     void aResourceTakenAfterTheValidationStopsTheApprovalWithoutReservingAnything() {
         final var takenWorker = person("p-2");
         final var freeWorker = person("p-3");
-        final var otherExpedition = expeditionIn(coast, leader).build(EXPEDITION_ID);
+        final var otherExpedition = expeditionIn(coast, leader).build(repository);
         final var otherItem = otherExpedition.schedule(sampling("a-9", coast, hours(8, 18)), hours(9, 11));
         otherExpedition.assignStaff(otherItem, takenWorker);
         assignCooler(otherExpedition, otherItem);
@@ -140,12 +138,12 @@ class ApproveExpeditionTest {
         final var jars = supply("d-1", "Sample container", Quantity.of("3", UNITS));
         final var policy = new ApprovalPolicy(List.of());
         final var approveExpedition = new ApproveExpedition(policy, reservations, repository);
-        final var first = expeditionIn(coast, leader).build(new ExpeditionId("e-1"));
+        final var first = expeditionIn(coast, leader).build(repository);
         final var firstItem = first.schedule(sampling("a-1", coast, hours(0, 24)), hours(9, 11));
         first.assignSupply(firstItem, jars);
         first.assignStaff(firstItem, person("p-2"));
         assignCooler(first, firstItem);
-        final var second = expeditionIn(coast, leader).build(new ExpeditionId("e-2"));
+        final var second = expeditionIn(coast, leader).build(repository);
         final var secondItem = second.schedule(sampling("a-2", coast, hours(0, 24)), hours(13, 15));
         second.assignSupply(secondItem, jars);
         second.assignStaff(secondItem, person("p-3"));

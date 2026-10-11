@@ -33,17 +33,16 @@ class InMemoryExpeditionRepositoryTest {
     }
 
     @Test
-    void rejectsASecondExpeditionWithAnIdAlreadyTaken() {
-        final var id = repository.nextId();
-        repository.add(expeditionIn(coast, leader).build(id));
-        final var impostor = expeditionIn(coast, leader).build(id);
+    void rejectsAnExpeditionThatWasAlreadyAdded() {
+        final var expedition = expeditionIn(coast, leader).build(repository);
+        repository.add(expedition);
 
-        assertThrows(DuplicateExpeditionException.class, () -> repository.add(impostor));
+        assertThrows(DuplicateExpeditionException.class, () -> repository.add(expedition));
     }
 
     @Test
     void findsTheVeryExpeditionThatWasAdded() {
-        final var expedition = expeditionIn(coast, leader).build(repository.nextId());
+        final var expedition = expeditionIn(coast, leader).build(repository);
         repository.add(expedition);
 
         assertSame(expedition, repository.findById(expedition.getId()).orElseThrow());

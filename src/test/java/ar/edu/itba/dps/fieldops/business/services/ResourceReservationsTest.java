@@ -2,6 +2,7 @@ package ar.edu.itba.dps.fieldops.business.services;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.InsufficientStockException;
 import ar.edu.itba.dps.fieldops.business.exceptions.ResourceUnavailableException;
+import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
@@ -10,7 +11,6 @@ import ar.edu.itba.dps.fieldops.business.models.resources.Reservation;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import org.junit.jupiter.api.Test;
 
-import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.EXPEDITION_ID;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.instrument;
@@ -27,9 +27,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ResourceReservationsTest {
 
+    private final SequentialExpeditionRepository repository = new SequentialExpeditionRepository();
     private final ResourceReservations reservations = new ResourceReservations();
     private final Zone coast = zone("z-1");
-    private final Expedition expedition = expeditionIn(coast, person("p-1")).build(EXPEDITION_ID);
+    private final Expedition expedition = expeditionIn(coast, person("p-1")).build(repository);
     private final Person worker = person("p-2");
 
     @Test

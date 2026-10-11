@@ -15,7 +15,7 @@ public class CreateExpedition {
     }
 
     public Expedition create(ExpeditionBuilder draft) {
-        final var expedition = draft.build(repository.nextId());
+        final var expedition = draft.build(repository);
         repository.add(expedition);
         return expedition;
     }

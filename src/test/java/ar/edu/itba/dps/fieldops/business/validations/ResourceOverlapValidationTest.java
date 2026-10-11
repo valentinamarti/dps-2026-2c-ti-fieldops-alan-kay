@@ -1,5 +1,6 @@
 package ar.edu.itba.dps.fieldops.business.validations;
 
+import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
@@ -15,7 +16,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.EXPEDITION_ID;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
@@ -28,9 +28,10 @@ class ResourceOverlapValidationTest {
 
     private static final ExpeditionId ANOTHER_EXPEDITION = new ExpeditionId("e-2");
 
+    private final SequentialExpeditionRepository repository = new SequentialExpeditionRepository();
     private final ResourceOverlapValidation validation = new ResourceOverlapValidation();
     private final Zone coast = zone("z-1");
-    private final Expedition expedition = expeditionIn(coast, person("p-1")).build(EXPEDITION_ID);
+    private final Expedition expedition = expeditionIn(coast, person("p-1")).build(repository);
     private final Person worker = person("p-2");
 
     private void scheduleWithWorker(String activityId, TimePeriod period) {

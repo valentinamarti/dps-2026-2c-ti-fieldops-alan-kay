@@ -3,9 +3,9 @@ package ar.edu.itba.dps.fieldops.business.replanning;
 import ar.edu.itba.dps.fieldops.business.exceptions.ActivitiesInProgressException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
+import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.interfaces.validation.ExpeditionValidator;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
-import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.validation.ApprovalResult;
@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.EXPEDITION_ID;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
@@ -32,12 +31,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ExpeditionReplannerTest {
 
     private static final ExpeditionValidator WITHOUT_PROBLEMS = _ -> new ApprovalResult(List.of());
-    private static final ExpeditionId ALTERNATIVE_ID = new ExpeditionId("e-1-alt");
 
-    private final ExpeditionReplanner replanner = new ExpeditionReplanner();
+    private final SequentialExpeditionRepository repository = new SequentialExpeditionRepository();
+    private final ExpeditionReplanner replanner = new ExpeditionReplanner(repository);
     private final Zone coast = zone("z-1");
     private final Person leader = person("p-1");
-    private final Expedition expedition = expeditionIn(coast, leader).build(EXPEDITION_ID);
+    private final Expedition expedition = expeditionIn(coast, leader).build(repository);
 
     private void approve() {
         expedition.submitForReview();
@@ -54,7 +53,7 @@ class ExpeditionReplannerTest {
         expedition.assignStaff(keptItem, worker);
         approve();
 
-        final var alternative = replanner.planAlternative(expedition, ALTERNATIVE_ID, affectedItem, new Cancellation());
+        final var alternative = replanner.planAlternative(expedition, affectedItem, new Cancellation());
 
         assertEquals(ExpeditionStatus.DRAFT, alternative.getStatus());
         assertEquals(1, alternative.getItinerary().getItems().size());
@@ -65,11 +64,11 @@ class ExpeditionReplannerTest {
 
     @Test
     void rejectsAnItemThatDoesNotBelongToTheOriginalExpedition() {
-        final var otherExpedition = expeditionIn(coast, leader).build(EXPEDITION_ID);
+        final var otherExpedition = expeditionIn(coast, leader).build(repository);
         final var foreignItem = otherExpedition.schedule(sampling("a-1", coast, hours(8, 18)), hours(9, 11));
         approve();
 
-        assertThrows(IllegalArgumentException.class, () -> replanner.planAlternative(expedition, ALTERNATIVE_ID, foreignItem, new Cancellation()));
+        assertThrows(IllegalArgumentException.class, () -> replanner.planAlternative(expedition, foreignItem, new Cancellation()));
     }
 
     @Test
@@ -80,14 +79,14 @@ class ExpeditionReplannerTest {
         expedition.schedule(dependent, hours(12, 14));
         approve();
 
-        assertThrows(InvalidScheduleException.class, () -> replanner.planAlternative(expedition, ALTERNATIVE_ID, affectedItem, new Cancellation()));
+        assertThrows(InvalidScheduleException.class, () -> replanner.planAlternative(expedition, affectedItem, new Cancellation()));
     }
 
     @Test
     void aDraftIsEditedDirectlyInsteadOfReplanned() {
         final var item = expedition.schedule(sampling("a-1", coast, hours(8, 18)), hours(9, 11));
 
-        assertThrows(InvalidStatusTransitionException.class, () -> replanner.planAlternative(expedition, ALTERNATIVE_ID, item, new Cancellation()));
+        assertThrows(InvalidStatusTransitionException.class, () -> replanner.planAlternative(expedition, item, new Cancellation()));
     }
 
     @Test
@@ -96,7 +95,7 @@ class ExpeditionReplannerTest {
         approve();
         expedition.start();
 
-        assertThrows(InvalidStatusTransitionException.class, () -> replanner.planAlternative(expedition, ALTERNATIVE_ID, item, new Cancellation()));
+        assertThrows(InvalidStatusTransitionException.class, () -> replanner.planAlternative(expedition, item, new Cancellation()));
     }
 
     @Test
@@ -107,7 +106,7 @@ class ExpeditionReplannerTest {
         expedition.start();
         expedition.suspend();
 
-        final var alternative = replanner.planAlternative(expedition, ALTERNATIVE_ID, affectedItem, new Cancellation());
+        final var alternative = replanner.planAlternative(expedition, affectedItem, new Cancellation());
 
         assertEquals(ExpeditionStatus.DRAFT, alternative.getStatus());
         assertEquals(ExpeditionStatus.SUSPENDED, expedition.getStatus());
@@ -122,7 +121,7 @@ class ExpeditionReplannerTest {
         expedition.startActivity(runningItem, LocalDateTime.of(2026, 10, 1, 9, 0));
         expedition.suspend();
 
-        assertThrows(ActivitiesInProgressException.class, () -> replanner.planAlternative(expedition, ALTERNATIVE_ID, affectedItem, new Cancellation()));
+        assertThrows(ActivitiesInProgressException.class, () -> replanner.planAlternative(expedition, affectedItem, new Cancellation()));
     }
 
     @Test
@@ -141,7 +140,7 @@ class ExpeditionReplannerTest {
         expedition.finishActivity(doneItem, LocalDateTime.of(2026, 10, 1, 11, 0), "Samples taken");
         expedition.suspend();
 
-        final var alternative = replanner.planAlternative(expedition, ALTERNATIVE_ID, affectedItem, new Cancellation());
+        final var alternative = replanner.planAlternative(expedition, affectedItem, new Cancellation());
 
         final var keptDone = alternative.getItinerary().itemFor(done).orElseThrow();
         final var keptPending = alternative.getItinerary().itemFor(pending).orElseThrow();
@@ -165,7 +164,7 @@ class ExpeditionReplannerTest {
         expedition.startActivity(doneItem, LocalDateTime.of(2026, 10, 1, 9, 0));
         expedition.finishActivity(doneItem, LocalDateTime.of(2026, 10, 1, 11, 0), "Samples taken");
         expedition.suspend();
-        final var alternative = replanner.planAlternative(expedition, ALTERNATIVE_ID, affectedItem, new Cancellation());
+        final var alternative = replanner.planAlternative(expedition, affectedItem, new Cancellation());
 
         new ResourceReservations().reserveFor(alternative);
 
@@ -180,7 +179,7 @@ class ExpeditionReplannerTest {
         expedition.assignStaff(affectedItem, worker);
         approve();
 
-        final var alternative = replanner.planAlternative(expedition, ALTERNATIVE_ID, affectedItem, new Delay(Duration.ofHours(2)));
+        final var alternative = replanner.planAlternative(expedition, affectedItem, new Delay(Duration.ofHours(2)));
 
         final var delayed = alternative.getItinerary().itemFor(affectedActivity).orElseThrow();
         assertEquals(hours(14, 16), delayed.getScheduledPeriod());
@@ -193,7 +192,7 @@ class ExpeditionReplannerTest {
         approve();
 
         assertThrows(InvalidScheduleException.class,
-                () -> replanner.planAlternative(expedition, ALTERNATIVE_ID, affectedItem, new Delay(Duration.ofHours(2))));
+                () -> replanner.planAlternative(expedition, affectedItem, new Delay(Duration.ofHours(2))));
     }
 
     @Test
@@ -206,7 +205,7 @@ class ExpeditionReplannerTest {
         expedition.assignStaff(affectedItem, otherWorker);
         approve();
 
-        final var alternative = replanner.planAlternative(expedition, ALTERNATIVE_ID, affectedItem,
+        final var alternative = replanner.planAlternative(expedition, affectedItem,
                 new ResourceWithdrawn(sickWorker.getId()));
 
         final var kept = alternative.getItinerary().itemFor(affectedActivity).orElseThrow();
@@ -220,7 +219,7 @@ class ExpeditionReplannerTest {
         approve();
         final var reason = new Delay(Duration.ofHours(1));
 
-        final var alternative = replanner.planAlternative(expedition, ALTERNATIVE_ID, affectedItem, reason);
+        final var alternative = replanner.planAlternative(expedition, affectedItem, reason);
 
         assertEquals(Optional.of(reason), alternative.getReplanReason());
     }
@@ -235,7 +234,7 @@ class ExpeditionReplannerTest {
         expedition.suspend();
 
         assertThrows(IllegalArgumentException.class,
-                () -> replanner.planAlternative(expedition, ALTERNATIVE_ID, doneItem, new Delay(Duration.ofHours(1))));
+                () -> replanner.planAlternative(expedition, doneItem, new Delay(Duration.ofHours(1))));
     }
 
     @Test

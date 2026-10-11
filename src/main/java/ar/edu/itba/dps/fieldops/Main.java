@@ -28,7 +28,7 @@ public final class Main {
         return new FieldOps(
                 new CreateExpedition(repository),
                 new ApproveExpedition(new ApprovalPolicy(List.of()), reservations, repository),
-                new ReplanExpedition(repository, new ExpeditionReplanner()),
+                new ReplanExpedition(repository, new ExpeditionReplanner(repository)),
                 new FinishExpedition(reservations),
                 new ExpeditionReporter(new ExpeditionEstimator()));
     }

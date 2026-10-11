@@ -34,7 +34,7 @@ class ApproveAlternativeTest {
     private final InMemoryExpeditionRepository repository = new InMemoryExpeditionRepository();
     private final ApproveExpedition approveExpedition =
             new ApproveExpedition(new ApprovalPolicy(List.of()), new ResourceReservations(), repository);
-    private final ReplanExpedition replanExpedition = new ReplanExpedition(repository, new ExpeditionReplanner());
+    private final ReplanExpedition replanExpedition = new ReplanExpedition(repository, new ExpeditionReplanner(repository));
     private final Zone coast = zone("z-1");
     private final Person keptWorker = person("p-a-1");
     private final Person affectedWorker = person("p-a-2");

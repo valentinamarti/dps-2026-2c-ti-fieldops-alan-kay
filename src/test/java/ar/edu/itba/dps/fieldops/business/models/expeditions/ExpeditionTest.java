@@ -3,6 +3,7 @@ package ar.edu.itba.dps.fieldops.business.models.expeditions;
 import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotEditableException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
+import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
 import ar.edu.itba.dps.fieldops.business.models.resources.Instrument;
@@ -15,7 +16,6 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Set;
 
-import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.EXPEDITION_ID;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
@@ -27,9 +27,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ExpeditionTest {
 
+    private final SequentialExpeditionRepository repository = new SequentialExpeditionRepository();
     private final Zone coast = zone("z-1");
     private final Person leader = person("p-1");
-    private final Expedition expedition = expeditionIn(coast, leader).build(EXPEDITION_ID);
+    private final Expedition expedition = expeditionIn(coast, leader).build(repository);
 
     @Test
     void schedulesAnActivityOfOneOfItsZonesWithinItsPeriod() {
@@ -81,7 +82,7 @@ class ExpeditionTest {
 
     @Test
     void rejectsAssignmentsToAnItemOfAnotherExpedition() {
-        final var otherExpedition = expeditionIn(coast, leader).build(EXPEDITION_ID);
+        final var otherExpedition = expeditionIn(coast, leader).build(repository);
         final var foreignItem = otherExpedition.schedule(sampling("a-1", coast, hours(8, 18)), hours(9, 11));
 
         assertThrows(IllegalArgumentException.class, () -> expedition.assignStaff(foreignItem, person("p-2")));

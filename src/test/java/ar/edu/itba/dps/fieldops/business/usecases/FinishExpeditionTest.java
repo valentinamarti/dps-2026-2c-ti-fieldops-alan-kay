@@ -2,6 +2,7 @@ package ar.edu.itba.dps.fieldops.business.usecases;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.ActivitiesInProgressException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
+import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
@@ -9,13 +10,11 @@ import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
 import ar.edu.itba.dps.fieldops.business.validations.ApprovalPolicy;
-import ar.edu.itba.dps.fieldops.providers.InMemoryExpeditionRepository;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
-import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.EXPEDITION_ID;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.assignContainers;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.assignCooler;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
@@ -32,11 +31,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FinishExpeditionTest {
 
+    private final SequentialExpeditionRepository repository = new SequentialExpeditionRepository();
     private final ResourceReservations reservations = new ResourceReservations();
-    private final InMemoryExpeditionRepository repository = new InMemoryExpeditionRepository();
     private final FinishExpedition finishExpedition = new FinishExpedition(reservations);
     private final Zone coast = zone("z-1");
-    private final Expedition expedition = expeditionIn(coast, person("p-1")).build(EXPEDITION_ID);
+    private final Expedition expedition = expeditionIn(coast, person("p-1")).build(repository);
     private final Person worker = person("p-2");
 
     private void approveEquipped() {

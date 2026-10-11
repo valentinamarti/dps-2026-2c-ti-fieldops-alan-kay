@@ -1,5 +1,6 @@
 package ar.edu.itba.dps.fieldops.business.validations;
 
+import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
@@ -12,7 +13,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.EXPEDITION_ID;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
@@ -23,11 +23,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CapacityExceededValidationTest {
 
+    private final SequentialExpeditionRepository repository = new SequentialExpeditionRepository();
     private final CapacityExceededValidation validation = new CapacityExceededValidation();
     private final Zone coast = zone("z-1");
     private final Expedition expedition = expeditionIn(coast, person("p-1"))
             .withRestrictions(new ExpeditionRestrictions(1, RiskLevel.MEDIUM))
-            .build(EXPEDITION_ID);
+            .build(repository);
 
     private ItineraryItem scheduleSampling(String activityId, TimePeriod period) {
         return expedition.schedule(sampling(activityId, coast, hours(0, 24)), period);

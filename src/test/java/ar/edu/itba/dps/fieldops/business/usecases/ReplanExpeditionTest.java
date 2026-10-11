@@ -25,7 +25,7 @@ class ReplanExpeditionTest {
     private static final ExpeditionValidator WITHOUT_PROBLEMS = _ -> new ApprovalResult(List.of());
 
     private final InMemoryExpeditionRepository repository = new InMemoryExpeditionRepository();
-    private final ReplanExpedition replanExpedition = new ReplanExpedition(repository, new ExpeditionReplanner());
+    private final ReplanExpedition replanExpedition = new ReplanExpedition(repository, new ExpeditionReplanner(repository));
     private final Zone coast = zone("z-1");
 
     @Test

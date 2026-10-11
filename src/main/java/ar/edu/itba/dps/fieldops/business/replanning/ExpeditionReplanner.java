@@ -5,8 +5,8 @@ import ar.edu.itba.dps.fieldops.business.interfaces.resources.Resource;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionBuilder;
-import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
+import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 
 import java.util.Comparator;
 import java.util.List;
@@ -16,11 +16,16 @@ import java.util.stream.Stream;
 
 public class ExpeditionReplanner {
 
-    public Expedition planAlternative(Expedition original, ExpeditionId alternativeId, ItineraryItem affectedItem,
-                                      ReplanReason reason) {
+    private final ExpeditionRepository repository;
+
+    public ExpeditionReplanner(ExpeditionRepository repository) {
+        this.repository = Objects.requireNonNull(repository, "repository is required");
+    }
+
+    public Expedition planAlternative(Expedition original, ItineraryItem affectedItem, ReplanReason reason) {
         requireReplannable(original, affectedItem, reason);
         final var carried = carriedItemsOf(original, affectedItem, reason);
-        final var alternative = draftReplacing(original, reason, carried).build(alternativeId);
+        final var alternative = draftReplacing(original, reason, carried).build(repository);
         carried.forEach(item -> copyAssignments(item, alternative));
         return alternative;
     }

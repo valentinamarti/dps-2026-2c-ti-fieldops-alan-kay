@@ -6,10 +6,12 @@ import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
+import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 public class ExpeditionBuilder {
@@ -81,8 +83,9 @@ public class ExpeditionBuilder {
         return this;
     }
 
-    public Expedition build(ExpeditionId id) {
-        final var expedition = new Expedition(id, name, period, objectives, zones, responsibles, restrictions, grantedPermits, replacedExpedition, replanReason);
+    public Expedition build(ExpeditionRepository repository) {
+        Objects.requireNonNull(repository, "repository is required");
+        final var expedition = new Expedition(repository.nextId(), name, period, objectives, zones, responsibles, restrictions, grantedPermits, replacedExpedition, replanReason);
         finishedItems.forEach(expedition::addFinishedCopyOf);
         plannedActivities.forEach(planned -> expedition.schedule(planned.activity(), planned.scheduledPeriod()));
         return expedition;

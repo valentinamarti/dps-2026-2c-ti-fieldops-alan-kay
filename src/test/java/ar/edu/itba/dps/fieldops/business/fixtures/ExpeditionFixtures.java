@@ -7,7 +7,6 @@ import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionBuilder;
-import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionRestrictions;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.resources.Certification;
@@ -30,7 +29,6 @@ import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.UN
 public final class ExpeditionFixtures {
 
     public static final Certification DIVING = new Certification("Diving");
-    public static final ExpeditionId EXPEDITION_ID = new ExpeditionId("e-1");
 
     private static final LocalDateTime FIRST_DAY = LocalDateTime.of(2026, 10, 1, 0, 0);
 

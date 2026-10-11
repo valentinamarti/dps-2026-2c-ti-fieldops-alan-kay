@@ -3,6 +3,7 @@ package ar.edu.itba.dps.fieldops.business.models.expeditions;
 import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotApprovableException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
 import ar.edu.itba.dps.fieldops.business.exceptions.UnacceptedWarningException;
+import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.interfaces.validation.ExpeditionValidator;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
@@ -16,7 +17,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.EXPEDITION_ID;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
@@ -28,9 +28,10 @@ class ExpeditionApprovalTest {
     private static final ValidationResult MISSING_PERMIT = ValidationResult.critical(new RuleId("missing-permits"), ValidationSubject.expedition(), "Zone z-1 requires a permit");
     private static final ValidationResult RISKY_DIVE = ValidationResult.warning(new RuleId("risk-tolerance"), ValidationSubject.of(new ActivityId("a-1")), "Diving a-1 has HIGH risk");
 
+    private final SequentialExpeditionRepository repository = new SequentialExpeditionRepository();
     private final Zone coast = zone("z-1");
     private final Person leader = person("p-1");
-    private final Expedition expedition = expeditionIn(coast, leader).build(EXPEDITION_ID);
+    private final Expedition expedition = expeditionIn(coast, leader).build(repository);
 
     private static ExpeditionValidator finding(ValidationResult... results) {
         return _ -> new ApprovalResult(List.of(results));

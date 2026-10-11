@@ -4,6 +4,7 @@ import ar.edu.itba.dps.fieldops.business.exceptions.ActivitiesInProgressExceptio
 import ar.edu.itba.dps.fieldops.business.exceptions.InsufficientStockException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidTrackingException;
+import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.interfaces.activities.ActivityRules;
 import ar.edu.itba.dps.fieldops.business.interfaces.validation.ExpeditionValidator;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
@@ -23,7 +24,6 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.EXPEDITION_ID;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
@@ -41,8 +41,9 @@ class ExpeditionTrackingTest {
 
     private static final ExpeditionValidator WITHOUT_PROBLEMS = _ -> new ApprovalResult(List.of());
 
+    private final SequentialExpeditionRepository repository = new SequentialExpeditionRepository();
     private final Zone coast = zone("z-1");
-    private final Expedition expedition = expeditionIn(coast, person("p-1")).build(EXPEDITION_ID);
+    private final Expedition expedition = expeditionIn(coast, person("p-1")).build(repository);
     private final Depletable jars = supply("d-1", "Sample container", Quantity.of("10", UNITS));
     private final ItineraryItem item = expedition.schedule(sampling("a-1", coast, hours(0, 24)), hours(9, 11));
 
@@ -189,7 +190,7 @@ class ExpeditionTrackingTest {
 
     @Test
     void aFailedConsumptionLeavesTheActivityInProgressAndTheStockUntouched() {
-        final var scarceExpedition = expeditionIn(coast, person("p-1")).build(EXPEDITION_ID);
+        final var scarceExpedition = expeditionIn(coast, person("p-1")).build(repository);
         final var scarceItem = scarceExpedition.schedule(sampling("a-1", coast, hours(0, 24)), hours(9, 11));
         final var scarceJars = supply("d-2", "Sample container", Quantity.of("2", UNITS));
         scarceExpedition.assignSupply(scarceItem, scarceJars);
@@ -207,7 +208,7 @@ class ExpeditionTrackingTest {
 
     @Test
     void anActivityThatCannotConsumeEverySupplyConsumesNone() {
-        final var multiSupplyExpedition = expeditionIn(coast, person("p-1")).build(EXPEDITION_ID);
+        final var multiSupplyExpedition = expeditionIn(coast, person("p-1")).build(repository);
         final var activity = new Activity(new ActivityId("a-1"), "Survey with boat", hours(0, 24), coast, List.of(), new FuelAndContainersRules());
         final var multiSupplyItem = multiSupplyExpedition.schedule(activity, hours(9, 11));
         final var fuel = supply("d-2", "Fuel", Quantity.of("50", LITERS));

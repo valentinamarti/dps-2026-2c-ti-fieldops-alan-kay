@@ -47,7 +47,7 @@ src/main/java/ar/edu/itba/dps/fieldops
 │   ├── validations     # ValidationRule implementations and the ApprovalPolicy, which always runs the mandatory ones
 │   ├── estimations     # ExpeditionEstimator
 │   ├── reports         # ExpeditionReporter
-│   ├── replanning      # ExpeditionReplanner and the replan reasons: Cancellation, Delay, ResourceWithdrawn
+│   ├── replanning      # ExpeditionReplanner (gets the alternative's id from the ExpeditionRepository) and the replan reasons: Cancellation, Delay, ResourceWithdrawn
 │   ├── services        # ResourceReservations, books every resource of an expedition or none, and releases them
 │   ├── usecases        # CreateExpedition, ApproveExpedition, ReplanExpedition and FinishExpedition: operations that coordinate several objects
 │   └── exceptions      # domain exceptions
