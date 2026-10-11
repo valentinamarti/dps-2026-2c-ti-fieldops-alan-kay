@@ -197,7 +197,7 @@ class ExpeditionReplannerTest {
     }
 
     @Test
-    void aResourceUnavailabilityKeepsTheActivityWithoutThatResource() {
+    void aResourceWithdrawnKeepsTheActivityWithoutThatResource() {
         final var affectedActivity = sampling("a-1", coast, hours(8, 18));
         final var affectedItem = expedition.schedule(affectedActivity, hours(12, 14));
         final var sickWorker = person("p-2");
@@ -207,7 +207,7 @@ class ExpeditionReplannerTest {
         approve();
 
         final var alternative = replanner.planAlternative(expedition, ALTERNATIVE_ID, affectedItem,
-                new ResourceUnavailability(sickWorker.getId()));
+                new ResourceWithdrawn(sickWorker.getId()));
 
         final var kept = alternative.getItinerary().itemFor(affectedActivity).orElseThrow();
         assertEquals(hours(12, 14), kept.getScheduledPeriod());
