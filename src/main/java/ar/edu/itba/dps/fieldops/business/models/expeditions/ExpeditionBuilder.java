@@ -76,8 +76,9 @@ public class ExpeditionBuilder {
         return this;
     }
 
-    public void addFinishedItem(ItineraryItem finished) {
+    public ExpeditionBuilder addFinishedItem(ItineraryItem finished) {
         finishedItems.add(finished);
+        return this;
     }
 
     public Expedition build(ExpeditionId id) {

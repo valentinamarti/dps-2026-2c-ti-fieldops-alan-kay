@@ -46,7 +46,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 - **Alternativas descartadas:**
   - Builder + Director — más estructura de la que hace falta para este caso.
   - Validar todas las reglas de negocio dentro de `build()` — mezclaría "está bien formado" con "es válido para operar", que tienen ciclos de vida distintos.
-  - Que el builder reciba `ItineraryItem` ya armados — obligaría a que existan ítems fuera de una expedición y a repetir en el builder los chequeos de zona, período y dependencias.
+  - Que el builder reciba `ItineraryItem` ya armados para planificar — obligaría a que existan ítems fuera de una expedición y a repetir en el builder los chequeos de zona, período y dependencias. Por eso las actividades nuevas entran como actividad y horario (`addActivity`) y se agendan con `Expedition.schedule`. La única excepción es `addFinishedItem` (D33): recibe ítems ya terminados de otra expedición, porque lo que ya ocurrió no se puede volver a agendar; `build` los copia (`addFinishedCopyOf`) y no los vuelve a validar como plan.
 
 
 ### D4 — Estimación como agregación, Informe como caso de uso que reutiliza
