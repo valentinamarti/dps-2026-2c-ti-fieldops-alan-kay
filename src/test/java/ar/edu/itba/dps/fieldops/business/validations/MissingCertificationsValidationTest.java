@@ -41,7 +41,7 @@ class MissingCertificationsValidationTest {
         expedition.assignStaff(dive, person("p-2", DIVING));
         expedition.assignStaff(dive, person("p-3"));
 
-        final var expected = ValidationResult.critical(MissingCertificationsValidation.ID, ValidationSubject.of(new ActivityId("a-1")), "Diving a-1 needs 2 people certified in Diving but only 1 qualify");
+        final var expected = ValidationResult.critical(MissingCertificationsValidation.ID, ValidationSubject.of(new ActivityId("a-1")), "Diving a-1 needs 2 people certified in diving but only 1 qualify");
         assertEquals(List.of(expected), validation.validate(expedition));
     }
 }

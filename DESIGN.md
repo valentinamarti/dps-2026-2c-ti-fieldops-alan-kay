@@ -462,6 +462,20 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - Dos métodos separados en `ReplanReason` (el horario y qué recursos conserva) — una cancelación tendría que implementar uno que nunca se usa, porque la actividad no vuelve (Interface Segregation). Con una sola pregunta, cada motivo responde exactamente lo que necesita.
   - Elegir automáticamente el reemplazo del recurso indisponible — haría falta un criterio de selección que el enunciado no define; el catálogo ya ofrece candidatos (D18).
 
+### D34 — Las categorías y las certificaciones se normalizan al construirse (corrección de la Entrega 1)
+
+- **Origen:** pregunta abierta 3 del informe (categorías y certificaciones como texto libre). Con el nombre tal cual lo escribe quien carga el dato, "Boat" y "boat " eran categorías distintas y una persona cargada con "Diving" no cumplía una actividad que pide "diving".
+- **Patrón / principio:** value object (D8) que se normaliza al construirse; la igualdad por valor (D15) compara el nombre ya normalizado.
+- **Dónde:** `ResourceCategory` y `Certification` (en `business.models.resources`): el constructor compacto valida el texto (D16) y guarda el nombre con `strip()` y `toLowerCase(Locale.ROOT)`. `name()` devuelve el nombre normalizado.
+- **Por qué:**
+  - Las dos clases son claves de comparación: el requisito de una actividad (D12, D17) se cumple si el recurso tiene la misma categoría o certificación (D10). Que la diferencia entre mayúsculas, minúsculas o un espacio de más rompa esa comparación es un error de carga, no una diferencia de negocio.
+  - Normalizar en el constructor lo deja en un solo lugar: todo lo que compare categorías o certificaciones (el catálogo, las reglas de validación, `Certifications.includes`) recibe el valor ya normalizado, y ninguna tiene que acordarse de comparar sin distinguir mayúsculas. `Locale.ROOT` evita que el resultado dependa del idioma de la máquina.
+  - Los mensajes de las validaciones muestran el nombre normalizado ("0 of the 1 cooler it needs"), porque es el único que guarda el value object.
+- **Alternativas descartadas:**
+  - Un catálogo de categorías validado al dar de alta un recurso — las categorías las definen las reglas de actividad en el código y el enunciado no pide administrarlas; un catálogo sumaría una entidad y una operación de alta que nadie pide.
+  - Fecha de otorgamiento y vencimiento de las certificaciones — ninguna regla la usa hoy.
+- **Consecuencia:** un error de tipeo o un sinónimo ("bote" en vez de "boat") sigue siendo otra categoría y se reporta como "falta equipo". Si el catálogo crece, la salida es un catálogo de categorías en `ResourceCatalog` y `Certification(nombre, vencimiento)`.
+
 ## Patrones que decidimos no aplicar
 
 | Patrón | Por qué no                                                                                                                                                                                              | Consecuencias |

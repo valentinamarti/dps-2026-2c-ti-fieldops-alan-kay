@@ -49,7 +49,7 @@ class MissingResourcesValidationTest {
         expedition.assignStaff(item, person("p-2"));
         expedition.assignEquipment(item, instrument("i-1", "Sonar"));
 
-        final var expected = ValidationResult.critical(MissingResourcesValidation.ID, ValidationSubject.of(new ActivityId("a-1")), "Sampling a-1 has 0 of the 1 Cooler it needs");
+        final var expected = ValidationResult.critical(MissingResourcesValidation.ID, ValidationSubject.of(new ActivityId("a-1")), "Sampling a-1 has 0 of the 1 cooler it needs");
         assertEquals(List.of(expected), validation.validate(expedition));
     }
 }

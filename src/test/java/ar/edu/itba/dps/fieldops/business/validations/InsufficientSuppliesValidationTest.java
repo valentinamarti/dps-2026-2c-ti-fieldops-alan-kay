@@ -49,7 +49,7 @@ class InsufficientSuppliesValidationTest {
     void flagsAnActivityWithoutASupplyOfTheRequiredCategory() {
         expedition.assignSupply(scheduleSampling("a-1", hours(9, 11)), supply("d-1", "Fuel", Quantity.of("50", LITERS)));
 
-        final var expected = ValidationResult.critical(InsufficientSuppliesValidation.ID, ValidationSubject.of(new ActivityId("a-1")), "Sampling a-1 needs 3 UNITS of Sample container but has no supply of that category assigned");
+        final var expected = ValidationResult.critical(InsufficientSuppliesValidation.ID, ValidationSubject.of(new ActivityId("a-1")), "Sampling a-1 needs 3 UNITS of sample container but has no supply of that category assigned");
         assertEquals(List.of(expected), validation.validate(expedition));
     }
 
