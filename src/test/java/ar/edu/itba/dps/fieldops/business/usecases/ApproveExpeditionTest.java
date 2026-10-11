@@ -47,7 +47,7 @@ class ApproveExpeditionTest {
     private final ResourceReservations reservations = new ResourceReservations();
 
     private ApproveExpedition finding(ValidationResult... results) {
-        return new ApproveExpedition(new ApprovalPolicy(List.of(_ -> List.of(results))), reservations, repository);
+        return new ApproveExpedition(List.of(_ -> List.of(results)), reservations, repository);
     }
 
     @Test
@@ -112,7 +112,7 @@ class ApproveExpeditionTest {
     void aDiveWithoutDiversIsNotApprovedEvenWithoutAdditionalRules() {
         expedition.schedule(diving("a-1", coast, hours(0, 24), 30), hours(9, 11));
         expedition.submitForReview();
-        final var approveExpedition = new ApproveExpedition(new ApprovalPolicy(List.of()), reservations, repository);
+        final var approveExpedition = new ApproveExpedition(List.of(), reservations, repository);
 
         assertThrows(ExpeditionNotApprovableException.class, () -> approveExpedition.approve(expedition, List.of()));
         assertEquals(ExpeditionStatus.IN_REVIEW, expedition.getStatus());
@@ -137,7 +137,7 @@ class ApproveExpeditionTest {
     void aSecondExpeditionCannotBeApprovedWithStockAlreadyReserved() {
         final var jars = supply("d-1", "Sample container", Quantity.of("3", UNITS));
         final var policy = new ApprovalPolicy(List.of());
-        final var approveExpedition = new ApproveExpedition(policy, reservations, repository);
+        final var approveExpedition = new ApproveExpedition(List.of(), reservations, repository);
         final var first = expeditionIn(coast, leader).build(repository);
         final var firstItem = first.schedule(sampling("a-1", coast, hours(0, 24)), hours(9, 11));
         first.assignSupply(firstItem, jars);

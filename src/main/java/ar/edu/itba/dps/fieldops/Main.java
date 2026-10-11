@@ -8,7 +8,6 @@ import ar.edu.itba.dps.fieldops.business.usecases.ApproveExpedition;
 import ar.edu.itba.dps.fieldops.business.usecases.CreateExpedition;
 import ar.edu.itba.dps.fieldops.business.usecases.FinishExpedition;
 import ar.edu.itba.dps.fieldops.business.usecases.ReplanExpedition;
-import ar.edu.itba.dps.fieldops.business.validations.ApprovalPolicy;
 import ar.edu.itba.dps.fieldops.providers.InMemoryExpeditionRepository;
 
 import java.util.List;
@@ -27,7 +26,7 @@ public final class Main {
         final var reservations = new ResourceReservations();
         return new FieldOps(
                 new CreateExpedition(repository),
-                new ApproveExpedition(new ApprovalPolicy(List.of()), reservations, repository),
+                new ApproveExpedition(List.of(), reservations, repository),
                 new ReplanExpedition(repository, new ExpeditionReplanner(repository)),
                 new FinishExpedition(reservations),
                 new ExpeditionReporter(new ExpeditionEstimator()));

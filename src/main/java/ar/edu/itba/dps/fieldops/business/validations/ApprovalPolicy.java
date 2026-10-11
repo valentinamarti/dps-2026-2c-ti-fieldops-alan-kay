@@ -1,6 +1,5 @@
 package ar.edu.itba.dps.fieldops.business.validations;
 
-import ar.edu.itba.dps.fieldops.business.interfaces.validation.ExpeditionValidator;
 import ar.edu.itba.dps.fieldops.business.interfaces.validation.ValidationRule;
 import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
@@ -9,7 +8,7 @@ import ar.edu.itba.dps.fieldops.business.models.validation.ApprovalResult;
 import java.util.List;
 import java.util.stream.Stream;
 
-public final class ApprovalPolicy implements ExpeditionValidator {
+public final class ApprovalPolicy {
 
     private static final List<ValidationRule> MANDATORY_RULES = List.of(
             new ResourceOverlapValidation(),
@@ -27,7 +26,6 @@ public final class ApprovalPolicy implements ExpeditionValidator {
                 DomainArguments.requireList(additionalRules, "additionalRules").stream()).toList();
     }
 
-    @Override
     public ApprovalResult validate(Expedition expedition) {
         return new ApprovalResult(rules.stream()
                 .flatMap(rule -> rule.validate(expedition).stream())

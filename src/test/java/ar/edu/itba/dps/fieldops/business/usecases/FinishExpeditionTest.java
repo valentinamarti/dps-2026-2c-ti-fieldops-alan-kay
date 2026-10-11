@@ -9,7 +9,6 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
-import ar.edu.itba.dps.fieldops.business.validations.ApprovalPolicy;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -45,7 +44,7 @@ class FinishExpeditionTest {
             assignContainers(expedition, item);
         });
         expedition.submitForReview();
-        new ApproveExpedition(new ApprovalPolicy(List.of()), reservations, repository).approve(expedition, List.of());
+        new ApproveExpedition(List.of(), reservations, repository).approve(expedition, List.of());
     }
 
     @Test

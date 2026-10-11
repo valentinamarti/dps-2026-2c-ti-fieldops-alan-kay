@@ -75,6 +75,20 @@ public final class ExpeditionFixtures {
         expedition.assignSupply(item, supply("j-" + item.getActivity().getId(), "Sample container", Quantity.of("10", UNITS)));
     }
 
+    public static void completeAssignments(Expedition expedition) {
+        expedition.getItinerary().getItems().forEach(item -> {
+            if (item.getAssignedStaff().isEmpty()) {
+                expedition.assignStaff(item, person("s-" + item.getActivity().getId()));
+            }
+            if (item.getAssignedEquipment().isEmpty()) {
+                assignCooler(expedition, item);
+            }
+            if (item.getAssignedSupplies().isEmpty()) {
+                assignContainers(expedition, item);
+            }
+        });
+    }
+
     public static ExpeditionBuilder expeditionIn(Zone zone, Person responsible) {
         return new ExpeditionBuilder()
                 .withName("Coastal survey")

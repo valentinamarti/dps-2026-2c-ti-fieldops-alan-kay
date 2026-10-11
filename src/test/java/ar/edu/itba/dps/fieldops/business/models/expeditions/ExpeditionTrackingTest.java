@@ -6,7 +6,6 @@ import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionExcep
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidTrackingException;
 import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.interfaces.activities.ActivityRules;
-import ar.edu.itba.dps.fieldops.business.interfaces.validation.ExpeditionValidator;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.activities.DepletableRequirement;
@@ -16,7 +15,6 @@ import ar.edu.itba.dps.fieldops.business.models.activities.StaffRequirement;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
-import ar.edu.itba.dps.fieldops.business.models.validation.ApprovalResult;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import org.junit.jupiter.api.Test;
 
@@ -24,6 +22,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.assignCooler;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
@@ -39,8 +38,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ExpeditionTrackingTest {
 
-    private static final ExpeditionValidator WITHOUT_PROBLEMS = _ -> new ApprovalResult(List.of());
-
     private final SequentialExpeditionRepository repository = new SequentialExpeditionRepository();
     private final Zone coast = zone("z-1");
     private final Expedition expedition = expeditionIn(coast, person("p-1")).build(repository);
@@ -53,9 +50,10 @@ class ExpeditionTrackingTest {
 
     private Expedition inExecution() {
         expedition.assignStaff(item, person("p-2"));
+        assignCooler(expedition, item);
         expedition.assignSupply(item, jars);
         expedition.submitForReview();
-        expedition.approve(WITHOUT_PROBLEMS, List.of());
+        expedition.approve(List.of(), List.of());
         expedition.start();
         return expedition;
     }
@@ -146,8 +144,10 @@ class ExpeditionTrackingTest {
     @Test
     void activitiesCannotBeTrackedBeforeTheExpeditionStarts() {
         expedition.assignStaff(item, person("p-2"));
+        assignCooler(expedition, item);
+        expedition.assignSupply(item, jars);
         expedition.submitForReview();
-        expedition.approve(WITHOUT_PROBLEMS, List.of());
+        expedition.approve(List.of(), List.of());
 
         assertThrows(InvalidTrackingException.class, () -> expedition.startActivity(item, at(9, 0)));
     }
@@ -192,10 +192,13 @@ class ExpeditionTrackingTest {
     void aFailedConsumptionLeavesTheActivityInProgressAndTheStockUntouched() {
         final var scarceExpedition = expeditionIn(coast, person("p-1")).build(repository);
         final var scarceItem = scarceExpedition.schedule(sampling("a-1", coast, hours(0, 24)), hours(9, 11));
-        final var scarceJars = supply("d-2", "Sample container", Quantity.of("2", UNITS));
+        final var scarceJars = supply("d-2", "Sample container", Quantity.of("3", UNITS));
+        scarceExpedition.assignStaff(scarceItem, person("p-2"));
+        assignCooler(scarceExpedition, scarceItem);
         scarceExpedition.assignSupply(scarceItem, scarceJars);
         scarceExpedition.submitForReview();
-        scarceExpedition.approve(WITHOUT_PROBLEMS, List.of());
+        scarceExpedition.approve(List.of(), List.of());
+        scarceJars.consume(repository.nextId(), Quantity.of("1", UNITS));
         scarceExpedition.start();
         scarceExpedition.startActivity(scarceItem, at(9, 0));
 
@@ -212,11 +215,12 @@ class ExpeditionTrackingTest {
         final var activity = new Activity(new ActivityId("a-1"), "Survey with boat", hours(0, 24), coast, List.of(), new FuelAndContainersRules());
         final var multiSupplyItem = multiSupplyExpedition.schedule(activity, hours(9, 11));
         final var fuel = supply("d-2", "Fuel", Quantity.of("50", LITERS));
-        final var scarceJars = supply("d-3", "Sample container", Quantity.of("2", UNITS));
+        final var scarceJars = supply("d-3", "Sample container", Quantity.of("3", UNITS));
         multiSupplyExpedition.assignSupply(multiSupplyItem, fuel);
         multiSupplyExpedition.assignSupply(multiSupplyItem, scarceJars);
         multiSupplyExpedition.submitForReview();
-        multiSupplyExpedition.approve(WITHOUT_PROBLEMS, List.of());
+        multiSupplyExpedition.approve(List.of(), List.of());
+        scarceJars.consume(repository.nextId(), Quantity.of("1", UNITS));
         multiSupplyExpedition.start();
         multiSupplyExpedition.startActivity(multiSupplyItem, at(9, 0));
 

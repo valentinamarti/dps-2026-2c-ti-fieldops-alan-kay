@@ -32,7 +32,7 @@ src/main/java/ar/edu/itba/dps/fieldops
 │   │   ├── activities  # ActivityRules
 │   │   ├── replanning  # ReplanReason
 │   │   ├── resources   # Resource, ReusableResource, Equipment, DepletableResource, Certifiable, Categorized
-│   │   └── validation  # ValidationRule, ExpeditionValidator
+│   │   └── validation  # ValidationRule
 │   ├── models          # entities and value objects
 │   │   ├── activities  # Activity and its requirements
 │   │   ├── common      # TimePeriod, Quantity, MeasurementUnit, DomainArguments
@@ -44,7 +44,7 @@ src/main/java/ar/edu/itba/dps/fieldops
 │   │   └── zones       # zones and permits
 │   ├── providers       # interfaces the business needs from the outside world: ExpeditionRepository
 │   ├── rules           # ActivityRules implementations, one per activity type
-│   ├── validations     # ValidationRule implementations and the ApprovalPolicy, which always runs the mandatory ones
+│   ├── validations     # ValidationRule implementations and the ApprovalPolicy, which Expedition.approve builds to always run the mandatory ones
 │   ├── estimations     # ExpeditionEstimator
 │   ├── reports         # ExpeditionReporter
 │   ├── replanning      # ExpeditionReplanner (gets the alternative's id from the ExpeditionRepository) and the replan reasons: Cancellation, Delay, ResourceWithdrawn

@@ -11,7 +11,7 @@ import ar.edu.itba.dps.fieldops.business.exceptions.UnacceptedWarningException;
 import ar.edu.itba.dps.fieldops.business.interfaces.replanning.ReplanReason;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.DepletableResource;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.Equipment;
-import ar.edu.itba.dps.fieldops.business.interfaces.validation.ExpeditionValidator;
+import ar.edu.itba.dps.fieldops.business.interfaces.validation.ValidationRule;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
@@ -20,6 +20,7 @@ import ar.edu.itba.dps.fieldops.business.models.validation.AcceptedWarning;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
 import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
+import ar.edu.itba.dps.fieldops.business.validations.ApprovalPolicy;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
@@ -106,9 +107,9 @@ public class Expedition {
         transitionTo(ExpeditionStatus.DRAFT);
     }
 
-    public void approve(ExpeditionValidator validator, List<AcceptedWarning> acceptances) {
+    public void approve(List<ValidationRule> additionalRules, List<AcceptedWarning> acceptances) {
         requireCanTransitionTo(ExpeditionStatus.APPROVED);
-        final var result = validator.validate(this);
+        final var result = new ApprovalPolicy(additionalRules).validate(this);
         if (!result.canBeApproved()) {
             throw new ExpeditionNotApprovableException(result.criticals());
         }

@@ -2,7 +2,7 @@ package ar.edu.itba.dps.fieldops.business.reports;
 
 import ar.edu.itba.dps.fieldops.business.estimations.ExpeditionEstimator;
 import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
-import ar.edu.itba.dps.fieldops.business.interfaces.validation.ExpeditionValidator;
+import ar.edu.itba.dps.fieldops.business.interfaces.validation.ValidationRule;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
@@ -14,7 +14,6 @@ import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
 import ar.edu.itba.dps.fieldops.business.models.validation.AcceptedWarning;
-import ar.edu.itba.dps.fieldops.business.models.validation.ApprovalResult;
 import ar.edu.itba.dps.fieldops.business.models.validation.RuleId;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
@@ -25,6 +24,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.completeAssignments;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
@@ -50,8 +50,8 @@ class ExpeditionReporterTest {
     private final ItineraryItem morning = expedition.schedule(sampling("a-1", coast, hours(0, 24)), hours(9, 11));
     private final ItineraryItem afternoon = expedition.schedule(sampling("a-2", coast, hours(0, 24)), hours(14, 16));
 
-    private static ExpeditionValidator finding(ValidationResult... results) {
-        return expedition -> new ApprovalResult(List.of(results));
+    private static List<ValidationRule> finding(ValidationResult... results) {
+        return List.of(_ -> List.of(results));
     }
 
     private static LocalDateTime at(int hour) {
@@ -63,6 +63,7 @@ class ExpeditionReporterTest {
         expedition.assignSupply(morning, jars);
         expedition.assignStaff(afternoon, person("p-3"));
         expedition.assignSupply(afternoon, jars);
+        completeAssignments(expedition);
         expedition.submitForReview();
         expedition.approve(finding(findings), acceptances);
         expedition.start();

@@ -4,11 +4,9 @@ import ar.edu.itba.dps.fieldops.business.exceptions.ActivitiesInProgressExceptio
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
 import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
-import ar.edu.itba.dps.fieldops.business.interfaces.validation.ExpeditionValidator;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
-import ar.edu.itba.dps.fieldops.business.models.validation.ApprovalResult;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
 import org.junit.jupiter.api.Test;
@@ -19,6 +17,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.completeAssignments;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
@@ -30,7 +29,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ExpeditionReplannerTest {
 
-    private static final ExpeditionValidator WITHOUT_PROBLEMS = _ -> new ApprovalResult(List.of());
 
     private final SequentialExpeditionRepository repository = new SequentialExpeditionRepository();
     private final ExpeditionReplanner replanner = new ExpeditionReplanner(repository);
@@ -39,8 +37,9 @@ class ExpeditionReplannerTest {
     private final Expedition expedition = expeditionIn(coast, leader).build(repository);
 
     private void approve() {
+        completeAssignments(expedition);
         expedition.submitForReview();
-        expedition.approve(WITHOUT_PROBLEMS, List.of());
+        expedition.approve(List.of(), List.of());
     }
 
     @Test

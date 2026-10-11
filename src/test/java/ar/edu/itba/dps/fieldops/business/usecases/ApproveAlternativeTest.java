@@ -10,7 +10,6 @@ import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.replanning.Cancellation;
 import ar.edu.itba.dps.fieldops.business.replanning.ExpeditionReplanner;
 import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
-import ar.edu.itba.dps.fieldops.business.validations.ApprovalPolicy;
 import ar.edu.itba.dps.fieldops.providers.InMemoryExpeditionRepository;
 import org.junit.jupiter.api.Test;
 
@@ -33,7 +32,7 @@ class ApproveAlternativeTest {
 
     private final InMemoryExpeditionRepository repository = new InMemoryExpeditionRepository();
     private final ApproveExpedition approveExpedition =
-            new ApproveExpedition(new ApprovalPolicy(List.of()), new ResourceReservations(), repository);
+            new ApproveExpedition(List.of(), new ResourceReservations(), repository);
     private final ReplanExpedition replanExpedition = new ReplanExpedition(repository, new ExpeditionReplanner(repository));
     private final Zone coast = zone("z-1");
     private final Person keptWorker = person("p-a-1");

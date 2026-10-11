@@ -4,11 +4,10 @@ import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotApprovableExcep
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
 import ar.edu.itba.dps.fieldops.business.exceptions.UnacceptedWarningException;
 import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
-import ar.edu.itba.dps.fieldops.business.interfaces.validation.ExpeditionValidator;
+import ar.edu.itba.dps.fieldops.business.interfaces.validation.ValidationRule;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.validation.AcceptedWarning;
-import ar.edu.itba.dps.fieldops.business.models.validation.ApprovalResult;
 import ar.edu.itba.dps.fieldops.business.models.validation.RuleId;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
@@ -17,7 +16,9 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.diving;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -33,8 +34,8 @@ class ExpeditionApprovalTest {
     private final Person leader = person("p-1");
     private final Expedition expedition = expeditionIn(coast, leader).build(repository);
 
-    private static ExpeditionValidator finding(ValidationResult... results) {
-        return _ -> new ApprovalResult(List.of(results));
+    private static List<ValidationRule> finding(ValidationResult... results) {
+        return List.of(_ -> List.of(results));
     }
 
     @Test
@@ -44,6 +45,15 @@ class ExpeditionApprovalTest {
         expedition.approve(finding(), List.of());
 
         assertEquals(ExpeditionStatus.APPROVED, expedition.getStatus());
+    }
+
+    @Test
+    void theMandatoryRulesRunEvenWithoutAdditionalRules() {
+        expedition.schedule(diving("a-1", coast, hours(0, 24), 30), hours(9, 11));
+        expedition.submitForReview();
+
+        assertThrows(ExpeditionNotApprovableException.class, () -> expedition.approve(List.of(), List.of()));
+        assertEquals(ExpeditionStatus.IN_REVIEW, expedition.getStatus());
     }
 
     @Test
