@@ -2,39 +2,40 @@ package ar.edu.itba.dps.fieldops.business.models.expeditions;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotApprovableException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
-import ar.edu.itba.dps.fieldops.business.exceptions.ResourceUnavailableException;
 import ar.edu.itba.dps.fieldops.business.exceptions.UnacceptedWarningException;
-import ar.edu.itba.dps.fieldops.business.interfaces.validation.ExpeditionValidator;
+import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
+import ar.edu.itba.dps.fieldops.business.interfaces.validation.ValidationRule;
+import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.validation.AcceptedWarning;
-import ar.edu.itba.dps.fieldops.business.models.validation.ApprovalResult;
+import ar.edu.itba.dps.fieldops.business.models.validation.RuleId;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
+import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.diving;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
-import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.sampling;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ExpeditionApprovalTest {
 
-    private static final ValidationResult MISSING_PERMIT = ValidationResult.critical("Zone z-1 requires a permit");
-    private static final ValidationResult RISKY_DIVE = ValidationResult.warning("Diving a-1 has HIGH risk");
+    private static final ValidationResult MISSING_PERMIT = ValidationResult.critical(new RuleId("missing-permits"), ValidationSubject.expedition(), "Zone z-1 requires a permit");
+    private static final ValidationResult RISKY_DIVE = ValidationResult.warning(new RuleId("risk-tolerance"), ValidationSubject.of(new ActivityId("a-1")), "Diving a-1 has HIGH risk");
 
+    private final SequentialExpeditionRepository repository = new SequentialExpeditionRepository();
     private final Zone coast = zone("z-1");
     private final Person leader = person("p-1");
-    private final Expedition expedition = expeditionIn(coast, leader).build();
+    private final Expedition expedition = expeditionIn(coast, leader).build(repository);
 
-    private static ExpeditionValidator finding(ValidationResult... results) {
-        return expedition -> new ApprovalResult(List.of(results));
+    private static List<ValidationRule> finding(ValidationResult... results) {
+        return List.of(_ -> List.of(results));
     }
 
     @Test
@@ -44,6 +45,15 @@ class ExpeditionApprovalTest {
         expedition.approve(finding(), List.of());
 
         assertEquals(ExpeditionStatus.APPROVED, expedition.getStatus());
+    }
+
+    @Test
+    void theMandatoryRulesRunEvenWithoutAdditionalRules() {
+        expedition.schedule(diving("a-1", coast, hours(0, 24), 30), hours(9, 11));
+        expedition.submitForReview();
+
+        assertThrows(ExpeditionNotApprovableException.class, () -> expedition.approve(List.of(), List.of()));
+        assertEquals(ExpeditionStatus.IN_REVIEW, expedition.getStatus());
     }
 
     @Test
@@ -91,42 +101,23 @@ class ExpeditionApprovalTest {
     }
 
     @Test
-    void reservesTheAssignedResourcesForTheirScheduledPeriods() {
-        final var item = expedition.schedule(sampling("a-1", coast, hours(8, 18)), hours(9, 11));
-        final var worker = person("p-2");
-        expedition.assignStaff(item, worker);
+    void anAcceptanceStillCoversItsWarningWhenTheWordingChanges() {
+        final var acceptance = new AcceptedWarning(RISKY_DIVE, leader, "Both divers are instructors");
+        final var reworded = ValidationResult.warning(RISKY_DIVE.rule(), RISKY_DIVE.subject(), "Diving a-1 is riskier than allowed");
         expedition.submitForReview();
 
-        expedition.approve(finding(), List.of());
+        expedition.approve(finding(reworded), List.of(acceptance));
 
-        assertFalse(worker.isAvailableDuring(hours(10, 12)));
-        assertTrue(worker.isAvailableDuring(hours(11, 13)));
+        assertEquals(ExpeditionStatus.APPROVED, expedition.getStatus());
     }
 
     @Test
-    void aResourceTakenAfterTheValidationStopsTheApprovalWithoutReservingAnything() {
-        final var takenWorker = person("p-2");
-        final var freeWorker = person("p-3");
-        final var otherExpedition = expeditionIn(coast, leader).build();
-        final var otherItem = otherExpedition.schedule(sampling("a-9", coast, hours(8, 18)), hours(9, 11));
-        otherExpedition.assignStaff(otherItem, takenWorker);
-        otherExpedition.submitForReview();
-        otherExpedition.approve(finding(), List.of());
-
-        final var earlyItem = expedition.schedule(sampling("a-1", coast, hours(0, 24)), hours(6, 8));
-        final var clashingItem = expedition.schedule(sampling("a-2", coast, hours(0, 24)), hours(10, 12));
-        expedition.assignStaff(earlyItem, freeWorker);
-        expedition.assignStaff(clashingItem, takenWorker);
+    void anAcceptanceForAnotherActivityDoesNotCoverTheWarning() {
+        final var otherDive = ValidationResult.warning(RISKY_DIVE.rule(), ValidationSubject.of(new ActivityId("a-2")), "Diving a-2 has HIGH risk");
+        final var acceptance = new AcceptedWarning(otherDive, leader, "Both divers are instructors");
         expedition.submitForReview();
 
-        assertThrows(ResourceUnavailableException.class, () -> expedition.approve(finding(RISKY_DIVE), acceptances()));
-        assertEquals(ExpeditionStatus.IN_REVIEW, expedition.getStatus());
-        assertTrue(expedition.getAcceptedWarnings().isEmpty());
-        assertTrue(freeWorker.isAvailableDuring(hours(6, 8)));
-    }
-
-    private List<AcceptedWarning> acceptances() {
-        return List.of(new AcceptedWarning(RISKY_DIVE, leader, "Both divers are instructors"));
+        assertThrows(UnacceptedWarningException.class, () -> expedition.approve(finding(RISKY_DIVE), List.of(acceptance)));
     }
 
     @Test

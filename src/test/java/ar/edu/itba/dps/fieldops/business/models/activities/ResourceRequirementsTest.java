@@ -4,6 +4,7 @@ import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
 import ar.edu.itba.dps.fieldops.business.models.resources.Instrument;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
+import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.resources.Vehicle;
 import org.junit.jupiter.api.Test;
 
@@ -35,35 +36,35 @@ class ResourceRequirementsTest {
 
     @Test
     void reusableRequirementAcceptsEquipmentOfItsCategory() {
-        final var boat = new Vehicle("v-1", "Albatros", BOAT, "ABC 123", Set.of());
+        final var boat = new Vehicle(new ResourceId("v-1"), "Albatros", BOAT, "ABC 123", Set.of());
 
         assertTrue(new ReusableRequirement(BOAT, 1).accepts(boat));
     }
 
     @Test
     void reusableRequirementRejectsEquipmentOfAnotherCategory() {
-        final var sonar = new Instrument("i-1", "Sonar 3000", SONAR, Set.of());
+        final var sonar = new Instrument(new ResourceId("i-1"), "Sonar 3000", SONAR, Set.of());
 
         assertFalse(new ReusableRequirement(BOAT, 1).accepts(sonar));
     }
 
     @Test
     void depletableRequirementIsCoveredByASupplyOfItsCategoryWithEnoughStock() {
-        final var diesel = new Depletable("d-1", "Diesel", FUEL, Quantity.of("50", LITERS));
+        final var diesel = new Depletable(new ResourceId("d-1"), "Diesel", FUEL, Quantity.of("50", LITERS));
 
         assertTrue(TWENTY_LITERS_OF_FUEL.isCoveredBy(diesel));
     }
 
     @Test
     void depletableRequirementIsNotCoveredWhenTheStockFallsShort() {
-        final var almostEmpty = new Depletable("d-1", "Diesel", FUEL, Quantity.of("5", LITERS));
+        final var almostEmpty = new Depletable(new ResourceId("d-1"), "Diesel", FUEL, Quantity.of("5", LITERS));
 
         assertFalse(TWENTY_LITERS_OF_FUEL.isCoveredBy(almostEmpty));
     }
 
     @Test
     void depletableRequirementIsNotCoveredByASupplyOfAnotherCategory() {
-        final var water = new Depletable("d-2", "Drinking water", WATER, Quantity.of("100", LITERS));
+        final var water = new Depletable(new ResourceId("d-2"), "Drinking water", WATER, Quantity.of("100", LITERS));
 
         assertFalse(TWENTY_LITERS_OF_FUEL.isCoveredBy(water));
     }

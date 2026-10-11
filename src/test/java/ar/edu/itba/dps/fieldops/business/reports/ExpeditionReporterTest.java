@@ -1,7 +1,9 @@
 package ar.edu.itba.dps.fieldops.business.reports;
 
 import ar.edu.itba.dps.fieldops.business.estimations.ExpeditionEstimator;
-import ar.edu.itba.dps.fieldops.business.interfaces.validation.ExpeditionValidator;
+import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
+import ar.edu.itba.dps.fieldops.business.interfaces.validation.ValidationRule;
+import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
@@ -12,8 +14,9 @@ import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
 import ar.edu.itba.dps.fieldops.business.models.validation.AcceptedWarning;
-import ar.edu.itba.dps.fieldops.business.models.validation.ApprovalResult;
+import ar.edu.itba.dps.fieldops.business.models.validation.RuleId;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
+import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import org.junit.jupiter.api.Test;
 
@@ -21,6 +24,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.completeAssignments;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
@@ -35,18 +39,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ExpeditionReporterTest {
 
     private static final ResourceCategory SAMPLE_CONTAINER = new ResourceCategory("Sample container");
-    private static final ValidationResult RISKY = ValidationResult.warning("Sampling a-1 is risky");
+    private static final ValidationResult RISKY = ValidationResult.warning(new RuleId("risk-tolerance"), ValidationSubject.of(new ActivityId("a-1")), "Sampling a-1 is risky");
 
+    private final SequentialExpeditionRepository repository = new SequentialExpeditionRepository();
     private final ExpeditionReporter reporter = new ExpeditionReporter(new ExpeditionEstimator());
     private final Zone coast = zone("z-1");
     private final Person leader = person("p-1");
-    private final Expedition expedition = expeditionIn(coast, leader).build();
+    private final Expedition expedition = expeditionIn(coast, leader).build(repository);
     private final Depletable jars = supply("d-1", "Sample container", Quantity.of("20", UNITS));
     private final ItineraryItem morning = expedition.schedule(sampling("a-1", coast, hours(0, 24)), hours(9, 11));
     private final ItineraryItem afternoon = expedition.schedule(sampling("a-2", coast, hours(0, 24)), hours(14, 16));
 
-    private static ExpeditionValidator finding(ValidationResult... results) {
-        return expedition -> new ApprovalResult(List.of(results));
+    private static List<ValidationRule> finding(ValidationResult... results) {
+        return List.of(_ -> List.of(results));
     }
 
     private static LocalDateTime at(int hour) {
@@ -58,6 +63,7 @@ class ExpeditionReporterTest {
         expedition.assignSupply(morning, jars);
         expedition.assignStaff(afternoon, person("p-3"));
         expedition.assignSupply(afternoon, jars);
+        completeAssignments(expedition);
         expedition.submitForReview();
         expedition.approve(finding(findings), acceptances);
         expedition.start();

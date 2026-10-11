@@ -26,7 +26,7 @@ class ActivityTest {
     private static final ActivityRules FIXED_RULES = new FixedRules();
 
     private static Activity activityDependingOn(List<Activity> dependencies) {
-        return new Activity("a-1", "Survey", WINDOW, ZONE, dependencies, FIXED_RULES);
+        return new Activity(new ActivityId("a-1"), "Survey", WINDOW, ZONE, dependencies, FIXED_RULES);
     }
 
     @Test
@@ -67,23 +67,23 @@ class ActivityTest {
     @Test
     void rejectsABlankOrMissingIdentity() {
         assertThrows(IllegalArgumentException.class,
-                () -> new Activity("", "Survey", WINDOW, ZONE, List.of(), FIXED_RULES));
+                () -> new Activity(new ActivityId(""), "Survey", WINDOW, ZONE, List.of(), FIXED_RULES));
         assertThrows(IllegalArgumentException.class,
-                () -> new Activity("a-1", " ", WINDOW, ZONE, List.of(), FIXED_RULES));
-        assertThrows(IllegalArgumentException.class,
+                () -> new Activity(new ActivityId("a-1"), " ", WINDOW, ZONE, List.of(), FIXED_RULES));
+        assertThrows(NullPointerException.class,
                 () -> new Activity(null, "Survey", WINDOW, ZONE, List.of(), FIXED_RULES));
     }
 
     @Test
     void rejectsMissingCollaborators() {
         assertThrows(NullPointerException.class,
-                () -> new Activity("a-1", "Survey", null, ZONE, List.of(), FIXED_RULES));
+                () -> new Activity(new ActivityId("a-1"), "Survey", null, ZONE, List.of(), FIXED_RULES));
         assertThrows(NullPointerException.class,
-                () -> new Activity("a-1", "Survey", WINDOW, null, List.of(), FIXED_RULES));
+                () -> new Activity(new ActivityId("a-1"), "Survey", WINDOW, null, List.of(), FIXED_RULES));
         assertThrows(NullPointerException.class,
-                () -> new Activity("a-1", "Survey", WINDOW, ZONE, null, FIXED_RULES));
+                () -> new Activity(new ActivityId("a-1"), "Survey", WINDOW, ZONE, null, FIXED_RULES));
         assertThrows(NullPointerException.class,
-                () -> new Activity("a-1", "Survey", WINDOW, ZONE, List.of(), null));
+                () -> new Activity(new ActivityId("a-1"), "Survey", WINDOW, ZONE, List.of(), null));
     }
 
     @Test

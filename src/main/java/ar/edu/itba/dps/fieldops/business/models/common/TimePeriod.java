@@ -26,6 +26,10 @@ public record TimePeriod(LocalDateTime start, LocalDateTime end) {
         return !instant.isBefore(start) && instant.isBefore(end);
     }
 
+    public TimePeriod shiftedBy(Duration delay) {
+        return new TimePeriod(start.plus(delay), end.plus(delay));
+    }
+
     public Duration duration() {
         return Duration.between(start, end);
     }

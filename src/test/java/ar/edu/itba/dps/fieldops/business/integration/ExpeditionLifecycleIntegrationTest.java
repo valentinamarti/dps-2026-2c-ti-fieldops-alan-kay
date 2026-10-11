@@ -1,8 +1,8 @@
 package ar.edu.itba.dps.fieldops.business.integration;
 
-import ar.edu.itba.dps.fieldops.business.estimations.ExpeditionEstimator;
+import ar.edu.itba.dps.fieldops.FieldOps;
+import ar.edu.itba.dps.fieldops.Main;
 import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotApprovableException;
-import ar.edu.itba.dps.fieldops.business.interfaces.validation.ExpeditionValidator;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
@@ -19,22 +19,19 @@ import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
 import ar.edu.itba.dps.fieldops.business.models.validation.AcceptedWarning;
 import ar.edu.itba.dps.fieldops.business.models.validation.Severity;
+import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
 import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
-import ar.edu.itba.dps.fieldops.business.reports.ExpeditionReporter;
-import ar.edu.itba.dps.fieldops.business.validations.CapacityExceededValidation;
-import ar.edu.itba.dps.fieldops.business.validations.InsufficientSuppliesValidation;
-import ar.edu.itba.dps.fieldops.business.validations.MissingCertificationsValidation;
-import ar.edu.itba.dps.fieldops.business.validations.MissingPermitsValidation;
-import ar.edu.itba.dps.fieldops.business.validations.MissingResourcesValidation;
-import ar.edu.itba.dps.fieldops.business.validations.ResourceOverlapValidation;
-import ar.edu.itba.dps.fieldops.business.validations.RiskToleranceValidation;
-import ar.edu.itba.dps.fieldops.business.validations.ValidationOrchestrator;
+import ar.edu.itba.dps.fieldops.business.replanning.Delay;
+import ar.edu.itba.dps.fieldops.business.validations.ApprovalPolicy;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.DIVING;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.diving;
@@ -51,30 +48,20 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-
 class ExpeditionLifecycleIntegrationTest {
 
     private static final Permit MARINE_RESERVE = new Permit("Marine reserve access");
     private static final ResourceCategory FUEL = new ResourceCategory("Fuel");
     private static final ResourceCategory SAMPLE_CONTAINER = new ResourceCategory("Sample container");
 
-    private final Zone reef = new Zone("z-1", "Protected reef", java.util.Set.of(MARINE_RESERVE));
+    private final FieldOps fieldOps = Main.wire();
+    private final ApprovalPolicy preview = new ApprovalPolicy(List.of());
+
+    private final Zone reef = new Zone("z-1", "Protected reef", Set.of(MARINE_RESERVE));
     private final Person leader = person("p-1", DIVING);
-    private final Person secondDiver = person("p-2", DIVING);
-    private final Person fieldWorker = person("p-3");
     private final Depletable fuel = supply("d-1", "Fuel", Quantity.of("100", LITERS));
     private final Depletable jars = supply("d-2", "Sample container", Quantity.of("20", UNITS));
-
     private final ResourceCatalog catalog = new ResourceCatalog();
-    private final ExpeditionValidator validator = new ValidationOrchestrator(List.of(
-            new ResourceOverlapValidation(),
-            new MissingResourcesValidation(),
-            new InsufficientSuppliesValidation(),
-            new MissingCertificationsValidation(),
-            new MissingPermitsValidation(),
-            new CapacityExceededValidation(),
-            new RiskToleranceValidation()));
-    private final ExpeditionReporter reporter = new ExpeditionReporter(new ExpeditionEstimator());
 
     private final TimePeriod divePeriod = hours(9, 12);
     private final TimePeriod samplingPeriod = hours(13, 15);
@@ -83,8 +70,8 @@ class ExpeditionLifecycleIntegrationTest {
 
     ExpeditionLifecycleIntegrationTest() {
         catalog.addStaff(leader);
-        catalog.addStaff(secondDiver);
-        catalog.addStaff(fieldWorker);
+        catalog.addStaff(person("p-2", DIVING));
+        catalog.addStaff(person("p-3"));
         catalog.addEquipment(vehicle("v-1", "Boat"));
         catalog.addEquipment(instrument("i-1", "Oxygen tank"));
         catalog.addEquipment(instrument("i-2", "Oxygen tank"));
@@ -93,19 +80,16 @@ class ExpeditionLifecycleIntegrationTest {
         catalog.addSupply(jars);
     }
 
-    private Expedition draft() {
+    private ExpeditionBuilder reefSurvey() {
         return new ExpeditionBuilder()
-                .withId("e-1")
                 .withName("Reef survey")
                 .withPeriod(hours(0, 24))
                 .addObjective("Map the reef and collect water samples")
                 .addZone(reef)
                 .addResponsible(leader)
                 .addPermit(MARINE_RESERVE)
-                .withRestrictions(new ExpeditionRestrictions(10, RiskLevel.MEDIUM))
-                .build();
+                .withRestrictions(new ExpeditionRestrictions(10, RiskLevel.MEDIUM));
     }
-
 
     private void assignFromCatalog(Expedition expedition, ItineraryItem item) {
         final var period = item.getScheduledPeriod();
@@ -120,22 +104,36 @@ class ExpeditionLifecycleIntegrationTest {
                 .ifPresent(supply -> expedition.assignSupply(item, supply)));
     }
 
+    private Expedition approvedReefSurvey() {
+        final var expedition = fieldOps.createExpedition().create(reefSurvey());
+        assignFromCatalog(expedition, expedition.schedule(dive, divePeriod));
+        assignFromCatalog(expedition, expedition.schedule(survey, samplingPeriod));
+        final var riskyDive = preview.validate(expedition).warnings().getFirst();
+        expedition.submitForReview();
+        fieldOps.approveExpedition().approve(expedition, List.of(new AcceptedWarning(riskyDive, leader, "Both divers are instructors")));
+        return expedition;
+    }
+
+    private ItineraryItem itemOf(Expedition expedition, Activity activity) {
+        return expedition.getItinerary().itemFor(activity).orElseThrow();
+    }
+
     @Test
     void planningApprovingAndExecutingAnExpeditionEndToEnd() {
-        final var expedition = draft();
+        final var expedition = fieldOps.createExpedition().create(reefSurvey());
         final var diveItem = expedition.schedule(dive, divePeriod);
         final var surveyItem = expedition.schedule(survey, samplingPeriod);
         assignFromCatalog(expedition, diveItem);
         assignFromCatalog(expedition, surveyItem);
 
-        final var result = validator.validate(expedition);
+        final var result = preview.validate(expedition);
         assertTrue(result.criticals().isEmpty(), () -> "unexpected criticals: " + result.criticals());
         assertEquals(1, result.warnings().size());
         assertEquals(Severity.WARNING, result.warnings().getFirst().severity());
 
         expedition.submitForReview();
         final var acceptance = new AcceptedWarning(result.warnings().getFirst(), leader, "Both divers are instructors");
-        expedition.approve(validator, List.of(acceptance));
+        fieldOps.approveExpedition().approve(expedition, List.of(acceptance));
         assertEquals(ExpeditionStatus.APPROVED, expedition.getStatus());
         assertFalse(leader.isAvailableDuring(divePeriod));
 
@@ -145,9 +143,9 @@ class ExpeditionLifecycleIntegrationTest {
         expedition.finishActivity(diveItem, LocalDateTime.of(2026, 10, 1, 12, 0), "Reef mapped");
         expedition.startActivity(surveyItem, LocalDateTime.of(2026, 10, 1, 13, 0));
         expedition.finishActivity(surveyItem, LocalDateTime.of(2026, 10, 1, 15, 0), "Six samples collected");
-        expedition.finish();
+        fieldOps.finishExpedition().finish(expedition);
 
-        final var report = reporter.reportOf(expedition);
+        final var report = fieldOps.reporter().reportOf(expedition);
         assertEquals(ExpeditionStatus.FINISHED, report.status());
         assertTrue(report.isComplete());
         assertEquals(RiskLevel.HIGH, report.estimate().overallRisk());
@@ -157,29 +155,64 @@ class ExpeditionLifecycleIntegrationTest {
         assertEquals(List.of(acceptance), report.acceptedWarnings());
         assertEquals(Quantity.of("80", LITERS), fuel.getStock());
         assertEquals(Quantity.of("17", UNITS), jars.getStock());
+        assertTrue(leader.isAvailableDuring(divePeriod));
+    }
+
+    @Test
+    void replanningInTheFieldEndToEnd() {
+        final var original = approvedReefSurvey();
+        original.start();
+        final var originalDive = itemOf(original, dive);
+        original.startActivity(originalDive, LocalDateTime.of(2026, 10, 1, 9, 0));
+        original.finishActivity(originalDive, LocalDateTime.of(2026, 10, 1, 12, 0), "Reef mapped");
+        original.suspend();
+
+        final var alternative = fieldOps.replanExpedition()
+                .replan(original, itemOf(original, survey), new Delay(Duration.ofHours(1)));
+        alternative.submitForReview();
+        fieldOps.approveExpedition().approve(alternative, List.of());
+
+        assertEquals(ExpeditionStatus.REPLACED, original.getStatus());
+        assertEquals(Optional.of(alternative.getId()), original.getReplacement());
+        assertEquals(ExpeditionStatus.APPROVED, alternative.getStatus());
+        assertTrue(itemOf(alternative, dive).isFinished());
+        final var delayedSurvey = itemOf(alternative, survey);
+        assertEquals(hours(14, 16), delayedSurvey.getScheduledPeriod());
+
+        alternative.start();
+        alternative.startActivity(delayedSurvey, LocalDateTime.of(2026, 10, 1, 14, 0));
+        alternative.finishActivity(delayedSurvey, LocalDateTime.of(2026, 10, 1, 16, 0), "Six samples collected");
+        fieldOps.finishExpedition().finish(alternative);
+
+        final var report = fieldOps.reporter().reportOf(alternative);
+        assertEquals(ExpeditionStatus.FINISHED, report.status());
+        assertTrue(report.isComplete());
+        assertEquals(Map.of(FUEL, Quantity.of("20", LITERS), SAMPLE_CONTAINER, Quantity.of("3", UNITS)),
+                report.actualConsumption());
+        assertEquals(Quantity.of("80", LITERS), fuel.getStock());
+        assertEquals(Quantity.of("17", UNITS), jars.getStock());
+        assertTrue(jars.hasStockFor(Quantity.of("17", UNITS)));
     }
 
     @Test
     void anExpeditionMissingPermitsAndResourcesCannotBeApproved() {
-        final var expedition = new ExpeditionBuilder()
-                .withId("e-2")
+        final var expedition = fieldOps.createExpedition().create(new ExpeditionBuilder()
                 .withName("Unprepared dive")
                 .withPeriod(hours(0, 24))
                 .addObjective("Dive without a permit")
                 .addZone(reef)
                 .addResponsible(leader)
-                .withRestrictions(new ExpeditionRestrictions(10, RiskLevel.HIGH))
-                .build();
+                .withRestrictions(new ExpeditionRestrictions(10, RiskLevel.HIGH)));
         expedition.schedule(dive, divePeriod);
         expedition.submitForReview();
 
-        final var result = validator.validate(expedition);
-        final var messages = result.criticals().stream().map(critical -> critical.message()).toList();
-        assertTrue(messages.stream().anyMatch(message -> message.contains("Marine reserve access")), () -> messages.toString());
-        assertTrue(messages.stream().anyMatch(message -> message.contains("staff")), () -> messages.toString());
+        final var result = preview.validate(expedition);
+        final var messages = result.criticals().stream().map(ValidationResult::message).toList();
+        assertTrue(messages.stream().anyMatch(message -> message.contains("Marine reserve access")), messages::toString);
+        assertTrue(messages.stream().anyMatch(message -> message.contains("staff")), messages::toString);
         assertFalse(result.canBeApproved());
 
-        assertThrows(ExpeditionNotApprovableException.class, () -> expedition.approve(validator, List.of()));
+        assertThrows(ExpeditionNotApprovableException.class, () -> fieldOps.approveExpedition().approve(expedition, List.of()));
         assertEquals(ExpeditionStatus.IN_REVIEW, expedition.getStatus());
         assertTrue(leader.isAvailableDuring(divePeriod));
     }

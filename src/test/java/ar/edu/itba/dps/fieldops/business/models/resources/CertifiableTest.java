@@ -23,9 +23,9 @@ class CertifiableTest {
 
     static Stream<Certifiable> resourcesCertifiedForDiving() {
         return Stream.of(
-                new Person("p-1", "Ana", Set.of(DIVING)),
-                new Vehicle("v-1", "Albatros", BOAT, "ABC 123", Set.of(DIVING)),
-                new Instrument("i-1", "Sonar 3000", SONAR, Set.of(DIVING))
+                new Person(new ResourceId("p-1"), "Ana", Set.of(DIVING)),
+                new Vehicle(new ResourceId("v-1"), "Albatros", BOAT, "ABC 123", Set.of(DIVING)),
+                new Instrument(new ResourceId("i-1"), "Sonar 3000", SONAR, Set.of(DIVING))
         );
     }
 

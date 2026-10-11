@@ -77,4 +77,9 @@ class TimePeriodTest {
     void durationIsTheTimeBetweenStartAndEnd() {
         assertEquals(Duration.ofHours(4), hours(8, 12).duration());
     }
+
+    @Test
+    void shiftingAPeriodMovesItsStartAndEndByTheSameAmount() {
+        assertEquals(hours(11, 13), hours(9, 11).shiftedBy(Duration.ofHours(2)));
+    }
 }

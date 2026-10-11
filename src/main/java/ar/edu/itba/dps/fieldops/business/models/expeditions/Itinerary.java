@@ -28,6 +28,14 @@ public class Itinerary {
         return items.contains(item);
     }
 
+    public List<ItineraryItem> pendingItems() {
+        return items.stream().filter(item -> !item.isFinished()).toList();
+    }
+
+    public List<SupplyDemand> supplyDemands() {
+        return SupplyDemand.combine(pendingItems().stream().flatMap(item -> item.supplyDemands().stream()));
+    }
+
     ItineraryItem add(Activity activity, TimePeriod scheduledPeriod) {
         requireNotScheduled(activity);
         final var item = new ItineraryItem(activity, scheduledPeriod);
@@ -35,6 +43,13 @@ public class Itinerary {
         items.add(item);
         items.sort(BY_START);
         return item;
+    }
+
+    void addFinishedCopyOf(ItineraryItem finished) {
+        requireNotScheduled(finished.getActivity());
+        final var copy = ItineraryItem.finishedCopyOf(finished);
+        items.add(copy);
+        items.sort(BY_START);
     }
 
     private void requireNotScheduled(Activity activity) {

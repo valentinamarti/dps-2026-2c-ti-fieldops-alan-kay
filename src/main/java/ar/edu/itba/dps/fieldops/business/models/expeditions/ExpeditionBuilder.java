@@ -1,14 +1,17 @@
 package ar.edu.itba.dps.fieldops.business.models.expeditions;
 
+import ar.edu.itba.dps.fieldops.business.interfaces.replanning.ReplanReason;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
+import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 public class ExpeditionBuilder {
@@ -18,15 +21,12 @@ public class ExpeditionBuilder {
     private final Set<Person> responsibles = new HashSet<>();
     private final Set<Permit> grantedPermits = new HashSet<>();
     private final List<PlannedActivity> plannedActivities = new ArrayList<>();
-    private String id;
+    private final List<ItineraryItem> finishedItems = new ArrayList<>();
     private String name;
     private TimePeriod period;
     private ExpeditionRestrictions restrictions;
-
-    public ExpeditionBuilder withId(String id) {
-        this.id = id;
-        return this;
-    }
+    private ExpeditionId replacedExpedition;
+    private ReplanReason replanReason;
 
     public ExpeditionBuilder withName(String name) {
         this.name = name;
@@ -68,8 +68,25 @@ public class ExpeditionBuilder {
         return this;
     }
 
-    public Expedition build() {
-        final var expedition = new Expedition(id, name, period, objectives, zones, responsibles, restrictions, grantedPermits);
+    public ExpeditionBuilder withReplacedExpedition(ExpeditionId original) {
+        this.replacedExpedition = original;
+        return this;
+    }
+
+    public ExpeditionBuilder withReplanReason(ReplanReason replanReason) {
+        this.replanReason = replanReason;
+        return this;
+    }
+
+    public ExpeditionBuilder addFinishedItem(ItineraryItem finished) {
+        finishedItems.add(finished);
+        return this;
+    }
+
+    public Expedition build(ExpeditionRepository repository) {
+        Objects.requireNonNull(repository, "repository is required");
+        final var expedition = new Expedition(repository.nextId(), name, period, objectives, zones, responsibles, restrictions, grantedPermits, replacedExpedition, replanReason);
+        finishedItems.forEach(expedition::addFinishedCopyOf);
         plannedActivities.forEach(planned -> expedition.schedule(planned.activity(), planned.scheduledPeriod()));
         return expedition;
     }

@@ -5,12 +5,16 @@ import ar.edu.itba.dps.fieldops.business.models.activities.ReusableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.StaffRequirement;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
+import ar.edu.itba.dps.fieldops.business.models.validation.RuleId;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
+import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
 
 import java.util.List;
 import java.util.stream.Stream;
 
 public class MissingResourcesValidation implements ValidationRule {
+
+    public static final RuleId ID = new RuleId("missing-resources");
 
     @Override
     public List<ValidationResult> validate(Expedition expedition) {
@@ -25,14 +29,14 @@ public class MissingResourcesValidation implements ValidationRule {
         if (assigned >= required) {
             return Stream.empty();
         }
-        return Stream.of(ValidationResult.critical("%s has %d of the %d staff members it needs"
+        return Stream.of(ValidationResult.critical(ID, ValidationSubject.of(item.getActivity().getId()), "%s has %d of the %d staff members it needs"
                 .formatted(item.getActivity().getName(), assigned, required)));
     }
 
     private Stream<ValidationResult> missingEquipment(ItineraryItem item) {
         return item.getActivity().requiredEquipment().stream()
                 .filter(requirement -> accepted(item, requirement) < requirement.count())
-                .map(requirement -> ValidationResult.critical("%s has %d of the %d %s it needs".formatted(
+                .map(requirement -> ValidationResult.critical(ID, ValidationSubject.of(item.getActivity().getId()), "%s has %d of the %d %s it needs".formatted(
                         item.getActivity().getName(), accepted(item, requirement), requirement.count(), requirement.category().name())));
     }
 

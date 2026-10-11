@@ -2,22 +2,28 @@ package ar.edu.itba.dps.fieldops.business.validations;
 
 import ar.edu.itba.dps.fieldops.business.interfaces.validation.ValidationRule;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
+import ar.edu.itba.dps.fieldops.business.models.validation.RuleId;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
+import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 public class ResourceOverlapValidation implements ValidationRule {
 
+    public static final RuleId ID = new RuleId("resource-overlap");
+
     @Override
     public List<ValidationResult> validate(Expedition expedition) {
-        final var items = expedition.getItinerary().getItems();
+        final var items = expedition.getItinerary().pendingItems();
         final var results = new ArrayList<ValidationResult>();
         for (int i = 0; i < items.size(); i++) {
             final var item = items.get(i);
             items.subList(i + 1, items.size()).forEach(later -> results.addAll(sharedResources(item, later)));
-            results.addAll(alreadyBookedResources(item));
+            results.addAll(unavailableResources(item, expedition.reservationsItTakesOver()));
         }
         return results;
     }
@@ -28,15 +34,15 @@ public class ResourceOverlapValidation implements ValidationRule {
         }
         return item.getAssignedReusableResources().stream()
                 .filter(other.getAssignedReusableResources()::contains)
-                .map(resource -> ValidationResult.critical("%s is assigned to %s and %s at the same time"
+                .map(resource -> ValidationResult.critical(ID, ValidationSubject.of(item.getActivity().getId(), resource.getId()), "%s is assigned to %s and %s at the same time"
                         .formatted(resource.getId(), item.getActivity().getName(), other.getActivity().getName())))
                 .toList();
     }
 
-    private List<ValidationResult> alreadyBookedResources(ItineraryItem item) {
+    private List<ValidationResult> unavailableResources(ItineraryItem item, Set<ExpeditionId> ignoredOwners) {
         return item.getAssignedReusableResources().stream()
-                .filter(resource -> !resource.isAvailableDuring(item.getScheduledPeriod()))
-                .map(resource -> ValidationResult.critical("%s is already booked during %s"
+                .filter(resource -> !resource.isAvailableDuring(item.getScheduledPeriod(), ignoredOwners))
+                .map(resource -> ValidationResult.critical(ID, ValidationSubject.of(item.getActivity().getId(), resource.getId()), "%s is not available during %s"
                         .formatted(resource.getId(), item.getActivity().getName())))
                 .toList();
     }

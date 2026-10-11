@@ -14,6 +14,7 @@ import lombok.Getter;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -35,6 +36,15 @@ public class ItineraryItem {
         if (!activity.getTimeWindow().contains(scheduledPeriod)) {
             throw new InvalidScheduleException("%s must be scheduled within its time window".formatted(activity.getName()));
         }
+    }
+
+    static ItineraryItem finishedCopyOf(ItineraryItem finished) {
+        final var copy = new ItineraryItem(finished.activity, finished.scheduledPeriod);
+        copy.assignedStaff.addAll(finished.assignedStaff);
+        copy.assignedEquipment.addAll(finished.assignedEquipment);
+        copy.assignedSupplies.addAll(finished.assignedSupplies);
+        copy.tracking = finished.finishedTracking().copy();
+        return copy;
     }
 
     public boolean isFor(Activity activity) {
@@ -70,6 +80,11 @@ public class ItineraryItem {
         return assignedSupplies.stream().filter(requirement::accepts).findFirst();
     }
 
+    public List<SupplyDemand> supplyDemands() {
+        return SupplyDemand.combine(activity.requiredSupplies().stream().flatMap(requirement ->
+                supplyFor(requirement).stream().map(supply -> new SupplyDemand(supply, List.of(requirement.quantity())))));
+    }
+
     public Optional<ActivityTracking> getTracking() {
         return Optional.ofNullable(tracking);
     }
@@ -80,6 +95,10 @@ public class ItineraryItem {
 
     public boolean isFinished() {
         return tracking != null && tracking.isFinished();
+    }
+
+    public boolean isInProgress() {
+        return isStarted() && !isFinished();
     }
 
     /**
@@ -99,6 +118,13 @@ public class ItineraryItem {
     ActivityTracking startedTracking() {
         if (!isStarted()) {
             throw new InvalidTrackingException("%s has not started yet".formatted(activity.getName()));
+        }
+        return tracking;
+    }
+
+    private ActivityTracking finishedTracking() {
+        if (!isFinished()) {
+            throw new InvalidTrackingException("%s has not finished yet".formatted(activity.getName()));
         }
         return tracking;
     }

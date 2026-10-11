@@ -1,15 +1,17 @@
 package ar.edu.itba.dps.fieldops.business.models.expeditions;
 
+import ar.edu.itba.dps.fieldops.business.exceptions.ActivitiesInProgressException;
 import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotApprovableException;
 import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotEditableException;
+import ar.edu.itba.dps.fieldops.business.exceptions.InsufficientStockException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidTrackingException;
-import ar.edu.itba.dps.fieldops.business.exceptions.ResourceUnavailableException;
 import ar.edu.itba.dps.fieldops.business.exceptions.UnacceptedWarningException;
+import ar.edu.itba.dps.fieldops.business.interfaces.replanning.ReplanReason;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.DepletableResource;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.Equipment;
-import ar.edu.itba.dps.fieldops.business.interfaces.validation.ExpeditionValidator;
+import ar.edu.itba.dps.fieldops.business.interfaces.validation.ValidationRule;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
@@ -18,18 +20,20 @@ import ar.edu.itba.dps.fieldops.business.models.validation.AcceptedWarning;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
 import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
+import ar.edu.itba.dps.fieldops.business.validations.ApprovalPolicy;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 public class Expedition {
 
     @Getter
-    private final String id;
+    private final ExpeditionId id;
     @Getter
     private final String name;
     @Getter
@@ -50,10 +54,14 @@ public class Expedition {
     private ExpeditionStatus status = ExpeditionStatus.DRAFT;
     @Getter
     private List<AcceptedWarning> acceptedWarnings = List.of();
+    private final ExpeditionId replacedExpedition;
+    private final ReplanReason replanReason;
+    private ExpeditionId replacement;
 
-    Expedition(String id, String name, TimePeriod period, List<String> objectives, Set<Zone> zones,
-               Set<Person> responsibles, ExpeditionRestrictions restrictions, Set<Permit> grantedPermits) {
-        this.id = DomainArguments.requireText(id, "id");
+    Expedition(ExpeditionId id, String name, TimePeriod period, List<String> objectives, Set<Zone> zones,
+               Set<Person> responsibles, ExpeditionRestrictions restrictions, Set<Permit> grantedPermits,
+               ExpeditionId replacedExpedition, ReplanReason replanReason) {
+        this.id = Objects.requireNonNull(id, "id is required");
         this.name = DomainArguments.requireText(name, "name");
         this.period = Objects.requireNonNull(period, "period is required");
         this.objectives = DomainArguments.requireNonEmptyList(objectives, "objectives");
@@ -62,6 +70,8 @@ public class Expedition {
         this.responsibles = DomainArguments.requireNonEmptySet(responsibles, "responsibles");
         this.restrictions = Objects.requireNonNull(restrictions, "restrictions are required");
         this.grantedPermits = DomainArguments.requireSet(grantedPermits, "grantedPermits");
+        this.replacedExpedition = replacedExpedition;
+        this.replanReason = replanReason;
     }
 
     public ItineraryItem schedule(Activity activity, TimePeriod scheduledPeriod) {
@@ -97,15 +107,13 @@ public class Expedition {
         transitionTo(ExpeditionStatus.DRAFT);
     }
 
-    public void approve(ExpeditionValidator validator, List<AcceptedWarning> acceptances) {
+    public void approve(List<ValidationRule> additionalRules, List<AcceptedWarning> acceptances) {
         requireCanTransitionTo(ExpeditionStatus.APPROVED);
-        final var result = validator.validate(this);
+        final var result = new ApprovalPolicy(additionalRules).validate(this);
         if (!result.canBeApproved()) {
             throw new ExpeditionNotApprovableException(result.criticals());
         }
-        final var accepted = result.warnings().stream().map(warning -> acceptanceOf(warning, acceptances)).toList();
-        reserveAssignedResources();
-        acceptedWarnings = accepted;
+        acceptedWarnings = result.warnings().stream().map(warning -> acceptanceOf(warning, acceptances)).toList();
         status = ExpeditionStatus.APPROVED;
     }
 
@@ -122,7 +130,35 @@ public class Expedition {
     }
 
     public void finish() {
+        requireNoActivityInProgress();
         transitionTo(ExpeditionStatus.FINISHED);
+    }
+
+    public Optional<ExpeditionId> getReplacedExpedition() {
+        return Optional.ofNullable(replacedExpedition);
+    }
+
+    public Set<ExpeditionId> reservationsItTakesOver() {
+        return getReplacedExpedition().map(Set::of).orElse(Set.of());
+    }
+
+    public Optional<ReplanReason> getReplanReason() {
+        return Optional.ofNullable(replanReason);
+    }
+
+    public Optional<ExpeditionId> getReplacement() {
+        return Optional.ofNullable(replacement);
+    }
+
+    public void markReplacedBy(ExpeditionId alternative) {
+        requireReplaceable();
+        replacement = Objects.requireNonNull(alternative, "alternative is required");
+        status = ExpeditionStatus.REPLACED;
+    }
+
+    public void requireReplaceable() {
+        requireNoActivityInProgress();
+        requireCanTransitionTo(ExpeditionStatus.REPLACED);
     }
 
     public void startActivity(ItineraryItem item, LocalDateTime at) {
@@ -133,9 +169,10 @@ public class Expedition {
      * Closing an activity consumes what it actually used, so the supplies left reflect the field, not the plan.
      */
     public void finishActivity(ItineraryItem item, LocalDateTime at, String result) {
-        final var tracked = inExecution(item);
-        tracked.startedTracking().finish(at, result);
-        consumeAssignedSupplies(tracked);
+        final var tracking = inExecution(item).startedTracking();
+        tracking.requireCanFinish(at, result);
+        consumeAssignedSupplies(item);
+        tracking.finish(at, result);
     }
 
     public void recordObservation(ItineraryItem item, Observation observation) {
@@ -147,8 +184,15 @@ public class Expedition {
     }
 
     private void consumeAssignedSupplies(ItineraryItem item) {
-        item.getActivity().requiredSupplies().forEach(requirement ->
-                item.supplyFor(requirement).ifPresent(supply -> supply.consume(requirement.quantity())));
+        final var demands = item.supplyDemands();
+        demands.forEach(this::requireConsumable);
+        demands.forEach(demand -> demand.supply().consume(id, demand.total()));
+    }
+
+    private void requireConsumable(SupplyDemand demand) {
+        if (!demand.supply().canConsume(id, demand.total())) {
+            throw new InsufficientStockException(demand.supply().getId(), demand.total());
+        }
     }
 
     private ItineraryItem inExecution(ItineraryItem item) {
@@ -166,21 +210,13 @@ public class Expedition {
                 .orElseThrow(() -> new UnacceptedWarningException(warning));
     }
 
-    /**
-     * Checks every assigned resource before booking any of them, so a resource taken by another
-     * expedition since the validation ran leaves this one untouched instead of half reserved.
-     */
-    private void reserveAssignedResources() {
-        itinerary.getItems().forEach(this::requireAssignedResourcesAvailable);
-        itinerary.getItems().forEach(item ->
-                item.getAssignedReusableResources().forEach(resource -> resource.reserve(item.getScheduledPeriod())));
-    }
-
-    private void requireAssignedResourcesAvailable(ItineraryItem item) {
-        for (final var resource : item.getAssignedReusableResources()) {
-            if (!resource.isAvailableDuring(item.getScheduledPeriod())) {
-                throw new ResourceUnavailableException(item.getScheduledPeriod());
-            }
+    private void requireNoActivityInProgress() {
+        final var inProgress = itinerary.getItems().stream()
+                .filter(ItineraryItem::isInProgress)
+                .map(item -> item.getActivity().getName())
+                .toList();
+        if (!inProgress.isEmpty()) {
+            throw new ActivitiesInProgressException(inProgress);
         }
     }
 
@@ -195,9 +231,18 @@ public class Expedition {
         }
     }
 
+    void addFinishedCopyOf(ItineraryItem finished) {
+        requireEditable();
+        itinerary.addFinishedCopyOf(finished);
+    }
+
     private ItineraryItem editable(ItineraryItem item) {
         requireEditable();
-        return requireOwnItem(item);
+        requireOwnItem(item);
+        if (item.isStarted()) {
+            throw new InvalidScheduleException("%s already happened and cannot change".formatted(item.getActivity().getName()));
+        }
+        return item;
     }
 
     private ItineraryItem requireOwnItem(ItineraryItem item) {

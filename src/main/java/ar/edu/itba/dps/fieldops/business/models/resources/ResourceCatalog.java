@@ -17,7 +17,7 @@ import java.util.Set;
 
 public class ResourceCatalog {
 
-    private final Set<String> registeredIds = new HashSet<>();
+    private final Set<ResourceId> registeredIds = new HashSet<>();
     private final List<Person> staff = new ArrayList<>();
     private final List<Equipment> equipment = new ArrayList<>();
     private final List<DepletableResource> supplies = new ArrayList<>();

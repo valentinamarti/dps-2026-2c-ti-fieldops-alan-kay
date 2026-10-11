@@ -1,7 +1,10 @@
 package ar.edu.itba.dps.fieldops.business.validations;
 
+import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
+import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
+import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import org.junit.jupiter.api.Test;
 
@@ -17,15 +20,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RiskToleranceValidationTest {
 
+    private final SequentialExpeditionRepository repository = new SequentialExpeditionRepository();
     private final RiskToleranceValidation validation = new RiskToleranceValidation();
     private final Zone reef = zone("z-1");
-    private final Expedition expedition = expeditionIn(reef, person("p-1")).build();
+    private final Expedition expedition = expeditionIn(reef, person("p-1")).build(repository);
 
     @Test
     void warnsAboutAnActivityRiskierThanTheExpeditionTolerance() {
         expedition.schedule(diving("a-1", reef, hours(8, 18), 40), hours(9, 12));
 
-        final var expected = ValidationResult.warning("Diving a-1 has HIGH risk, above the expedition tolerance of MEDIUM");
+        final var expected = ValidationResult.warning(RiskToleranceValidation.ID, ValidationSubject.of(new ActivityId("a-1")), "Diving a-1 has HIGH risk, above the expedition tolerance of MEDIUM");
         assertEquals(List.of(expected), validation.validate(expedition));
     }
 

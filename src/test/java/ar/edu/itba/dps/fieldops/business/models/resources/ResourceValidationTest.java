@@ -17,40 +17,40 @@ class ResourceValidationTest {
 
     @Test
     void personRejectsABlankOrMissingIdentity() {
-        assertThrows(IllegalArgumentException.class, () -> new Person("", "Ana", Set.of()));
-        assertThrows(IllegalArgumentException.class, () -> new Person("p-1", " ", Set.of()));
-        assertThrows(IllegalArgumentException.class, () -> new Person(null, "Ana", Set.of()));
+        assertThrows(IllegalArgumentException.class, () -> new Person(new ResourceId(""), "Ana", Set.of()));
+        assertThrows(IllegalArgumentException.class, () -> new Person(new ResourceId("p-1"), " ", Set.of()));
+        assertThrows(NullPointerException.class, () -> new Person(null, "Ana", Set.of()));
     }
 
     @Test
     void vehicleRejectsABlankOrMissingIdentity() {
-        assertThrows(IllegalArgumentException.class, () -> new Vehicle("", "Hilux", PICKUP, "ABC 123", Set.of()));
-        assertThrows(IllegalArgumentException.class, () -> new Vehicle("v-1", " ", PICKUP, "ABC 123", Set.of()));
-        assertThrows(IllegalArgumentException.class, () -> new Vehicle("v-1", "Hilux", PICKUP, "", Set.of()));
+        assertThrows(IllegalArgumentException.class, () -> new Vehicle(new ResourceId(""), "Hilux", PICKUP, "ABC 123", Set.of()));
+        assertThrows(IllegalArgumentException.class, () -> new Vehicle(new ResourceId("v-1"), " ", PICKUP, "ABC 123", Set.of()));
+        assertThrows(IllegalArgumentException.class, () -> new Vehicle(new ResourceId("v-1"), "Hilux", PICKUP, "", Set.of()));
     }
 
     @Test
     void instrumentRejectsABlankOrMissingIdentity() {
-        assertThrows(IllegalArgumentException.class, () -> new Instrument("", "Sonar 3000", SONAR, Set.of()));
-        assertThrows(IllegalArgumentException.class, () -> new Instrument("i-1", " ", SONAR, Set.of()));
+        assertThrows(IllegalArgumentException.class, () -> new Instrument(new ResourceId(""), "Sonar 3000", SONAR, Set.of()));
+        assertThrows(IllegalArgumentException.class, () -> new Instrument(new ResourceId("i-1"), " ", SONAR, Set.of()));
     }
 
     @Test
     void depletableRejectsABlankOrMissingIdentity() {
-        assertThrows(IllegalArgumentException.class, () -> new Depletable("", "Diesel", FUEL, SOME_FUEL));
-        assertThrows(IllegalArgumentException.class, () -> new Depletable("d-1", " ", FUEL, SOME_FUEL));
+        assertThrows(IllegalArgumentException.class, () -> new Depletable(new ResourceId(""), "Diesel", FUEL, SOME_FUEL));
+        assertThrows(IllegalArgumentException.class, () -> new Depletable(new ResourceId("d-1"), " ", FUEL, SOME_FUEL));
     }
 
     @Test
     void depletableNeedsAnInitialStock() {
-        assertThrows(NullPointerException.class, () -> new Depletable("d-1", "Diesel", FUEL, null));
+        assertThrows(NullPointerException.class, () -> new Depletable(new ResourceId("d-1"), "Diesel", FUEL, null));
     }
 
     @Test
     void reusableResourcesRejectANullCertificationSet() {
-        assertThrows(NullPointerException.class, () -> new Person("p-1", "Ana", null));
-        assertThrows(NullPointerException.class, () -> new Vehicle("v-1", "Hilux", PICKUP, "ABC 123", null));
-        assertThrows(NullPointerException.class, () -> new Instrument("i-1", "Sonar 3000", SONAR, null));
+        assertThrows(NullPointerException.class, () -> new Person(new ResourceId("p-1"), "Ana", null));
+        assertThrows(NullPointerException.class, () -> new Vehicle(new ResourceId("v-1"), "Hilux", PICKUP, "ABC 123", null));
+        assertThrows(NullPointerException.class, () -> new Instrument(new ResourceId("i-1"), "Sonar 3000", SONAR, null));
     }
 
     @Test
