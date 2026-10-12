@@ -58,6 +58,14 @@ final class Mappings {
                 .collect(Collectors.toUnmodifiableSet());
     }
 
+    /**
+     * The same translation as {@link #mapped} for the values whose order is part of what was sent, like the
+     * ids of the dependencies of an activity.
+     */
+    static <T> List<T> mappedInOrder(List<String> values, Function<String, T> asValueObject) {
+        return Objects.requireNonNullElse(values, List.<String>of()).stream().map(asValueObject).toList();
+    }
+
     static List<String> sorted(Stream<String> values) {
         return values.sorted().toList();
     }

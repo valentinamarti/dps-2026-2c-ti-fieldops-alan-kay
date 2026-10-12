@@ -50,6 +50,17 @@ class OpenApiDocumentationTest {
     }
 
     @Test
+    void publishesTheActivitiesOfAnExpeditionAndTheTypesTheyCanBeScheduledAs() throws Exception {
+        api.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/expeditions/{expeditionId}/activities'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/activity-types'].get").exists())
+                .andExpect(jsonPath("$.components.schemas.ScheduleActivityRequest").exists())
+                .andExpect(jsonPath("$.components.schemas.ScheduledActivityResponse").exists())
+                .andExpect(jsonPath("$.components.schemas.ActivityTypeResponse").exists());
+    }
+
+    @Test
     void servesSwaggerUi() throws Exception {
         api.perform(get("/swagger-ui/index.html")).andExpect(status().isOk());
     }
