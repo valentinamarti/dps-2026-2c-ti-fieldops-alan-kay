@@ -31,6 +31,12 @@ public interface ItineraryNode {
     boolean runsInParallel(ItineraryItem first, ItineraryItem second);
 
     /**
+     * The items this node runs after the given one because they come later in a sequential block, at any depth.
+     * Empty when the item is not inside this node.
+     */
+    List<ItineraryItem> itemsAfter(ItineraryItem item);
+
+    /**
      * The plan of a node with this same shape, asking for the plan of each item. Items without a plan are left out,
      * and so is a node left with nothing inside.
      */

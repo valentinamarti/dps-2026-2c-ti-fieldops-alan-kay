@@ -6,8 +6,10 @@ import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
@@ -52,6 +54,23 @@ public class Itinerary {
     }
 
     /**
+     * The items that cannot happen without this one: those that depend on it, directly or through others.
+     */
+    public List<ItineraryItem> dependentsOf(ItineraryItem item) {
+        return reachableFrom(item, this::directDependentsOf);
+    }
+
+    /**
+     * The items that have to move later when this one does: those that come after it in a sequential block and
+     * those that depend on it, and in turn the ones that have to move with each of them.
+     */
+    public List<ItineraryItem> movingWith(ItineraryItem item) {
+        return reachableFrom(item, current -> Stream.concat(
+                nodes.stream().flatMap(node -> node.itemsAfter(current).stream()),
+                directDependentsOf(current).stream()).toList());
+    }
+
+    /**
      * The plans that rebuild this itinerary with the same blocks, in the order its nodes were scheduled.
      */
     public List<PlannedNode> planKeepingStructure(Function<ItineraryItem, Optional<PlannedNode>> itemPlans) {
@@ -71,6 +90,22 @@ public class Itinerary {
                 .forEach(item -> requireDependenciesMet(item, scheduled, node));
         nodes.add(node);
         return node;
+    }
+
+    private List<ItineraryItem> directDependentsOf(ItineraryItem item) {
+        return getItems().stream().filter(other -> other.getActivity().dependsOn(item.getActivity())).toList();
+    }
+
+    private List<ItineraryItem> reachableFrom(ItineraryItem start, Function<ItineraryItem, List<ItineraryItem>> next) {
+        final var reached = new LinkedHashSet<ItineraryItem>();
+        final var pending = new ArrayDeque<>(next.apply(start));
+        while (!pending.isEmpty()) {
+            final var current = pending.poll();
+            if (!current.equals(start) && reached.add(current)) {
+                pending.addAll(next.apply(current));
+            }
+        }
+        return getItems().stream().filter(reached::contains).toList();
     }
 
     private Optional<ItineraryItem> itemFor(Activity activity, List<ItineraryItem> items) {

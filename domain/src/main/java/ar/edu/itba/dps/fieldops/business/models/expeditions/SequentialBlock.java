@@ -6,6 +6,7 @@ import ar.edu.itba.dps.fieldops.business.interfaces.itinerary.ItineraryNode;
 import java.time.Duration;
 import java.util.List;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 public final class SequentialBlock extends ItineraryBlock {
 
@@ -19,6 +20,18 @@ public final class SequentialBlock extends ItineraryBlock {
     @Override
     public Duration estimatedDuration() {
         return children().stream().map(ItineraryNode::estimatedDuration).reduce(Duration.ZERO, Duration::plus);
+    }
+
+    @Override
+    public List<ItineraryItem> itemsAfter(ItineraryItem item) {
+        return IntStream.range(0, children().size())
+                .filter(position -> children().get(position).leaves().contains(item))
+                .boxed()
+                .findFirst()
+                .map(position -> Stream.concat(
+                        children().get(position).itemsAfter(item).stream(),
+                        children().subList(position + 1, children().size()).stream().flatMap(child -> child.leaves().stream())).toList())
+                .orElse(List.of());
     }
 
     @Override

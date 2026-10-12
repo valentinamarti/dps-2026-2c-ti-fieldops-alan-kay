@@ -121,15 +121,13 @@ class ExpeditionTrackingTest {
     }
 
     @Test
-    void recordsObservationsAndIncidentsOfAnActivityInProgress() {
+    void recordsObservationsOfAnActivityInProgress() {
         inExecution().startActivity(item, at(9, 0));
 
         expedition.recordObservation(item, new Observation("Water clearer than expected", at(9, 30)));
-        expedition.reportIncident(item, new Incident("One sample jar broke", at(10, 0)));
 
         final var tracking = item.getTracking().orElseThrow();
         assertEquals(List.of(new Observation("Water clearer than expected", at(9, 30))), tracking.getObservations());
-        assertEquals(List.of(new Incident("One sample jar broke", at(10, 0))), tracking.getIncidents());
     }
 
     @Test

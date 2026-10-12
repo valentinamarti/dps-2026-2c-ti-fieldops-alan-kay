@@ -21,6 +21,7 @@ public class ExpeditionBuilder {
     private final Set<Person> responsibles = new HashSet<>();
     private final Set<Permit> grantedPermits = new HashSet<>();
     private final List<PlannedNode> plannedNodes = new ArrayList<>();
+    private final List<Incident> inheritedIncidents = new ArrayList<>();
     private String name;
     private TimePeriod period;
     private ExpeditionRestrictions restrictions;
@@ -81,13 +82,21 @@ public class ExpeditionBuilder {
         return this;
     }
 
+    /**
+     * Incidents an alternative keeps from the expedition it replaces, so its report still tells the whole trip.
+     */
+    public ExpeditionBuilder addInheritedIncident(Incident incident) {
+        inheritedIncidents.add(incident);
+        return this;
+    }
+
     public ExpeditionBuilder addFinishedItem(ItineraryItem finished) {
         return addNode(PlannedNode.finished(finished));
     }
 
     public Expedition build(ExpeditionRepository repository) {
         Objects.requireNonNull(repository, "repository is required");
-        final var expedition = new Expedition(repository.nextId(), name, period, objectives, zones, responsibles, restrictions, grantedPermits, replacedExpedition, replanReason);
+        final var expedition = new Expedition(repository.nextId(), name, period, objectives, zones, responsibles, restrictions, grantedPermits, replacedExpedition, replanReason, inheritedIncidents);
         plannedNodes.forEach(expedition::schedule);
         return expedition;
     }

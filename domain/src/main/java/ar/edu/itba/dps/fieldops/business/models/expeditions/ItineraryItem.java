@@ -85,6 +85,11 @@ public class ItineraryItem implements ItineraryNode {
     }
 
     @Override
+    public List<ItineraryItem> itemsAfter(ItineraryItem item) {
+        return List.of();
+    }
+
+    @Override
     public Optional<PlannedNode> planKeepingStructure(Function<ItineraryItem, Optional<PlannedNode>> itemPlans) {
         return itemPlans.apply(this);
     }
