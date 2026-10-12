@@ -483,9 +483,9 @@ Inventario completo, con el caso de uso que hay detrás de cada uno. Los marcado
 
 | Capacidad | Endpoint | Caso de uso |
 | --- | --- | --- |
-| Catálogo | `POST` y `GET /api/staff`, `/api/equipment`, `/api/supplies` | `RegisterStaff`, `RegisterEquipment`, `RegisterSupply`, `QueryCatalog` **(nuevos)** |
-| Catálogo | `POST /api/{recurso}/{id}/unavailabilities` | `MarkResourceUnavailable` **(nuevo)** |
-| Zonas | `POST /api/zones`, `GET /api/zones`, `GET /api/zones/{id}` | `RegisterZone`, `QueryZones` **(nuevos)** |
+| Catálogo | [x] `POST` y `GET /api/staff`, `/api/vehicles`, `/api/instruments`, `/api/supplies`, y `GET /api/equipment` | `RegisterResources`, `QueryCatalog` **(nuevos)** |
+| Catálogo | [x] `POST /api/{staff\|vehicles\|instruments}/{id}/unavailabilities` | `MarkResourceUnavailable` **(nuevo)** |
+| Zonas | [x] `POST /api/zones`, `GET /api/zones`, `GET /api/zones/{id}` | `RegisterZone`, `QueryZones` **(nuevos)** |
 | Expediciones | `POST /api/expeditions`, `GET /api/expeditions`, `GET /api/expeditions/{id}` | `CreateExpedition.create(command)`, `QueryExpeditions` |
 | Itinerario | `POST /api/expeditions/{id}/activities` | `ScheduleActivity` **(dominio, F1)** |
 | Itinerario | `POST /api/expeditions/{id}/blocks` | `ScheduleBlock` **(dominio, F2)** |
@@ -503,7 +503,21 @@ Inventario completo, con el caso de uso que hay detrás de cada uno. Los marcado
 | Propuestas | `GET /api/expeditions/{id}/replan-proposals`, `GET /api/replan-proposals/{id}` | `QueryReplanProposals` **(F3)** |
 | Propuestas | `POST /api/replan-proposals/{id}/acceptance` (número de opción + responsable, justificación y fecha), `/rejection` | `DecideReplanProposal` **(F3)** |
 
-Son unos treinta endpoints sobre diecisiete casos de uso existentes y seis nuevos. `ReplanExpedition` (la replanificación manual, sin incidente) **no se expone**: la consigna pide la replanificación por incidente y el caso de uso manual ya tiene cobertura unitaria. Queda anotado en D49.
+Son unos treinta endpoints sobre diecisiete casos de uso existentes y cinco nuevos (eran seis a título indicativo: las cuatro altas del catálogo quedaron juntas en `RegisterResources`, por el mismo criterio con el que `TransitionExpedition` juntó las transiciones; el detalle está en D52). `ReplanExpedition` (la replanificación manual, sin incidente) **no se expone**: la consigna pide la replanificación por incidente y el caso de uso manual ya tiene cobertura unitaria. Queda anotado en D49.
+
+**Estado del primer tramo (rama `assignment-2-phase-5b`, sobre la 5a): catálogo y zonas hechos.** `mvn -B verify` pasa con 688 tests (608 domain, 20 app, 60 web); antes eran 638 y los 20 de `app` siguen pasando sin tocarlos. Lo que quedó:
+
+- En `domain`, cinco casos de uso nuevos con sus comandos (`RegisterResources`, `QueryCatalog`, `MarkResourceUnavailable`, `RegisterZone`, `QueryZones`), con la resolución de ids por tipo en `Lookups`. D52 documenta la agrupación, la decisión de `Vehicle`/`Instrument` y la deuda del catálogo sin puerto de salida.
+- En `web`, seis controllers (`StaffController`, `VehicleController`, `InstrumentController`, `EquipmentController`, `SupplyController`, `ZoneController`) con sus DTOs y sus mappers. Las traducciones compartidas salieron de `ExpeditionMapper` a `Mappings`.
+- Tests: `RegisterResourcesTest`, `QueryCatalogTest`, `MarkResourceUnavailableTest` y `ZoneUseCasesTest` en `domain` (26); `CatalogApiTest` (16), `ZoneApiTest` (5), `CatalogUnlocksExpeditionsApiTest` (2, el que registra zona y persona por HTTP y después crea la expedición que las referencia) y una entrada más en `OpenApiDocumentationTest` en `web`.
+
+Qué cambió respecto del plan:
+
+- **`/api/equipment` se partió en `/api/vehicles` y `/api/instruments`**, y quedó como el listado combinado de los dos (un documento con dos listas, no un arreglo plano). El vehículo tiene patente y el instrumento no, así que un solo cuerpo necesitaría un discriminador y un campo opcional que depende de él. Está justificado en D52.
+- **La indisponibilidad no aplica a los consumibles** (`markUnavailable` está en `ReusableResource`), así que el sub-recurso existe en personal, vehículos e instrumentos y no en `/api/supplies`. Responde 204: no hay nada que leer después, porque `AvailabilityCalendar` no expone sus indisponibilidades.
+- **No hizo falta ninguna excepción nueva:** el catálogo ya rechaza un id repetido con `DuplicateResourceException` sobre un único espacio de ids, y el contrato de `ZoneRepository` ya rechaza la zona repetida. Las dos ya tenían su fila de 409.
+- **El modelo sumó accesores de lectura** de lo que ya guardaba (categoría de `Vehicle`, `Instrument` y `Depletable`, certificaciones de los tres certificables, permisos requeridos de `Zone`), porque la respuesta tiene que mostrarlos. Las preguntas del dominio (`belongsTo`, `hasCertification`, `missingPermits`) no cambiaron.
+- **Dos arreglos del 5a:** `ExpeditionApiTest.createsAnExpeditionInDraftAndSaysWhereToFindIt` creaba dos expediciones y ahora crea una, y D49 tiene anotada la deuda de `NullPointerException` -> 400.
 
 ### PR 5c: demo
 
@@ -516,7 +530,7 @@ Son unos treinta endpoints sobre diecisiete casos de uso existentes y seis nuevo
 
 - [ ] Tests de API con el contexto completo y los adaptadores reales en memoria, sin mocks: un caso feliz por capacidad.
 - [ ] Parametrizado: cada excepción de dominio devuelve su código HTTP.
-- [ ] Unitarios de los casos de uso nuevos del catálogo, con Mockito, como el resto de la Fase 1.
+- [x] Unitarios de los casos de uso nuevos del catálogo y de las zonas, como el resto de la Fase 1. Con Mockito donde hay puerto de salida (`ZoneRepository`); para el catálogo con la clase real, que es un objeto en memoria sin I/O.
 - [ ] Tests de API de lo que absorbemos: agendar un bloque con su árbol, alta de una actividad nocturna por tipo, listar tipos, y el flujo completo de F3 (incidente, propuesta, aceptar y rechazar).
 - [ ] Test del cargador del seed: los archivos de `demo/` cargan sin errores.
 - [ ] Un test de API que recorre el mismo guion de `demo.http`, para que la CI avise si la demo se rompe.
@@ -535,7 +549,7 @@ Son unos treinta endpoints sobre diecisiete casos de uso existentes y seis nuevo
 - D49: la API como adaptador driving, con DTOs propios y el mapeo de errores fuera del dominio. Alternativas descartadas: serializar entidades, anotar excepciones de dominio con códigos HTTP. Se escribe en el PR 5a y se le agrega después cómo se serializa el árbol del itinerario sin condicionales por tipo de nodo, y por qué no se expone la replanificación manual.
 - D50: seed como datos con un cargador genérico. Alternativas descartadas: clases Java de demo, `data.sql` antes de tener persistencia.
 - D51: persistencia en memoria detrás de los puertos y tests de repositorio como contrato. Se registra como deuda técnica de la entrega.
-- D52: casos de uso de alta del catálogo y de zonas. Extiende D38. Alternativa descartada: que el controller llame directo a `ResourceCatalog` y `ZoneRepository` y construya los objetos de dominio.
+- D52: casos de uso de alta del catálogo y de zonas. Extiende D38. Alternativa descartada: que el controller llame directo a `ResourceCatalog` y `ZoneRepository` y construya los objetos de dominio. **Escrita** en el primer tramo del PR 5b, con la agrupación en cinco casos de uso, los dos sub-recursos de equipo y la deuda del catálogo sin puerto de salida.
 - Revisión de D38: los comandos de agendar actividad y bloque pasan a recibir ids, tipo y parámetros, que es lo que la Fase 1 dejó anotado como pendiente y la Fase 3 como deuda.
 - Patrones no aplicados: JPA en esta entrega, y Visitor si el árbol del itinerario se resuelve de otra forma.
 
