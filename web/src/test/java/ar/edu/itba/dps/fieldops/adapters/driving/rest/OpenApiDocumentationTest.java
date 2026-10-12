@@ -1,0 +1,40 @@
+package ar.edu.itba.dps.fieldops.adapters.driving.rest;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.test.web.servlet.MockMvc;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+/**
+ * springdoc publishes the contract of the controllers. It is tested because the compatible line with Spring
+ * Boot 4 is springdoc 3.x, and a build that compiles does not prove that the document is generated.
+ */
+@SpringBootTest
+@AutoConfigureMockMvc
+class OpenApiDocumentationTest {
+
+    @Autowired
+    private MockMvc api;
+
+    @Test
+    void publishesTheExpeditionEndpointsInTheOpenApiDocument() throws Exception {
+        api.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.info.title").value("Field Ops API"))
+                .andExpect(jsonPath("$.paths['/api/expeditions'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/expeditions'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/expeditions/{id}'].get").exists())
+                .andExpect(jsonPath("$.components.schemas.ExpeditionResponse").exists())
+                .andExpect(jsonPath("$.components.schemas.CreateExpeditionRequest").exists());
+    }
+
+    @Test
+    void servesSwaggerUi() throws Exception {
+        api.perform(get("/swagger-ui/index.html")).andExpect(status().isOk());
+    }
+}
