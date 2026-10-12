@@ -20,8 +20,7 @@ public class ExpeditionBuilder {
     private final Set<Zone> zones = new HashSet<>();
     private final Set<Person> responsibles = new HashSet<>();
     private final Set<Permit> grantedPermits = new HashSet<>();
-    private final List<PlannedActivity> plannedActivities = new ArrayList<>();
-    private final List<ItineraryItem> finishedItems = new ArrayList<>();
+    private final List<PlannedNode> plannedNodes = new ArrayList<>();
     private String name;
     private TimePeriod period;
     private ExpeditionRestrictions restrictions;
@@ -64,7 +63,11 @@ public class ExpeditionBuilder {
     }
 
     public ExpeditionBuilder addActivity(Activity activity, TimePeriod scheduledPeriod) {
-        plannedActivities.add(new PlannedActivity(activity, scheduledPeriod));
+        return addNode(PlannedNode.activity(activity, scheduledPeriod));
+    }
+
+    public ExpeditionBuilder addNode(PlannedNode node) {
+        plannedNodes.add(node);
         return this;
     }
 
@@ -79,18 +82,13 @@ public class ExpeditionBuilder {
     }
 
     public ExpeditionBuilder addFinishedItem(ItineraryItem finished) {
-        finishedItems.add(finished);
-        return this;
+        return addNode(PlannedNode.finished(finished));
     }
 
     public Expedition build(ExpeditionRepository repository) {
         Objects.requireNonNull(repository, "repository is required");
         final var expedition = new Expedition(repository.nextId(), name, period, objectives, zones, responsibles, restrictions, grantedPermits, replacedExpedition, replanReason);
-        finishedItems.forEach(expedition::addFinishedCopyOf);
-        plannedActivities.forEach(planned -> expedition.schedule(planned.activity(), planned.scheduledPeriod()));
+        plannedNodes.forEach(expedition::schedule);
         return expedition;
-    }
-
-    private record PlannedActivity(Activity activity, TimePeriod scheduledPeriod) {
     }
 }

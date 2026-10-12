@@ -8,6 +8,7 @@ import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidTrackingException;
 import ar.edu.itba.dps.fieldops.business.exceptions.UnacceptedWarningException;
+import ar.edu.itba.dps.fieldops.business.interfaces.itinerary.ItineraryNode;
 import ar.edu.itba.dps.fieldops.business.interfaces.replanning.ReplanReason;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.DepletableResource;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.Equipment;
@@ -79,6 +80,11 @@ public class Expedition {
         requireOwnZone(activity);
         requireWithinPeriod(activity, scheduledPeriod);
         return itinerary.add(activity, scheduledPeriod);
+    }
+
+    public ItineraryNode schedule(PlannedNode plan) {
+        requireEditable();
+        return itinerary.add(plan.nodeIn(this));
     }
 
     public void assignStaff(ItineraryItem item, Person person) {
@@ -231,9 +237,10 @@ public class Expedition {
         }
     }
 
-    void addFinishedCopyOf(ItineraryItem finished) {
-        requireEditable();
-        itinerary.addFinishedCopyOf(finished);
+    ItineraryItem plannedItem(Activity activity, TimePeriod scheduledPeriod) {
+        requireOwnZone(activity);
+        requireWithinPeriod(activity, scheduledPeriod);
+        return new ItineraryItem(activity, scheduledPeriod);
     }
 
     private ItineraryItem editable(ItineraryItem item) {

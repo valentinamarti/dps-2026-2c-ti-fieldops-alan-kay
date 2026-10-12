@@ -2,15 +2,18 @@ package ar.edu.itba.dps.fieldops.business.models.expeditions;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidTrackingException;
+import ar.edu.itba.dps.fieldops.business.interfaces.itinerary.ItineraryNode;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.DepletableResource;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.Equipment;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.ReusableResource;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.activities.DepletableRequirement;
+import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import lombok.Getter;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -18,8 +21,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 
-public class ItineraryItem {
+public class ItineraryItem implements ItineraryNode {
 
     @Getter
     private final Activity activity;
@@ -53,6 +57,36 @@ public class ItineraryItem {
 
     public boolean overlapsWith(ItineraryItem other) {
         return scheduledPeriod.overlapsWith(other.scheduledPeriod);
+    }
+
+    @Override
+    public Duration estimatedDuration() {
+        return activity.estimatedDuration();
+    }
+
+    @Override
+    public RiskLevel estimatedRisk() {
+        return activity.estimatedRisk();
+    }
+
+    @Override
+    public List<DepletableRequirement> requiredSupplies() {
+        return activity.requiredSupplies();
+    }
+
+    @Override
+    public List<ItineraryItem> leaves() {
+        return List.of(this);
+    }
+
+    @Override
+    public boolean runsInParallel(ItineraryItem first, ItineraryItem second) {
+        return false;
+    }
+
+    @Override
+    public Optional<PlannedNode> planKeepingStructure(Function<ItineraryItem, Optional<PlannedNode>> itemPlans) {
+        return itemPlans.apply(this);
     }
 
     public Set<Person> getAssignedStaff() {
@@ -93,6 +127,7 @@ public class ItineraryItem {
         return tracking != null;
     }
 
+    @Override
     public boolean isFinished() {
         return tracking != null && tracking.isFinished();
     }

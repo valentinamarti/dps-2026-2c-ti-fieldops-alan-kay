@@ -7,14 +7,19 @@ import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.completeAssignments;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.sampling;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
+import static ar.edu.itba.dps.fieldops.business.models.expeditions.PlannedNode.activity;
+import static ar.edu.itba.dps.fieldops.business.models.expeditions.PlannedNode.parallel;
+import static ar.edu.itba.dps.fieldops.business.models.expeditions.PlannedNode.sequential;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -54,6 +59,49 @@ class ExpeditionBuilderTest {
 
         assertThrows(InvalidScheduleException.class,
                 () -> expeditionIn(coast, leader).addActivity(morningSurvey, hours(11, 13)).build(repository));
+    }
+
+    @Test
+    void schedulesTheBlocksAddedToIt() {
+        final var dive = sampling("a-1", coast, hours(8, 18));
+        final var transect = sampling("a-2", coast, hours(8, 18));
+
+        final var expedition = expeditionIn(coast, leader)
+                .addNode(parallel(activity(dive, hours(9, 11)), activity(transect, hours(9, 11))))
+                .build(repository);
+
+        final var itinerary = expedition.getItinerary();
+        assertEquals(1, itinerary.getNodes().size());
+        assertTrue(itinerary.runInParallel(itinerary.itemFor(dive).orElseThrow(), itinerary.itemFor(transect).orElseThrow()));
+    }
+
+    @Test
+    void appliesTheBlockRulesToTheBlocksAddedToIt() {
+        final var dive = sampling("a-1", coast, hours(8, 18));
+        final var transect = sampling("a-2", coast, hours(8, 18));
+        final var overlapping = sequential(activity(dive, hours(9, 11)), activity(transect, hours(10, 12)));
+
+        assertThrows(InvalidScheduleException.class, () -> expeditionIn(coast, leader).addNode(overlapping).build(repository));
+    }
+
+    @Test
+    void keepsAsClosedTheFinishedItemsAddedToIt() {
+        final var survey = sampling("a-1", coast, hours(8, 18));
+        final var executed = expeditionIn(coast, leader).addActivity(survey, hours(9, 11)).build(repository);
+        final var done = executed.getItinerary().itemFor(survey).orElseThrow();
+        completeAssignments(executed);
+        executed.submitForReview();
+        executed.approve(List.of(), List.of());
+        executed.start();
+        executed.startActivity(done, LocalDateTime.of(2026, 10, 1, 9, 0));
+        executed.finishActivity(done, LocalDateTime.of(2026, 10, 1, 11, 0), "Samples taken");
+
+        final var expedition = expeditionIn(coast, leader).addFinishedItem(done).build(repository);
+
+        final var kept = expedition.getItinerary().itemFor(survey).orElseThrow();
+        assertTrue(kept.isFinished());
+        assertEquals(done.getAssignedStaff(), kept.getAssignedStaff());
+        assertTrue(expedition.getItinerary().pendingItems().isEmpty());
     }
 
     @Test
