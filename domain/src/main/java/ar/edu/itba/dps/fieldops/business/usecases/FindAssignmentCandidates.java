@@ -23,7 +23,8 @@ public class FindAssignmentCandidates {
         final var period = item.getScheduledPeriod();
         return new AssignmentCandidates(
                 activity.requiredStaff().stream()
-                        .map(requirement -> new AssignmentCandidates.For<>(requirement, catalog.availableStaffFor(requirement, period)))
+                        .map(requirement -> new AssignmentCandidates.For<>(requirement,
+                                catalog.availableStaffFor(requirement, period).stream().filter(activity::admits).toList()))
                         .toList(),
                 activity.requiredEquipment().stream()
                         .map(requirement -> new AssignmentCandidates.For<>(requirement, catalog.availableEquipmentFor(requirement, period)))

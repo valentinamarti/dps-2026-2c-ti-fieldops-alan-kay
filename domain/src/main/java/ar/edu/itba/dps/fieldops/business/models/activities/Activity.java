@@ -1,14 +1,20 @@
 package ar.edu.itba.dps.fieldops.business.models.activities;
 
 import ar.edu.itba.dps.fieldops.business.interfaces.activities.ActivityRules;
+import ar.edu.itba.dps.fieldops.business.interfaces.resources.Certifiable;
 import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
+import ar.edu.itba.dps.fieldops.business.models.resources.Certification;
+import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import lombok.Getter;
 
 import java.time.Duration;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public class Activity {
 
@@ -55,5 +61,23 @@ public class Activity {
 
     public List<StaffRequirement> requiredStaff() {
         return rules.requiredStaff();
+    }
+
+    public Set<Certification> requiredCertificationsForAllStaff() {
+        return rules.requiredCertificationsForAllStaff();
+    }
+
+    public boolean admits(Certifiable candidate) {
+        return requiredCertificationsForAllStaff().stream().allMatch(candidate::hasCertification);
+    }
+
+    public Set<Permit> requiredPermits() {
+        return rules.requiredPermitsIn(zone);
+    }
+
+    public Set<Permit> missingPermits(Collection<Permit> grantedPermits) {
+        return requiredPermits().stream()
+                .filter(permit -> !grantedPermits.contains(permit))
+                .collect(Collectors.toUnmodifiableSet());
     }
 }
