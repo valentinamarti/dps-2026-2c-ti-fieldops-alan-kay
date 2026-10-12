@@ -564,11 +564,11 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - Reemplazar las variantes que reciben el objeto — rompería los tests y el uso de la Entrega 1 sin necesidad.
   - Un método `save` en el repositorio — con el repositorio en memoria las entidades se modifican en el lugar. Cuando haya persistencia real hará falta.
 - **Consecuencia:**
-  - `ScheduleActivityCommand` recibe la `Activity` ya armada: crearla requiere elegir su `ActivityRules` por tipo y parámetros, y eso lo resuelve el registro de tipos de la Fase 3. Hasta entonces el adaptador que agenda una actividad la construye.
-  - **Pendiente (Fase 3):** el registro de tipos ya existe (`ActivityTypeRegistry`, D44), pero `ScheduleActivityCommand` sigue recibiendo la `Activity` armada. Que reciba el tipo, los parámetros y el indicador de nocturna queda para la API: además de las reglas, armar la actividad exige resolver por id la zona y las dependencias, y eso se define con el endpoint.
+  - ~~`ScheduleActivityCommand` recibe la `Activity` ya armada: crearla requiere elegir su `ActivityRules` por tipo y parámetros, y eso lo resuelve el registro de tipos de la Fase 3. Hasta entonces el adaptador que agenda una actividad la construye.~~ **Resuelto en D53:** el comando recibe el id de la actividad, su nombre, su ventana, el horario, el id de la zona, los ids de las dependencias, el nombre del tipo, sus parámetros y el indicador de nocturna, y `ScheduleActivity` resuelve las tres cosas (zona, dependencias y reglas). Ningún adaptador arma una `Activity`.
   - `ValidateExpedition` y `ApproveExpedition` reciben cada uno su lista de reglas adicionales; hoy ambas están vacías en `FieldOpsConfig`.
   - Los tests del repositorio se podrán reutilizar contra el adaptador JPA cuando exista.
 - **Ampliado en D52:** el alta del catálogo y de las zonas, que no tenía caso de uso, lo tiene con el mismo esquema (`RegisterResources`, `QueryCatalog`, `MarkResourceUnavailable`, `RegisterZone`, `QueryZones`). `Lookups` resuelve además la zona por id, el equipo por tipo y el consumible.
+- **Revisado en D53:** el comando de agendar una actividad pasa a recibir ids, tipo y parámetros, que es el pendiente que esta entrada tenía anotado. La variante que recibe la `Activity` armada se conserva, como las de esta misma decisión.
 
 ### D39 — El itinerario es un árbol de actividades y bloques (Composite) (Entrega 2, F2)
 
@@ -729,7 +729,8 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 - **Consecuencia:**
   - Sumar un tipo es escribir su regla con su `TYPE` y agregar una línea a `withStandardTypes()`.
   - Los parámetros son enteros. Si un tipo necesita otro dato (un decimal, un texto), hay que ampliar `ActivityParameters`.
-  - `ScheduleActivityCommand` sigue recibiendo la `Activity` ya armada (D38). Que reciba el tipo, los parámetros y el indicador de nocturna queda pendiente para la API, porque además hay que resolver por id la zona y las dependencias.
+  - ~~`ScheduleActivityCommand` sigue recibiendo la `Activity` ya armada (D38). Que reciba el tipo, los parámetros y el indicador de nocturna queda pendiente para la API, porque además hay que resolver por id la zona y las dependencias.~~ **Resuelto en D53:** el comando recibe el nombre del tipo, sus parámetros y el indicador de nocturna, y `ScheduleActivity` es el único cliente de `rulesFor` fuera de los tests.
+- **Revisado en D53:** `rulesFor(tipo, parámetros, atNight)` pasa a usarse de verdad, desde el caso de uso que agenda una actividad, y `QueryActivityTypes` queda publicado en `GET /api/activity-types`, que es el endpoint que le dice al cliente qué tipos y qué parámetros puede pedir.
 
 ### D45 — El incidente se publica como evento de dominio, con entrega síncrona (Entrega 2, F3)
 
@@ -888,11 +889,56 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - Las traducciones que comparten los mappers (período, cantidad, certificaciones y listas ordenadas) quedaron en `Mappings`, package-private en `rest.mappers`, en vez de repetidas en cada uno; `ExpeditionMapper` pasó a usarlo y no cambió de comportamiento.
   - El `amount` de una cantidad viaja como texto (`"10"`): `Quantity` guarda el decimal exacto con los ceros al final removidos, así que un stock de diez unidades serializado como número saldría `1E+1`.
 
+### D53 — El alta de una actividad entra por ids, nombre de tipo y parámetros (Entrega 2, F5, revisa D38 y D44)
+
+- **Origen:** el pendiente que D38 dejó anotado y que D44 repitió como deuda de F1. `ScheduleActivityCommand` era `(ExpeditionId, Activity, TimePeriod)`, y construir una `Activity` pide `(ActivityId, String, TimePeriod, Zone, List<Activity>, ActivityRules)`: una zona, otras actividades y una estrategia de reglas. Un adaptador REST recibe texto e ids y no tiene con qué armar ninguna de las tres, así que hasta este PR la única forma de agendar una actividad era desde Java. El registro de tipos (D44) estaba escrito y no lo usaba nadie fuera de sus tests.
+- **Patrón / principio:** caso de uso con comando por id (D38) + Registry (D44) + Decorator pedido con un indicador (D42). El caso de uso es la única frontera que traduce de ids y texto a objetos de dominio.
+- **Dónde:** en `business.usecases`, `ScheduleActivityCommand` y `ScheduleActivity`; en `web`, el paquete `adapters.driving.rest`:
+
+  | Pieza | Qué hace |
+  |---|---|
+  | `ScheduleActivityCommand` | `(expeditionId, activityId, name, timeWindow, scheduledPeriod, zoneId, dependencyIds, typeName, parameters, atNight)`. Los dos períodos y los ids son value objects; el tipo, los parámetros y el indicador son los primitivos que `rulesFor` ya pedía |
+  | `ScheduleActivity` | Recibe `ExpeditionRepository`, `ZoneRepository` y `ActivityTypeRegistry`. Resuelve la zona con `Lookups.zone`, cada dependencia con `Lookups.item` sobre el itinerario de la misma expedición, y las reglas con `registry.rulesFor(...)`; después le pasa la `Activity` a la expedición, que aplica las reglas de siempre (D19, D21) |
+  | `ActivityController` | `POST /api/expeditions/{expeditionId}/activities`, con `ScheduleActivityRequest` y `ScheduledActivityResponse` |
+  | `ActivityTypeController` | `GET /api/activity-types`, sobre `QueryActivityTypes`, con `ActivityTypeResponse` |
+  | `rest.dtos` | `ScheduleActivityRequest`, `ScheduledActivityResponse`, `ActivityTypeResponse` y los tres fragmentos de requisitos (`StaffRequirementDto`, `EquipmentRequirementDto`, `SupplyRequirementDto`) |
+  | `rest.mappers` | `ActivityMapper` (del pedido al comando y del ítem agendado a la respuesta) y `ActivityTypeMapper` (solo de salida: un tipo no se registra por HTTP) |
+
+  `FieldOpsConfig` le pasa al bean los tres colaboradores, que ya eran beans. `Mappings` sumó `mappedInOrder`, la traducción de una lista cuyo orden es parte de lo que se mandó.
+- **Por qué:**
+  - **Las tres cosas que faltaban se resuelven en el caso de uso y no en el adaptador.** Es el mismo argumento de D38 y D52: si el controller armara la `Activity`, cada adaptador (el REST, el cargador del seed de la Fase 5) repetiría la búsqueda de la zona, la de las dependencias y la elección de las reglas, y el hexágono quedaría sin un punto de entrada para agendar.
+  - **La variante que recibe la `Activity` armada se conserva**, con la firma `schedule(ExpeditionId, Activity, TimePeriod)`. Es el precedente de D38 (`ApproveExpedition.approve`, `FinishExpedition.finish`) y el de `CreateExpedition`, que acepta un comando o un `ExpeditionBuilder`: quien ya tiene el objeto no necesita el registro para volver a armarlo. Reemplazarla habría obligado a reescribir con el registro tests que no son del alta por tipo (los de asignación, candidatos y bloques), y el comando no es el único cliente del dominio.
+  - **Una dependencia es una actividad ya agendada en la misma expedición.** Se busca con `Lookups.item`, que mira el itinerario de la expedición del comando. No podría ser de otra forma: es la expedición la que verifica que una dependencia esté agendada y termine antes (D21, D40), y solo ve su propio itinerario. Por eso una dependencia de otra expedición y una que nadie agendó fallan igual, con `NotFoundException` ("no existe actividad agendada con id ..."): desde la expedición que se está planificando, las dos no existen.
+  - **El tipo y los parámetros viajan como los pide el registro**, texto y enteros, y el comando no los interpreta. `rulesFor` ya devolvía la regla envuelta en `NightOperationRules` cuando se le pide la variante nocturna (D42, D44), así que el caso de uso no conoce el decorador: pasa el indicador y recibe una `ActivityRules`.
+  - **El orden en que se resuelve es el que mejor explica el error:** primero la expedición, después la zona, después las dependencias y al final las reglas. Los tres primeros son 404 (un id que no existe) y el último es 400 (un tipo o un parámetro que no sirven), que es la distinción que ya tenía la tabla de D49; no hizo falta ninguna excepción nueva ni ninguna fila nueva.
+  - **La respuesta trae lo que la actividad exige y no sus datos declarados solamente.** Una regla envuelta no dice que es nocturna (D42), así que la API no puede mostrar un `atNight` que venga del dominio: lo que sí puede mostrar es el efecto, que es lo que un cliente necesita después para asignar. Por eso `ScheduledActivityResponse` incluye duración y riesgo estimados, los requisitos de personal, equipamiento y consumibles, las certificaciones que exige a todo el personal y los permisos que exige en su zona, con el nombre exacto que la expedición tiene que conceder (D43). Una nocturna se reconoce por lo que pide (iluminación, la certificación, el permiso, un nivel más de riesgo), que es justo lo que el test de API verifica.
+  - **La duración viaja en minutos, en un campo que lo dice (`estimatedDurationMinutes`).** Un `Duration` serializado por Jackson sale como `PT2H` o como un número de segundos según la configuración; el nombre del campo deja la unidad en el contrato y no en una convención del serializador.
+  - **La respuesta no trae `Location`.** Lo que se crea es un nodo del itinerario, y el itinerario todavía no tiene endpoint (`GET /api/expeditions/{id}/itinerary` es del tramo siguiente), así que no hay dirección que apuntar. Es el mismo criterio con el que la indisponibilidad responde 204 en D52: no se promete una dirección que no responde. Cuando el endpoint del itinerario exista, el `Location` va ahí.
+  - **`GET /api/activity-types` es de solo lectura y no tiene un endpoint por tipo.** El dominio decide qué tipos hay (`withStandardTypes`, D44); la API los publica con su nombre normalizado y los nombres de sus parámetros tal como hay que mandarlos, que es el contrato del cuerpo del alta.
+- **Alternativas descartadas:**
+  - **Que el adaptador arme la `Activity`** y el comando siga recibiéndola — es lo que D38 y D52 ya descartaron para las expediciones y el catálogo: el adaptador tendría que buscar la zona, buscar las dependencias en el itinerario de la expedición (es decir, cargarla antes que el caso de uso) y conocer el registro de tipos; tres responsabilidades del hexágono afuera, repetidas en el segundo adaptador.
+  - **Que el comando reciba la zona y las dependencias ya resueltas** (`Zone` y `List<Activity>`) y solo el tipo por nombre — resuelve la mitad del problema y deja la otra en quien llama: el que tiene que conseguir la `Zone` es el adaptador, y para conseguir las `Activity` de las dependencias tendría que leer el itinerario. Además los comandos de D38 reciben ids por decisión, no por casualidad.
+  - **Un endpoint por tipo de actividad** (`POST .../activities/diving`, `POST .../activities/transfer`) — es el mismo antipatrón que D44 descartó con el `switch` por tipo, movido a la URL: sumar un tipo obligaría a agregar un controller o un método, y el parámetro de cada tipo pasaría a ser un campo de un cuerpo distinto. Con un solo endpoint, el tipo es un dato y `GET /api/activity-types` dice cuáles valen. Es lo contrario del caso de D52 con vehículos e instrumentos, donde cada sub-recurso tiene campos propios y obligatorios distintos: acá todos los tipos tienen la misma forma (un nombre y un mapa de parámetros) y la diferencia la valida el dominio.
+  - **Un indicador de tipo de variante en vez de `atNight`** (una lista de decoradores a aplicar) — hoy hay una sola variante transversal y el registro la envuelve una sola vez (D42). Una lista abriría la puerta a envolver dos veces, que es justamente la deuda que F1 dejó anotada.
+  - **Que la respuesta eche atrás el tipo y el indicador de nocturna que se mandaron** — serían los únicos campos de la respuesta que no salen del dominio sino del pedido, y quedarían desincronizados el día que el itinerario se lea desde el repositorio en vez de desde el pedido que lo creó. Si el dato tiene que viajar, es el dominio el que tiene que guardarlo (D42 lo deja anotado y sigue siendo deuda de F1).
+  - **Validar en el DTO que el tipo exista o que los parámetros estén** — ya descartado en D49: el registro falla con `UnknownActivityTypeException` e `InvalidActivityParametersException`, que dicen qué tipos hay y qué parámetro falta, y las dos son 400 por la tabla de errores.
+- **Consecuencia:**
+  - `ScheduleActivity` depende ahora de tres puertos y no de uno. Es lo que cuesta resolver ids: el mismo esquema de `CreateExpedition` (repositorio, zonas y catálogo).
+  - **`ScheduleBlockCommand` sigue recibiendo el `PlannedNode` con las `Activity` ya armadas.** Es el punto 2 de los cambios de dominio de la Fase 5 y el tramo siguiente: el DTO de un bloque es un árbol y cada hoja se traduce con el mismo resolver de esta decisión, así que lo que hoy es privado de `ScheduleActivity` va a tener que compartirse.
+  - La respuesta de una actividad agendada es la primera forma que se le da a una hoja del itinerario. Cuando se escriba `GET /api/expeditions/{id}/itinerary` conviene que las hojas se serialicen con este mismo `ScheduledActivityResponse`, y lo que falta decidir ahí es el nodo compuesto (D49, pendiente del árbol).
+  - Agendar sigue sin verificar que una nocturna esté agendada de noche: la actividad se declara nocturna y nada compara su horario con el atardecer. Era un supuesto de F1 y no cambió.
+
 ## Funcionalidades nuevas de la Entrega 2
 
 ### F1 — Actividades nocturnas
 
-- **Decisiones:** D42, D43, D44.
+- **Decisiones:** D42, D43, D44, D53.
+- **API:** dos endpoints, con el alta de actividad por tipo que D53 habilitó.
+
+  | Endpoint | Caso de uso | Qué devuelve |
+  |---|---|---|
+  | `POST /api/expeditions/{id}/activities` | `ScheduleActivity.schedule(command)` | La actividad agendada con lo que sus reglas exigen: duración y riesgo estimados, requisitos de personal, equipamiento y consumibles, certificaciones para todo el personal y permisos en su zona. Una nocturna se pide con `"atNight": true` y se reconoce por lo que exige, porque el dominio no dice que lo es (D42) |
+  | `GET /api/activity-types` | `QueryActivityTypes.list()` | Los seis tipos con el nombre normalizado y los nombres de sus parámetros. Es lo que le dice al cliente qué puede pedir en el alta |
 - **Clases agregadas:**
   - `business.rules.ActivityRulesDecorator` — base abstracta de los decoradores de `ActivityRules`: delega todos los métodos en la regla que envuelve.
   - `business.rules.NightOperationRules` — la variante nocturna: suma iluminación, certificación para todo el personal y permiso de la zona, y sube un nivel el riesgo.
@@ -903,6 +949,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - `business.models.activities.ActivityTypeName` y `ActivityParameters` — el nombre normalizado de un tipo y los parámetros con que se lo pide.
   - `business.exceptions.UnknownActivityTypeException` e `InvalidActivityParametersException` — un tipo que no existe y un parámetro que falta o no sirve.
   - `business.usecases.QueryActivityTypes` — lista los tipos disponibles con sus parámetros.
+  - En `web`, con el alta por tipo (D53): `adapters.driving.rest.ActivityController` y `ActivityTypeController`; en `rest.dtos`, `ScheduleActivityRequest`, `ScheduledActivityResponse`, `ActivityTypeResponse`, `StaffRequirementDto`, `EquipmentRequirementDto` y `SupplyRequirementDto`; en `rest.mappers`, `ActivityMapper` y `ActivityTypeMapper`.
 - **Clases modificadas:**
   - `ActivityRules` — suma `requiredCertificationsForAllStaff()` y `requiredPermitsIn(Zone)`, con respuesta vacía por defecto.
   - `Activity` — expone las dos preguntas nuevas (`requiredCertificationsForAllStaff`, `requiredPermits`) y responde `admits(persona)` y `missingPermits(concedidos)`.
@@ -912,7 +959,10 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - `MissingPermitsValidation` — además de los permisos de las zonas, reporta los de cada actividad pendiente.
   - `FindAssignmentCandidates` — ofrece solo al personal que la actividad admite.
   - `DivingRules` y `SampleCollectionRules` — suman la constante `TYPE`.
-  - `FieldOpsConfig` (módulo `web`) — expone `ActivityTypeRegistry` y `QueryActivityTypes` como beans (D37).
+  - `ScheduleActivityCommand` — pasa a recibir ids, el nombre del tipo, sus parámetros y el indicador de nocturna en vez de la `Activity` armada (D53).
+  - `ScheduleActivity` — resuelve la zona, las dependencias y las reglas, y recibe `ZoneRepository` y `ActivityTypeRegistry` además del repositorio (D53). Conserva la variante que recibe la `Activity`.
+  - `FieldOpsConfig` (módulo `web`) — expone `ActivityTypeRegistry` y `QueryActivityTypes` como beans (D37), y le pasa los tres colaboradores a `ScheduleActivity` (D53).
+  - `rest.mappers.Mappings` (módulo `web`) — suma `mappedInOrder`, para las listas cuyo orden es parte de lo que se mandó (los ids de las dependencias).
   - No se modificaron `ExpeditionReporter`, `ExpeditionEstimator`, `RiskToleranceValidation`, `MissingResourcesValidation`, `ApprovalPolicy` ni `ItineraryItem`.
 - **Refactorizaciones realizadas:**
   - `MissingPermitsValidation` separó en dos métodos lo que reporta por zona y lo que reporta por actividad, con el texto del mensaje en una constante que comparten. Hizo falta para sumar el segundo origen sin duplicar el mensaje.
@@ -921,8 +971,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 - **Deuda técnica que se decidió no resolver:**
   - **Nada impide envolver dos veces una regla fuera del registro.** `new NightOperationRules(new NightOperationRules(regla))` sube el riesgo dos niveles y pide la iluminación dos veces. Se aceptó porque el único camino que arma la variante a partir de un pedido es el registro, que envuelve una vez. Habría que resolverlo si aparecen más decoradores o si otro código empieza a armar reglas envueltas por su cuenta.
   - **Una regla base que ya pida iluminación la pediría dos veces.** Los dos requisitos se evalúan por separado, así que un mismo equipo cubre ambos (el mismo límite que ya tiene el personal, ver supuestos). Hoy ningún tipo base pide `Lighting`.
-  - **`ScheduleActivityCommand` no usa el registro.** Sigue recibiendo la `Activity` armada (D38, D44). Se resuelve con el endpoint de alta de actividad, que tiene que definir cómo llegan la zona y las dependencias.
-  - **Una actividad no dice que es nocturna, ni de qué tipo es.** Es lo que evita los condicionales, pero la respuesta de la API no puede mostrarlo a partir del dominio. Si hace falta, el dato viaja en la respuesta o en una descripción que las reglas publiquen, no en un `isNight()`.
+  - **Una actividad no dice que es nocturna, ni de qué tipo es.** Es lo que evita los condicionales, pero la respuesta de la API no puede mostrarlo a partir del dominio. Si hace falta, el dato viaja en la respuesta o en una descripción que las reglas publiquen, no en un `isNight()`. El alta por tipo no lo resolvió: la respuesta muestra lo que la actividad exige, no de qué tipo es ni si es nocturna (D53).
   - **El permiso especial se identifica por una convención de nombre.** Alcanza mientras un permiso sea solo un nombre (D43). Habría que resolverlo si los permisos pasan a tener vigencia o emisor.
   - **Los parámetros de un tipo son enteros.** Alcanza para los seis tipos; un tipo con otro dato obliga a ampliar `ActivityParameters` (D44).
   - **El horario de una actividad nocturna no se verifica.** La actividad se declara nocturna y nada comprueba que su horario agendado sea de noche (ver supuestos).
@@ -937,6 +986,9 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - Una actividad nocturna dentro de un bloque se valida y se estima igual que suelta — `ItineraryBlocksTest.aNightActivityInsideABlockIsValidatedAndEstimatedLikeALooseOne`.
   - El decorador sobre cada uno de los seis tipos base suma la certificación, la iluminación y el permiso, y conserva la duración y los consumibles — el parametrizado `NightOperationRulesTest.addsTheCertificationTheLightingAndThePermitAndKeepsTheDurationAndTheSupplies`.
   - Los cuatro tipos nuevos y el registro — `DroneSurveyRulesTest`, `WildlifeObservationRulesTest`, `WaterQualityMeasurementRulesTest`, `TransferRulesTest`, `ActivityTypeRegistryTest` (cada tipo por nombre, la variante nocturna, tipo desconocido, parámetro faltante o inválido) y `QueryActivityTypesTest`.
+  - Una actividad nocturna se agenda **de punta a punta sobre HTTP** — `ActivityApiTest.schedulesANightActivityAskedForByItsTypeAndAnswersWhatItDemands`, que registra la zona, la persona certificada y la iluminación, crea la expedición con el permiso nocturno de la zona y agenda la actividad por el nombre de su tipo; que quedó en el itinerario lo verifica `theNightActivityStaysInTheItineraryAndCanBeDependedOn`, con una segunda actividad que depende de ella.
+  - El alta por tipo resuelve zona, dependencias y reglas, y falla como corresponde — `ScheduleActivityTest` (12 tests: la zona y el tipo del comando, otro tipo con su parámetro, las dependencias del mismo itinerario, la variante nocturna por lo que exige, tipo desconocido, parámetro faltante e inválido, zona, dependencia y expedición inexistentes) y, sobre HTTP, los cuatro errores de `ActivityApiTest` (400 y 404).
+  - Los tipos y sus parámetros se publican — `ActivityTypeApiTest.listsTheSixTypesWithTheParameterEachOneNeeds`.
 
 ### F2 — Bloques de actividades secuenciales y paralelos
 

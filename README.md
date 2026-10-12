@@ -35,7 +35,7 @@ If Maven picks another JDK, point `JAVA_HOME` to JDK 25:
 
 Compilable Java project containing the domain models, contracts (interfaces), services and use cases, along with their tests, and a Spring Boot application that wires them and exposes them over a REST API.
 
-The API is still partial: the expedition resource (`POST /api/expeditions`, `GET /api/expeditions`, `GET /api/expeditions/{id}`), the catalog (`/api/staff`, `/api/vehicles`, `/api/instruments`, `/api/equipment`, `/api/supplies`, with a `unavailabilities` sub-resource on the reusable ones), the zones (`/api/zones`), the error format every resource shares and the OpenAPI document. The endpoints of the itinerary, the assignments, the validation, the states, the approval, the tracking and the replanning, the demo data, real persistence, frontend, security and deployment are not included yet.
+The API is still partial: the expedition resource (`POST /api/expeditions`, `GET /api/expeditions`, `GET /api/expeditions/{id}`), the catalog (`/api/staff`, `/api/vehicles`, `/api/instruments`, `/api/equipment`, `/api/supplies`, with a `unavailabilities` sub-resource on the reusable ones), the zones (`/api/zones`), scheduling an activity of a type in an expedition (`POST /api/expeditions/{id}/activities`) with the types it can be asked for (`GET /api/activity-types`), the error format every resource shares and the OpenAPI document. The rest of the itinerary (the blocks and the itinerary tree), the assignments, the validation, the states, the approval, the tracking and the replanning, the demo data, real persistence, frontend, security and deployment are not included yet.
 
 ## Structure
 

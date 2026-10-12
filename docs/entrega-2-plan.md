@@ -438,7 +438,7 @@ Absorber los endpoints de las otras fases cambia el tamaño de la fase: pasa de 
 
 El dominio quedó cerrado para tres cosas que un adaptador REST no puede resolver solo. Son trabajo de esta fase, en el módulo `domain`, y se documentan como revisión de las decisiones que tocan.
 
-1. **Alta de actividad por tipo.** `ScheduleActivityCommand(ExpeditionId, Activity, TimePeriod)` recibe la `Activity` ya construida, y `new Activity(...)` pide `Zone`, `List<Activity>` de dependencias y `ActivityRules`. Hace falta un comando con `zoneId`, ids de dependencias, nombre del tipo, parámetros e indicador de nocturna, y que el caso de uso resuelva la zona con `ZoneRepository`, las dependencias en el itinerario y las reglas con `ActivityTypeRegistry`. Es la deuda que anotó la Fase 3 (nota en D38).
+1. ~~**Alta de actividad por tipo.** `ScheduleActivityCommand(ExpeditionId, Activity, TimePeriod)` recibe la `Activity` ya construida, y `new Activity(...)` pide `Zone`, `List<Activity>` de dependencias y `ActivityRules`. Hace falta un comando con `zoneId`, ids de dependencias, nombre del tipo, parámetros e indicador de nocturna, y que el caso de uso resuelva la zona con `ZoneRepository`, las dependencias en el itinerario y las reglas con `ActivityTypeRegistry`. Es la deuda que anotó la Fase 3 (nota en D38).~~ **Hecho** en el segundo tramo del PR 5b: el comando recibe exactamente eso y `ScheduleActivity` resuelve las tres cosas, con los dos endpoints de F1 arriba. Está en D53, y D38 y D44 quedaron revisadas. La variante que recibe la `Activity` armada se conservó, como las variantes por objeto de D38.
 2. **Alta de bloque.** `ScheduleBlockCommand(ExpeditionId, PlannedNode)` tiene el mismo problema un nivel más arriba: `PlannedNode.activity(...)` también recibe `Activity` armadas. El DTO es un árbol y se traduce con el mismo resolver del punto 1. **No estaba anotado en ninguna fase**; salió al definir este alcance.
 3. **Itinerario en árbol.** `ItineraryNode` no expone los hijos ni el tipo de nodo, y la Fase 2 cerró con el criterio de que no haya `instanceof` ni `switch` sobre el tipo de nodo. Para serializar el árbol hay que elegir: sumar a la interfaz un accesor de hijos y un nombre de tipo, o un Visitor (que la Fase 2 descartó en la tabla de patrones no aplicados). **Se decide en el PR que escribe el endpoint del itinerario y se agrega a D49 ahí.** El 5a no lo necesita: la respuesta de la expedición no incluye el itinerario.
 
@@ -487,10 +487,10 @@ Inventario completo, con el caso de uso que hay detrás de cada uno. Los marcado
 | Catálogo | [x] `POST /api/{staff\|vehicles\|instruments}/{id}/unavailabilities` | `MarkResourceUnavailable` **(nuevo)** |
 | Zonas | [x] `POST /api/zones`, `GET /api/zones`, `GET /api/zones/{id}` | `RegisterZone`, `QueryZones` **(nuevos)** |
 | Expediciones | `POST /api/expeditions`, `GET /api/expeditions`, `GET /api/expeditions/{id}` | `CreateExpedition.create(command)`, `QueryExpeditions` |
-| Itinerario | `POST /api/expeditions/{id}/activities` | `ScheduleActivity` **(dominio, F1)** |
+| Itinerario | [x] `POST /api/expeditions/{id}/activities` | `ScheduleActivity` **(dominio, F1)** |
 | Itinerario | `POST /api/expeditions/{id}/blocks` | `ScheduleBlock` **(dominio, F2)** |
 | Itinerario | `GET /api/expeditions/{id}/itinerary` | `QueryExpeditions.get` + mapeo del árbol **(dominio, F2)** |
-| Itinerario | `GET /api/activity-types` | `QueryActivityTypes` **(F1)** |
+| Itinerario | [x] `GET /api/activity-types` | `QueryActivityTypes` **(F1)** |
 | Asignación | `POST /api/expeditions/{id}/activities/{activityId}/staff`, `/equipment`, `/supplies` | `AssignResources` |
 | Asignación | `GET /api/expeditions/{id}/activities/{activityId}/candidates` | `FindAssignmentCandidates` |
 | Validación y estimación | `GET /api/expeditions/{id}/validation`, `/estimate` | `ValidateExpedition`, `EstimateExpedition` |
@@ -519,6 +519,21 @@ Qué cambió respecto del plan:
 - **El modelo sumó accesores de lectura** de lo que ya guardaba (categoría de `Vehicle`, `Instrument` y `Depletable`, certificaciones de los tres certificables, permisos requeridos de `Zone`), porque la respuesta tiene que mostrarlos. Las preguntas del dominio (`belongsTo`, `hasCertification`, `missingPermits`) no cambiaron.
 - **Dos arreglos del 5a:** `ExpeditionApiTest.createsAnExpeditionInDraftAndSaysWhereToFindIt` creaba dos expediciones y ahora crea una, y D49 tiene anotada la deuda de `NullPointerException` -> 400.
 
+**Estado del segundo tramo (rama `assignment-2-phase-5b-activities`, sobre la 5b): alta de actividad por tipo y listado de tipos hechos.** `mvn -B verify` pasa con 712 tests (620 domain, 20 app, 72 web); antes eran 688 y los 20 de `app` siguen pasando sin tocarlos. Es el punto 1 de "Cambios de dominio que la API necesita" y las dos filas de F1 de la tabla de arriba. Lo que quedó:
+
+- En `domain`, `ScheduleActivityCommand` pasó a ser `(expeditionId, activityId, name, timeWindow, scheduledPeriod, zoneId, dependencyIds, typeName, parameters, atNight)` y `ScheduleActivity` resuelve la zona con `Lookups.zone`, las dependencias con `Lookups.item` sobre el itinerario de la misma expedición y las reglas con `ActivityTypeRegistry.rulesFor`. Recibe los tres colaboradores, que ya eran beans. D53 lo documenta.
+- En `web`, `ActivityController` (`POST /api/expeditions/{id}/activities`) y `ActivityTypeController` (`GET /api/activity-types`), con sus DTOs (`ScheduleActivityRequest`, `ScheduledActivityResponse`, `ActivityTypeResponse` y los tres fragmentos de requisitos) y sus mappers.
+- Tests: `ScheduleActivityTest` en `domain` (12) y, en `web`, `ActivityApiTest` (9, con la nocturna de punta a punta sobre HTTP y los errores de tipo, parámetro, zona, dependencia y expedición), `ActivityTypeApiTest` (2) y una entrada más en `OpenApiDocumentationTest`.
+
+Qué cambió respecto del plan:
+
+- **La variante de `ScheduleActivity` que recibe la `Activity` armada se conservó**, con la firma `schedule(ExpeditionId, Activity, TimePeriod)`. Es el precedente de D38 y el de `CreateExpedition`, que acepta un comando o un `ExpeditionBuilder`; migrar todo habría obligado a reescribir con el registro tests de asignación, candidatos y bloques que no son del alta por tipo. El único test que la firma obligó a tocar fue `ItineraryUseCasesTest` (una línea del constructor y tres llamadas).
+- **Una dependencia se busca en el itinerario de la expedición del comando**, así que una que está en otra expedición o que todavía no se agendó falla igual, con `NotFoundException` (404). No podría ser de otra forma: es la expedición la que verifica que la dependencia termine antes (D21) y solo ve su propio itinerario. Está justificado en D53.
+- **El alta responde 201 con el cuerpo y sin `Location`:** lo que se crea es un nodo del itinerario y `GET /api/expeditions/{id}/itinerary` todavía no existe, así que no hay dirección que apuntar. El `Location` va cuando esté ese endpoint, igual que la indisponibilidad pasa a 201 cuando el calendario exponga lo que guarda (D52).
+- **La respuesta trae lo que la actividad exige** (duración y riesgo estimados, requisitos de personal, equipamiento y consumibles, certificaciones y permisos) y no de qué tipo es ni si es nocturna: una regla envuelta no lo dice (D42). Es lo que hace observable la variante nocturna sobre HTTP y lo que el cliente necesita para asignar. Sigue siendo deuda de F1 que el dominio no guarde el tipo.
+- **No hizo falta ninguna excepción nueva ni ninguna fila nueva** en el mapeo de errores: `UnknownActivityTypeException` e `InvalidActivityParametersException` ya eran 400 y `NotFoundException` ya era 404.
+- **`ScheduleBlockCommand` no se tocó:** sigue recibiendo el `PlannedNode` con las actividades armadas. Es el punto 2 y el tramo siguiente, que va a tener que compartir el resolver que hoy es privado de `ScheduleActivity`.
+
 ### PR 5c: demo
 
 - [ ] Seed como datos: `demo/catalog.json` y `demo/expedition.json`, más un único cargador genérico que corre con el perfil `demo`. Usa los builders y el registro de tipos de la Fase 3. No hay clases Java propias de la demo.
@@ -531,7 +546,7 @@ Qué cambió respecto del plan:
 - [ ] Tests de API con el contexto completo y los adaptadores reales en memoria, sin mocks: un caso feliz por capacidad.
 - [ ] Parametrizado: cada excepción de dominio devuelve su código HTTP.
 - [x] Unitarios de los casos de uso nuevos del catálogo y de las zonas, como el resto de la Fase 1. Con Mockito donde hay puerto de salida (`ZoneRepository`); para el catálogo con la clase real, que es un objeto en memoria sin I/O.
-- [ ] Tests de API de lo que absorbemos: agendar un bloque con su árbol, alta de una actividad nocturna por tipo, listar tipos, y el flujo completo de F3 (incidente, propuesta, aceptar y rechazar).
+- [ ] Tests de API de lo que absorbemos: agendar un bloque con su árbol, ~~alta de una actividad nocturna por tipo, listar tipos~~ (hechos en el segundo tramo del 5b: `ActivityApiTest` y `ActivityTypeApiTest`), y el flujo completo de F3 (incidente, propuesta, aceptar y rechazar).
 - [ ] Test del cargador del seed: los archivos de `demo/` cargan sin errores.
 - [ ] Un test de API que recorre el mismo guion de `demo.http`, para que la CI avise si la demo se rompe.
 
@@ -550,7 +565,8 @@ Qué cambió respecto del plan:
 - D50: seed como datos con un cargador genérico. Alternativas descartadas: clases Java de demo, `data.sql` antes de tener persistencia.
 - D51: persistencia en memoria detrás de los puertos y tests de repositorio como contrato. Se registra como deuda técnica de la entrega.
 - D52: casos de uso de alta del catálogo y de zonas. Extiende D38. Alternativa descartada: que el controller llame directo a `ResourceCatalog` y `ZoneRepository` y construya los objetos de dominio. **Escrita** en el primer tramo del PR 5b, con la agrupación en cinco casos de uso, los dos sub-recursos de equipo y la deuda del catálogo sin puerto de salida.
-- Revisión de D38: los comandos de agendar actividad y bloque pasan a recibir ids, tipo y parámetros, que es lo que la Fase 1 dejó anotado como pendiente y la Fase 3 como deuda.
+- D53: el alta de actividad entra por ids, nombre de tipo y parámetros. Revisa D38 y D44. Alternativas descartadas: que el adaptador arme la `Activity`, que el comando reciba la zona y las dependencias ya resueltas, un endpoint por tipo de actividad. **Escrita** en el segundo tramo del PR 5b. Es la primera entrada tomada de la numeración libre: **avisado al resto, el próximo que necesite una toma desde D54.**
+- Revisión de D38: ~~los comandos de agendar actividad y bloque pasan a recibir ids, tipo y parámetros, que es lo que la Fase 1 dejó anotado como pendiente y la Fase 3 como deuda~~. Hecha para la actividad en D53, con el pendiente de D38 cerrado y "Revisado en D53" en D38 y en D44. Para el bloque queda pendiente, con el punto 2 de los cambios de dominio.
 - Patrones no aplicados: JPA en esta entrega, y Visitor si el árbol del itinerario se resuelve de otra forma.
 
 **Terminado cuando:** un clon limpio compila, pasa los tests, arranca con el perfil `demo` y el guion de `demo.http` corre de principio a fin.
@@ -581,8 +597,9 @@ Cada fase escribe sus entradas en el mismo PR que el código, con numeración re
 | D50 | Seed como datos | 5 |
 | D51 | Persistencia en memoria y contrato de repositorios | 5 |
 | D52 | Casos de uso de alta del catálogo y de zonas | 5 |
+| D53 | Alta de actividad por ids, tipo y parámetros | 5 |
 
-Si una fase necesita una entrada más, toma desde D53 y avisa al resto.
+~~Si una fase necesita una entrada más, toma desde D53 y avisa al resto.~~ D53 la tomó el segundo tramo del PR 5b; la próxima entrada que haga falta toma desde D54 y avisa al resto.
 
 ### Formato de cada decisión
 
