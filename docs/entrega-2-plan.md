@@ -97,20 +97,32 @@ Deja el repo en multi-módulo hexagonal con CI, sin cambiar comportamiento, y co
 | `app` | `adapters.driven`: repositorios en memoria, publicador de eventos en memoria, cargador del seed | `domain` |
 | `web` | Spring Boot, `adapters.driving.rest`, clases `@Configuration` que reemplazan a `Main.wire()`, springdoc | `domain` y `app` |
 
-Punto a cerrar antes del PR: el diagrama de la clase 7 separa la interfaz del puerto de entrada (`domain.ports`) de su implementación (`application`). La decisión del 11/10 dice que los casos de uso son los puertos de entrada. Si se separan, las implementaciones van a `app`; si no, queda como alternativa descartada en D35.
+Punto a cerrar antes del PR: el diagrama de la clase 7 separa la interfaz del puerto de entrada (`domain.ports`) de su implementación (`application`). La decisión del 11/10 dice que los casos de uso son los puertos de entrada. Si se separan, las implementaciones van a `app`; si no, queda como alternativa descartada en D35. **Resuelto:** no se separan, quedó descartado en D35.
 
 ### PR 1a: módulos y CI (bloqueante)
 
-- [ ] Convertir el `../pom.xml` raíz en parent (`packaging pom`) con `dependencyManagement`, enforcer de JDK 25, compiler y Lombok. Declarar los módulos `domain`, `app` y `web`.
-- [ ] Mover `business.*` y sus tests a `domain`, sin renombrar paquetes. Verificar que su `pom` no trae Spring.
-- [ ] Mover `InMemoryExpeditionRepository` a `app` como adaptador driven.
-- [ ] Publicar los fixtures de test de `domain` (`ExpeditionFixtures`, `SequentialExpeditionRepository`) como `test-jar`, para que `app` y `web` los reutilicen.
-- [ ] Mover `ExpeditionLifecycleIntegrationTest` al módulo que tenga el wiring. Hoy depende de `Main.wire()`.
-- [ ] En `web`: importar el BOM `spring-boot-dependencies` (la clase 8 usa 4.1.1), `spring-boot-starter-web`, clase `@SpringBootApplication` y los beans actuales de `FieldOps` en una `@Configuration`.
-- [ ] Test `@SpringBootTest` que levanta el contexto.
-- [ ] `.github/workflows/ci.yml`: en cada pull request y push a `main`, JDK 25 (Temurin), caché de Maven y `mvn -B verify`.
-- [ ] Regla de protección de `main` en GitHub: PR obligatorio y check de CI requerido. La configura quien administra el repo.
-- [ ] Confirmar que los 282 tests siguen en verde desde la raíz.
+**Estado (rama `assignment-2-phase-1a`, PR abierto):** todo hecho salvo la regla de protección de `main`. Commits: LF en los finales de línea, división en módulos, módulo `web` con Spring Boot, CI, `DESIGN.md` y README.
+
+Cambios respecto del plan:
+
+- `Main` y `FieldOps` se borraron. El armado lo hace `FieldOpsConfig` en `web`.
+- `ExpeditionLifecycleIntegrationTest` recibe los casos de uso inyectados con `@SpringBootTest` y `@DirtiesContext` por test, porque el repositorio y las reservas son beans compartidos.
+- `CreateExpeditionTest`, `ReplanExpeditionTest` y `ApproveAlternativeTest` (domain) usaban `InMemoryExpeditionRepository`, que ahora está en `app`. Para evitar un ciclo `domain` <-> `app` pasaron a `SequentialExpeditionRepository`. Solo cambió el import y el tipo.
+- El enforcer de `domain` prohíbe `org.springframework*` (directo y transitivo).
+- Se agregó `.gitattributes` con `* text=auto eol=lf`.
+- D35, D36 y D37 escritas en `DESIGN.md`, con las filas de Clean Architecture y DDD en patrones no aplicados. La separación entre la interfaz del caso de uso y su implementación quedó **descartada** en D35: los casos de uso siguen siendo clases concretas en `domain`.
+- README actualizado (módulos, compilar, ejecutar, CI). Para `mvn spring-boot:run -pl web` hace falta un `mvn install -DskipTests` previo.
+
+- [x] Convertir el `../pom.xml` raíz en parent (`packaging pom`) con `dependencyManagement`, enforcer de JDK 25, compiler y Lombok. Declarar los módulos `domain`, `app` y `web`.
+- [x] Mover `business.*` y sus tests a `domain`, sin renombrar paquetes. Verificar que su `pom` no trae Spring.
+- [x] Mover `InMemoryExpeditionRepository` a `app` como adaptador driven.
+- [x] Publicar los fixtures de test de `domain` (`ExpeditionFixtures`, `SequentialExpeditionRepository`) como `test-jar`, para que `app` y `web` los reutilicen.
+- [x] Mover `ExpeditionLifecycleIntegrationTest` al módulo que tenga el wiring. Hoy depende de `Main.wire()`.
+- [x] En `web`: importar el BOM `spring-boot-dependencies` (la clase 8 usa 4.1.1), `spring-boot-starter-web`, clase `@SpringBootApplication` y los beans actuales de `FieldOps` en una `@Configuration`.
+- [x] Test `@SpringBootTest` que levanta el contexto.
+- [x] `.github/workflows/ci.yml`: en cada pull request y push a `main`, JDK 25 (Temurin), caché de Maven y `mvn -B verify`.
+- [ ] Regla de protección de `main` en GitHub: PR obligatorio y check de CI requerido. La configura quien administra el repo. **Pendiente:** esperando permisos de admin; el check `verify` ya corrió en el PR.
+- [x] Confirmar que los 282 tests siguen en verde desde la raíz. Corren 321 invocaciones (314 domain, 4 app, 3 web), las mismas que en `main`: el 282 cuenta métodos y no las invocaciones parametrizadas. Con el test de contexto de Spring son 322.
 
 ### PR 1b: casos de uso y puertos que faltan
 
@@ -428,7 +440,7 @@ La fecha de entrega es el pendiente que más condiciona el plan: el calendario d
 | Pendiente | Quién lo cierra | Bloquea a |
 | --- | --- | --- |
 | Fecha de entrega | El grupo con el docente | Todo el plan |
-| Separar o no la interfaz de los casos de uso de su implementación | Fase 1 con el grupo | PR 1a |
+| ~~Separar o no la interfaz de los casos de uso de su implementación~~ | Resuelto en la Fase 1: no se separa (D35). Reabrir si algún adaptador necesita sustituir un caso de uso | PR 1a |
 | Los cuatro tipos de actividad | Fase 3 con Fase 5 | Seed de la demo |
 | Nivel de riesgo por encima de `HIGH` | Fase 3 | F1 |
 | Dónde vive el conflicto en paralelo | Fase 2 | F2 |
