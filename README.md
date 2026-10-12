@@ -43,25 +43,25 @@ The project is a multi-module Maven build following a hexagonal architecture (se
 | Module | Contains | Depends on |
 | --- | --- | --- |
 | `domain` | All of `business.*`: model, rules, validations, services, use cases (input ports) and `business.providers` (output ports). Publishes a `test-jar` with shared fixtures | No frameworks. The enforcer bans `org.springframework*`, direct or transitive |
-| `app` | `adapters.driven`: driven adapters, today `InMemoryExpeditionRepository` | `domain` |
-| `web` | Spring Boot application (`FieldOpsApplication`) and `FieldOpsConfig`, the `@Configuration` that wires the use cases (composition root, D37) | `domain`, `app` |
+| `app` | `adapters.driven`: driven adapters, today the in-memory repositories (`InMemoryExpeditionRepository`, `InMemoryZoneRepository`, `InMemoryReplanProposalRepository`) and the synchronous `InMemoryEventPublisher` | `domain` |
+| `web` | Spring Boot application (`FieldOpsApplication`) and the `@Configuration` classes that wire the use cases (composition root, D37): `FieldOpsConfig` and `ReplanningConfig` (F3) | `domain`, `app` |
 
 ```
 domain/src/main/java/ar/edu/itba/dps/fieldops/business
-├── interfaces      # domain contracts: ActivityRules, ActivityType, ItineraryNode, ReplanReason, resources, ValidationRule
-├── models          # entities and value objects (activities, common, estimation, expeditions, report, resources, validation, zones)
-├── providers       # output ports: ExpeditionRepository, ZoneRepository
+├── interfaces      # domain contracts: ActivityRules, ActivityType, ItineraryNode, ReplanReason, ReplanOptionGenerator, DomainEvent/EventSubscriber, resources, ValidationRule
+├── models          # entities and value objects (activities, common, estimation, events, expeditions, replanning, report, resources, validation, zones)
+├── providers       # output ports: ExpeditionRepository, ZoneRepository, ReplanProposalRepository, EventPublisher
 ├── rules           # ActivityRules implementations, one per activity type, the night decorator (NightOperationRules) and the ActivityTypeRegistry
 ├── validations     # ValidationRule implementations and the ApprovalPolicy
 ├── estimations     # ExpeditionEstimator
 ├── reports         # ExpeditionReporter
-├── replanning      # ExpeditionReplanner and the replan reasons: Cancellation, Delay, ResourceWithdrawn
+├── replanning      # ExpeditionReplanner, the replan reasons (Cancellation, Delay, ResourceWithdrawn, ResourceReplaced) and the option generators of F3
 ├── services        # ResourceReservations
-├── usecases        # input ports: commands and operations by id (create, schedule, assign, transition, approve, track, finish, replan) and queries (get, list, validate, estimate, report, candidates, activity types)
+├── usecases        # input ports: commands and operations by id (create, schedule, assign, transition, approve, track, finish, replan, register an incident, decide a replan proposal) and queries (get, list, validate, estimate, report, candidates, activity types, replan proposals)
 └── exceptions      # domain exceptions
-app/src/main/java/ar/edu/itba/dps/fieldops/adapters/driven     # InMemoryExpeditionRepository, InMemoryZoneRepository
-web/src/main/java/ar/edu/itba/dps/fieldops                     # FieldOpsApplication, FieldOpsConfig
-*/src/test/java/...                                            # unit tests per module and an end-to-end integration test in web
+app/src/main/java/ar/edu/itba/dps/fieldops/adapters/driven     # in-memory repositories and InMemoryEventPublisher
+web/src/main/java/ar/edu/itba/dps/fieldops                     # FieldOpsApplication, FieldOpsConfig, ReplanningConfig
+*/src/test/java/...                                            # unit tests per module and end-to-end integration tests in web
 DESIGN.md                                                      # design decisions (in Spanish)
 ```
 

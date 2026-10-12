@@ -189,6 +189,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 - **Caso aparte — `Depletable.getStock()`:** este sí se expone. `stock` es un campo mutable (se reasigna al consumir) pero el `Quantity` que devuelve es inmutable (D8), así que entrega una foto del estado actual y no una referencia con la que romper invariantes. El informe de expedición (D4) necesita leer el consumo real, y no hay forma de obtenerlo preguntando `hasStockFor`.
 - **Nota de build:** desde JDK 23 `javac` no corre los annotation processors que encuentra en el classpath. Lombok tiene que declararse explícitamente en el `<annotationProcessorPaths>` del `maven-compiler-plugin`; si falta, `@Getter` no genera nada y el proyecto no compila. El plugin ya activa el procesamiento por su cuenta al ver esa lista, así que no hace falta agregar `<proc>full</proc>`.
 - **Alternativas descartadas:** `equals`/`hashCode` por `id` en las entidades — dos instancias con el mismo `id` pero distinto estado (distintas reservas, distinto stock) se tratarían como la misma. Hacer `record` todas las clases — los recursos son mutables por definición (se reservan, se consumen) y `Activity` referencia otras `Activity`, donde la identidad es justamente lo que importa. El caso menos obvio es `Zone`, que es inmutable y técnicamente podría ser un `record`: se deja como entidad porque pertenece a un catálogo y las expediciones la referencian por identidad — dos zonas con el mismo nombre son dos zonas distintas, no la misma.
+- **Revisado en D46 y D48:** suma la entidad `ReplanProposal` y los `record` `Incident`, `IncidentId`, `IncidentReport`, `IncidentRegistered`, `ReplanProposalId`, `ReplanOption`, `ReplanDecision` y `ResourceReplaced`. `ResourceAssignment` es un value object que no es `record` porque guarda la forma de asignar su recurso; compara por el recurso.
 
 
 ### D16 — Guards de argumentos compartidos, en un solo lugar
@@ -266,6 +267,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - `Expedition` le pregunta al enum antes de cada cambio y falla con excepción si la transición no es válida: cambiar de estado es un comando (D14). Terminar exige además que no quede ninguna actividad en curso (D29).
   - Una expedición aprobada no vuelve a borrador: si hay que cambiarla, se construye una alternativa (replanificación).
 - **Alternativas descartadas:** un `switch` sobre el estado en cada método de `Expedition` — repetiría el flujo en varios lugares y cada estado nuevo obligaría a tocarlos todos. Una clase por estado — ver la tabla de patrones no aplicados.
+- **Revisado en D47:** la tabla no cambió. Aceptar una propuesta de replanificación suspende la expedición en ejecución con las transiciones existentes (`suspendToReplan`) antes de armar la alternativa.
 
 
 ### D21 — Qué se rechaza al agendar y qué detecta la validación
@@ -307,6 +309,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 - **Dónde:** `ActivityTracking`, `Observation` e `Incident` (en `business.models.expeditions`); `Expedition.start`, `suspend`, `resume`, `finish`, `startActivity`, `finishActivity`, `recordObservation` y `reportIncident`; `InvalidTrackingException`.
 - **Por qué:** el enunciado pide registrar comienzo, finalización, observaciones, incidentes y resultados, que es el estado real de un ítem del itinerario y no lo planificado: `ItineraryItem` sabe cuándo *debía* hacerse y `ActivityTracking` cuándo se hizo, y un ítem sin tracking es una actividad que todavía no arrancó, así que el `Optional` distingue "no empezó" de "empezó y no terminó". Sólo se registra con la expedición en ejecución, y los métodos que mutan el tracking son package-private: igual que las asignaciones (D19), la expedición es la única puerta, porque la regla depende de su estado. `Observation` e `Incident` son conceptos distintos aunque tengan la misma forma, porque una observación es información y un incidente es lo que dispara una replanificación, y separarlos permite que el informe cuente incidentes sin filtrar texto libre. Al terminar una actividad se consume lo asignado, y si no alcanza la actividad no se cierra (D30): es el único momento en que el stock baja de verdad, porque antes era una previsión (D4) y la validación sólo comparaba contra el stock disponible, y así el informe puede contrastar consumo estimado contra consumo real. `startedOutOfSchedule` usa `TimePeriod.includes` para detectar una actividad que arrancó fuera de su franja, pero no lo impide: en el campo los retrasos existen, y lo que corresponde ante un desvío es replanificar, no rechazar el registro de lo que pasó.
 - **Alternativas descartadas:** campos sueltos en `ItineraryItem` (`startedAt`, `finishedAt`, listas de notas) — mezclaría el plan con la ejecución en una clase que ya tiene las asignaciones, y obligaría a chequear nulos en cada lugar. Exigir que el comienzo real caiga dentro del período agendado — haría imposible registrar lo que realmente pasó, que es justamente para lo que sirve el seguimiento. Consumir los consumibles al asignarlos o al aprobar — descontaría stock de algo que todavía no ocurrió, y una expedición suspendida o replanificada dejaría el catálogo mal.
+- **Revisado en D48:** los incidentes ya no viven en `ActivityTracking`: la expedición lleva una bitácora (`registerIncident`, `getIncidents`) porque un incidente puede afectar a una actividad que todavía no empezó, y cada uno tiene id, actividad afectada y, si se informan, el recurso y el retraso. `reportIncident` se reemplazó por `registerIncident`. Las observaciones siguen en el seguimiento.
 
 ### D24 — El informe es una proyección que no calcula nada por su cuenta
 
@@ -314,6 +317,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 - **Dónde:** `ExpeditionReporter` (en `business.reports`) y su resultado `ExpeditionReport` (en `business.models.report`); `ItineraryItem.supplyFor`.
 - **Por qué:** el informe que pide el enunciado (resumen operativo, consumo de recursos, riesgos e incidentes) es la misma información que ya tienen la estimación (D4) y el seguimiento (D23), vista junta. Por eso el reporter recibe el `ExpeditionEstimator` en el constructor y le delega todo lo estimado en vez de recalcularlo: si cambia cómo se combina el riesgo, el informe no se entera. Lo único propio del informe es contrastar el plan con lo que pasó: el consumo real sale de las actividades terminadas y el estimado de todas, así que un itinerario a medio ejecutar muestra los dos números distintos. `ExpeditionReport` es un `record` inmutable y sin builder porque no protege ningún invariante: es una foto de datos que ya validó otro. La regla de qué consumible cubre cada requisito pasó a `ItineraryItem.supplyFor`, porque la necesitaban tres clientes distintos (la validación de consumibles, el consumo real al terminar una actividad y el informe) y repetirla habría sido la duplicación que más caro se paga: la que se desincroniza sin que ningún test la note.
 - **Alternativas descartadas:** que el informe recorra el itinerario y calcule duración y riesgo por su cuenta — duplicaría las reglas de agregación de D4. Que sea `Expedition.report()` — mezclaría en la entidad una responsabilidad de presentación que cambia por motivos distintos (SRP), y obligaría a la expedición a conocer al estimador. Guardar el informe dentro de la expedición — quedaría desactualizado apenas se registre algo nuevo, cuando generarlo cuesta lo mismo que leerlo.
+- **Revisado en D48:** los incidentes del informe salen de la bitácora de la expedición y no del seguimiento de cada actividad.
 
 ### D25 — Replanificación: reutilizar el builder para construir una alternativa en borrador
 
@@ -328,6 +332,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - Mutar la expedición original in situ — contradice D20.
   - Reagendar automáticamente la actividad afectada eligiendo horario y recursos — el enunciado pide "construir una alternativa" para que un responsable la ajuste, no un algoritmo de reprogramación; además duplicaría la lógica de asignación (D18) sin un criterio de selección definido por el enunciado.
 - **Consecuencia:** si el ítem afectado tiene dependientes ya agendados, `planAlternative` falla en vez de dejarlos huérfanos o quitarlos en cascada; quien replanifica tiene que decidir explícitamente qué hacer con ellos primero.
+- **Revisado en D46:** la consecuencia de arriba ya no vale. Cancelar una actividad cancela en cascada las que dependen de ella (directa o indirectamente), y la alternativa solo falla si alguna de esas ya empezó.
 
 
 ### D26 — El id de la expedición es un value object y lo genera el sistema (corrección de la Entrega 1)
@@ -471,6 +476,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - Dos métodos separados en `ReplanReason` (el horario y qué recursos conserva) — una cancelación tendría que implementar uno que nunca se usa, porque la actividad no vuelve (Interface Segregation). Con una sola pregunta, cada motivo responde exactamente lo que necesita.
   - Elegir automáticamente el reemplazo del recurso indisponible — haría falta un criterio de selección que el enunciado no define; el catálogo ya ofrece candidatos (D18).
 - **Revisado en D39:** la alternativa conserva los bloques de la original. El replanificador ya no pasa los terminados con `ExpeditionBuilder.addFinishedItem` y el resto con `addActivity` ordenados por inicio: le pide al itinerario un plan con su misma estructura (`Itinerary.planKeepingStructure`) y decide por actividad (la terminada va como `PlannedNode.finished`, la afectada como diga el motivo, el resto con su horario). La alternativa se agenda en el orden en que se agendó la original. `addFinishedItem` sigue existiendo como atajo; `addFinishedCopyOf` ya no.
+- **Revisado en D46 y D47:** la actividad afectada ya no tiene que estar pendiente. Si había empezado (un incidente sobre una actividad en curso, que se cierra antes de aceptar), la alternativa la rehace cuando el motivo la devuelve y la deja cerrada cuando la cancela. El replanificador saca las consecuencias del motivo para el resto del itinerario: lo que vuelve más tarde corre lo que viene después en sus secuenciales y lo que depende de ella; lo que no vuelve se lleva lo que depende de ella. Hay un motivo más, `ResourceReplaced` (reemplazo elegido entre candidatos del catálogo), y `canPlan` responde si una alternativa se puede armar sin mirar el estado de la original. El reemplazo automático sigue descartado: las propuestas ofrecen candidatos y decide un responsable. La alternativa hereda la bitácora de incidentes de la original (D48).
 
 ### D34 — Las categorías y las certificaciones se normalizan al construirse (corrección de la Entrega 1)
 
@@ -616,6 +622,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - Exigir al menos dos hijos — cancelar una rama de un bloque de dos obligaría a desarmarlo.
   - Reportar estos problemas como reglas de validación — permitiría armar bloques imposibles que recién se detectarían al pedir la aprobación (mismo argumento que D21).
 - **Consecuencia:** al replanificar, un retraso que deja a la actividad afectada pisando al hermano siguiente de su secuencial no se puede armar y falla con `InvalidScheduleException`, igual que un retraso que la saca de su ventana (D33). Queda como deuda técnica de F2.
+- **Revisado en D46:** la deuda quedó resuelta. Un retraso corre por el mismo tiempo lo que viene después de la actividad en cualquier secuencial que la contenga y lo que depende de ella. Solo falla si algo de eso ya empezó o queda fuera de su ventana o del período.
 
 ### D41 — El conflicto de recursos entre ramas paralelas vive en la regla de superposición (Entrega 2, F2)
 
@@ -723,6 +730,95 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - Los parámetros son enteros. Si un tipo necesita otro dato (un decimal, un texto), hay que ampliar `ActivityParameters`.
   - `ScheduleActivityCommand` sigue recibiendo la `Activity` ya armada (D38). Que reciba el tipo, los parámetros y el indicador de nocturna queda pendiente para la API, porque además hay que resolver por id la zona y las dependencias.
 
+### D45 — El incidente se publica como evento de dominio, con entrega síncrona (Entrega 2, F3)
+
+- **Origen:** F3 pide que, al registrarse un incidente, el sistema proponga solo un plan alternativo. Registrar el incidente y armar la propuesta son dos responsabilidades distintas: la primera es del seguimiento (D23) y la segunda, de la replanificación (D25, D33).
+- **Patrón / principio:** evento de dominio + Observer (publicador y suscriptores) detrás de un puerto de salida (D35). La entidad no publica: publica el caso de uso, después de que la entidad registró el incidente.
+- **Dónde:** `DomainEvent` y `EventSubscriber<E>` (en `business.interfaces.events`); `IncidentRegistered(expedición, incidente)` (en `business.models.events`); puerto `EventPublisher` (en `business.providers`); caso de uso `RegisterIncident` con `RegisterIncidentCommand`; suscriptor `ProposeReplan` (en `business.usecases`); adaptador `InMemoryEventPublisher` (en `app`); `ReplanningConfig` (en `web`) arma el publicador con la lista de suscriptores que encuentra Spring.
+- **Por qué:**
+  - `RegisterIncident` busca la expedición y la actividad, le pide a la expedición que registre el incidente (`Expedition.registerIncident`, que valida el estado y la actividad) y publica `IncidentRegistered`. No sabe que alguien arma una propuesta: si mañana un incidente además tiene que avisar a alguien o actualizar un tablero, se suma un suscriptor sin tocar el registro (Open/Closed).
+  - La entrega es síncrona: `publish` vuelve cuando todos los suscriptores terminaron. Así, "al volver de `RegisterIncident` ya existe la propuesta" es una garantía y no una carrera, y el caso de uso devuelve la propuesta generada (la busca por incidente en el repositorio de propuestas). Si no hay ninguna, falla con `IllegalStateException`: es un error de armado (falta el suscriptor), no de negocio.
+  - Cada suscriptor declara el tipo de evento que atiende (`eventType()`). El publicador en memoria se lo entrega a los que corresponden, en el orden en que los recibió. La comparación de tipos queda en el adaptador, no en el dominio.
+  - El evento lleva el id de la expedición y el incidente completo (un `record` inmutable), así el suscriptor no depende de volver a leer el incidente.
+  - La entidad no publica eventos ni guarda una lista de pendientes: con el repositorio en memoria las entidades se modifican en el lugar (D38) y no hay un "al guardar" donde despacharlos. Publicar desde el caso de uso deja el orden explícito: primero registra, después avisa.
+- **Alternativas descartadas:**
+  - Que `RegisterIncident` llame directo al replanificador — acopla el registro con la replanificación; cada reacción nueva a un incidente obligaría a modificarlo.
+  - Usar el `ApplicationEventPublisher` de Spring dentro del dominio — rompe D36 y D37: `domain` no puede depender de Spring, y el enforcer lo prohíbe.
+  - Entrega asíncrona (otro hilo o una cola) — la propuesta podría no existir cuando vuelve la llamada, que es justo lo que pide el criterio de aceptación; y sumaría reintentos y orden de entrega sin necesidad.
+  - Un puerto por evento (`IncidentListener`) — cada evento nuevo sería un puerto nuevo con su adaptador.
+  - Que la entidad acumule los eventos y el repositorio los despache al guardar — hoy no existe ese "guardar" (D38).
+- **Consecuencia:** no hay transacción ni reintentos. Si el suscriptor falla, la excepción llega a quien registró el incidente, pero el incidente ya quedó registrado en la expedición. Con persistencia real, registrar y proponer tienen que ir en la misma transacción o pasar a un outbox. Queda como deuda técnica de F3.
+
+### D46 — La propuesta ofrece varias opciones, una por generador, y solo las que se pueden armar (Entrega 2, F3, revisa D25, D33 y D40)
+
+- **Origen:** F3 pide proponer "reprogramación, reemplazo de recursos o cancelación parcial". D33 ya tenía un motivo por cada caso (`Delay`, `ResourceWithdrawn`, `Cancellation`), pero descartó elegir solo el reemplazo de un recurso y dejaba fallar las alternativas que no se podían armar (un retraso que pisa al hermano siguiente de un secuencial, D40; una cancelación con dependientes, D25).
+- **Patrón / principio:** Strategy para cada tipo de opción (`ReplanOptionGenerator`), en una lista inyectada (Open/Closed) + reutilización del replanificador para decidir qué se puede armar (DRY) + Information Expert (el itinerario sabe qué se mueve o cae con una actividad).
+- **Dónde:** interfaz `ReplanOptionGenerator` (en `business.interfaces.replanning`); `RescheduleOptions`, `ResourceReplacementOptions` y `CancellationOptions` (en `business.replanning`); `ReplanOption(motivo, resumen)`; el motivo nuevo `ResourceReplaced` y `ResourceAssignment`; `ExpeditionReplanner.canPlan`; `Itinerary.dependentsOf` y `movingWith`; `ItineraryNode.itemsAfter`; `ReplannedActivity.additions`; el suscriptor `ProposeReplan`.
+- **Por qué:**
+  - Cada generador mira el incidente y propone opciones de un solo tipo, cada una con su `ReplanReason` y un resumen legible. `ProposeReplan` junta las de todos, en el orden de la lista (reprogramar, reemplazar, cancelar), y se queda con las que el replanificador puede armar. Sumar un tipo de opción es sumar una clase y una línea en `ReplanningConfig`.
+  - **Qué se puede armar lo decide el replanificador, no el generador.** `canPlan` arma la alternativa de prueba con un id descartable y responde si lo logró (`InvalidScheduleException` es "no se puede"). No guarda nada ni toca recursos, y no mira el estado de la original, porque la propuesta se hace con la expedición todavía en ejecución. Así, las reglas de qué es un plan válido (D21, D40) siguen en un solo lugar y una opción ofrecida siempre se puede aceptar si nada cambió en el medio.
+  - **Reprogramación.** El retraso lo declara quien informa el incidente (`IncidentReport.delayingBy`): "el motor se arregla en dos horas" lo sabe quien está en el campo. Sin retraso declarado no se ofrece. Elegir un retraso por nuestra cuenta (una escalera fija o un valor configurado) sería un número arbitrario.
+  - **El retraso arrastra lo que viene después (resuelve la deuda de D40).** Cuando una actividad vuelve más tarde, se corren por el mismo tiempo las actividades que vienen después de ella en cualquier bloque secuencial que la contenga (`ItineraryNode.itemsAfter`, que el secuencial responde con sus hermanos siguientes y que se compone hacia afuera) y las que dependen de ella, y a su vez lo que viene después de esas y lo que depende de ellas (`Itinerary.movingWith`, un cierre transitivo). Una rama paralela hermana no se corre: puede seguir en su horario. Si algo que habría que correr ya empezó, o se sale de su ventana o del período de la expedición, la alternativa no se puede armar y la opción no se ofrece.
+  - **Reemplazo de recurso.** Solo si el incidente nombra un recurso asignado a la actividad (`IncidentReport.affecting`). Los candidatos salen del catálogo con las mismas consultas de siempre (D18): los que cubren el requisito que cubría el recurso retirado, están libres en el horario de la actividad y, si es personal, la actividad los admite (D43); se dejan afuera los que ya están asignados a esa actividad. Se ofrece una opción por candidato, en el orden del catálogo y hasta tres (`MAX_CANDIDATES`), para que el responsable elija quién y no lo decida un criterio que el enunciado no da (D33). Sin candidatos no hay opción de reemplazo.
+  - `ResourceReplaced(retirado, reemplazo)` es el motivo nuevo: deja la actividad en su horario, sin el recurso retirado y con el reemplazo. Para que el replanificador pueda asignarlo sin preguntar de qué tipo es, el reemplazo viaja como `ResourceAssignment`, que se crea con `of(Person)`, `of(Equipment)` u `of(DepletableResource)` y guarda la forma de asignarlo. `ReplannedActivity` sumó la lista `additions`, vacía para los demás motivos.
+  - **Cancelación parcial (en cascada).** Siempre se ofrece. Cancela la actividad afectada y todas las que dependen de ella, directa o indirectamente (`Itinerary.dependentsOf`); el resumen las nombra. Si alguna ya empezó, no se puede armar.
+  - La cascada y el arrastre son del replanificador, no de cada motivo: `ReplanReason` sigue respondiendo una sola pregunta sobre la actividad afectada (D33), y el replanificador saca las consecuencias de esa respuesta para el resto del itinerario (vuelve más tarde: se corre lo que viene después; no vuelve: cae lo que depende). Por eso vale igual para la replanificación manual (`ReplanExpedition`) que para las propuestas.
+  - Una propuesta sin opciones se guarda igual: queda registrado que el sistema no encontró alternativa, y el responsable solo puede rechazarla (y replanificar a mano si quiere).
+- **Alternativas descartadas:**
+  - Un único método que arme todas las opciones con un `switch` por tipo — cada tipo nuevo obligaría a modificarlo.
+  - Que cada generador verifique por su cuenta si su opción se puede armar — repetiría las reglas de agenda y de bloques en tres lugares.
+  - Crear las alternativas al generar la propuesta y guardarlas en borrador — llenaría el repositorio de expediciones que nadie eligió.
+  - Elegir el primer candidato del catálogo, o una opción con una lista de candidatos para elegir al aceptar — la primera decide por el responsable; la segunda obliga a que aceptar reciba además un recurso.
+  - Una "retirada sin reemplazo" (`ResourceWithdrawn`) como opción cuando no hay candidatos — la alternativa nacería con un faltante crítico; el motivo sigue existiendo para la replanificación manual.
+  - Mantener la deuda de D40 y no ofrecer el retraso dentro de un secuencial — en la demo el caso típico es justamente una actividad en medio de una secuencia.
+  - Que la cascada sea propia de cada motivo (`Delay` corriendo hermanos) — cada motivo tendría que conocer el itinerario.
+- **Consecuencia:**
+  - Agregar un tipo de opción es una clase que implementa `ReplanOptionGenerator`.
+  - `canPlan` arma la alternativa entera por cada opción. Con el tamaño de un itinerario no pesa.
+  - Cambia el comportamiento de la replanificación manual: una cancelación con dependientes ya no falla (D25) y un retraso dentro de un secuencial ya no falla (D40). Los tests que lo esperaban se actualizaron.
+  - Que un candidato esté libre se verifica contra el calendario completo, incluidas las reservas de la propia original. No es un problema: un recurso reservado por la original en ese mismo horario está asignado a esa actividad o a una paralela.
+
+### D47 — Ciclo de vida de la propuesta y qué pasa con la expedición al decidir (Entrega 2, F3, revisa D33)
+
+- **Origen:** criterio de aceptación de F3: el responsable puede aceptar o rechazar. D33 solo replanificaba una expedición aprobada o suspendida y con la actividad afectada sin empezar; el incidente llega con la expedición en ejecución y puede afectar a una actividad en curso.
+- **Patrón / principio:** caso de uso para una operación que coordina varios objetos (D28) + todo o nada (D27) + estados de la propuesta como `enum` con un único estado de origen.
+- **Dónde:** `ReplanProposal` y `ReplanProposalStatus` (pendiente, aceptada, rechazada, reemplazada por otra) en `business.models.replanning`; `ReplanDecision`; caso de uso `DecideReplanProposal` (`accept`, `reject`) con `ReplanDecisionCommand`; `Expedition.suspendToReplan()` y `requireResponsible()`; `ProposalAlreadyDecidedException` y `NotAResponsibleException`.
+- **Por qué:**
+  - **Quién y cómo decide.** Decide un responsable de la expedición (`requireResponsible`), con una justificación no vacía, tanto para aceptar como para rechazar: las dos son decisiones que quedan auditadas. La fecha la pasa quien llama, igual que la de incidentes y observaciones (D23). Una propuesta se decide una sola vez.
+  - **Aceptar** recibe el número de opción (de 1 en adelante). Primero verifica todo: que la propuesta siga pendiente, que la opción exista, que quien decide sea responsable, que la opción todavía se pueda armar (`canPlan`, por si el itinerario cambió desde la propuesta) y que no haya actividades en curso. Recién entonces suspende la expedición si está en ejecución (`suspendToReplan`), arma la alternativa en borrador con `ReplanExpedition` (D33) y registra la decisión con el id de la alternativa. Si algo falla antes, no cambió nada.
+  - **Aceptar no reemplaza el plan en el acto.** La alternativa pasa por revisión y aprobación como cualquier expedición, y recién al aprobarla `ApproveExpedition` pasa la original a reemplazada y le transfiere las reservas (D33). Mientras tanto la original queda suspendida: el campo deja de seguir un plan que va a cambiar. Si la alternativa nunca se aprueba, se reanuda la original (`resume`), como cualquier suspensión.
+  - **Rechazar** no toca la expedición: sigue en ejecución con su plan.
+  - **Actividad afectada en curso.** El incidente se registra igual y la propuesta se arma. Para aceptar, la actividad tiene que estar cerrada, con el resultado real que conoce quien la ejecutó (D29): aceptar con una actividad en curso falla con `ActivitiesInProgressException`. En la alternativa, la actividad afectada se rehace según la opción (reprogramada o con el reemplazo) aunque en la original haya terminado; si la opción es cancelarla, queda cerrada con lo que llegó a hacerse. La original conserva el intento.
+  - **Varias propuestas pendientes.** Cada incidente tiene la suya. Al aceptar una, las demás pendientes de la misma expedición pasan a reemplazadas por la aceptada (`SUPERSEDED`, con el id de la que se aceptó): ya no se pueden decidir, porque se pensaron sobre un plan que dejó de estar vigente. Quedan auditadas.
+  - `suspendToReplan` no agrega transiciones: usa las de la tabla (D20). Suspende solo si la expedición puede pasar a suspendida y después exige que pueda pasar a reemplazada, así un borrador o una expedición terminada fallan sin cambiar.
+- **Alternativas descartadas:**
+  - Suspender al registrar el incidente — un incidente menor pararía la expedición aunque la propuesta se rechace.
+  - Agregar en ejecución → reemplazada a la tabla — la original seguiría ejecutándose mientras la alternativa está en revisión, y las actividades que se cierren en ese lapso no estarían en la alternativa.
+  - Cerrar sola la actividad en curso al aceptar — habría que inventar la hora de fin y el resultado, que D29 dejó en manos de quien la ejecuta.
+  - Dejar pendientes las demás propuestas — aceptar otra crearía una segunda alternativa de la misma original, y la que se aprobara segunda fallaría.
+  - Que la fecha de la decisión la ponga un `Clock` inyectado — sería el único lugar del dominio que toma la hora del sistema.
+- **Consecuencia:** entre aceptar y aprobar la alternativa, la expedición no registra seguimiento (está suspendida) ni nuevos incidentes (D23). Si hace falta seguir trabajando, se reanuda la original y la alternativa queda sin aprobar.
+
+### D48 — Auditoría: la propuesta es el registro, el plan original sigue siendo la expedición original (Entrega 2, F3, revisa D23)
+
+- **Origen:** criterio de aceptación de F3: el plan original, el incidente y la decisión quedan auditados y consultables.
+- **Patrón / principio:** la propuesta como registro inmutable de lo que pasó, una vez decidida + reutilización de lo que ya conserva el historial (D25, D33) en vez de un mecanismo nuevo.
+- **Dónde:** `ReplanProposal` (expedición original, incidente, opciones, estado, decisión, opción elegida, alternativa, la que la reemplazó); puerto `ReplanProposalRepository` (`nextId`, `add`, `findById`, `findByIncident`, `findByExpedition`) con `InMemoryReplanProposalRepository` en `app` y su contrato `ReplanProposalRepositoryContract`; caso de uso `QueryReplanProposals` (por id y por expedición); `Incident`, `IncidentId` e `IncidentReport`; `Expedition.registerIncident` y `getIncidents`; `ExpeditionBuilder.addInheritedIncident`; `ExpeditionReporter`.
+- **Por qué:**
+  - **El plan original** es la expedición original: no se modifica más allá de su estado (D25) y queda consultable por id con `QueryExpeditions`. Las dos expediciones están vinculadas en los dos sentidos (`getReplacedExpedition`, `getReplacement`, D33) y la propuesta guarda el id de las dos.
+  - **El incidente** queda en la bitácora de la expedición y, copiado, en la propuesta. Antes vivía en `ActivityTracking`, que solo existe cuando la actividad empezó; ahora un incidente puede afectar a una actividad pendiente, así que la expedición lleva una sola lista con todos (`getIncidents`), cada uno con su id, la actividad que afecta, el recurso y el retraso que se informaron. El informe los toma de ahí (D24).
+  - **El id del incidente lo pone la expedición:** `IncidentId(expedición, número)`, del 1 en adelante en el orden de registro. Es único porque el id de la expedición lo es (D26), y no hace falta un puerto nuevo.
+  - **La alternativa hereda la bitácora** de la que reemplaza, con los ids originales: su informe sigue mostrando la salida entera (D33), incluido el incidente que la motivó.
+  - **La decisión** queda en la propuesta: quién, por qué, cuándo, qué opción y qué alternativa generó; o quién la rechazó y por qué; o qué propuesta la dejó sin efecto.
+  - El id de la propuesta lo genera el repositorio, como el de la expedición (D26).
+- **Alternativas descartadas:**
+  - Event Sourcing (reconstruir la expedición a partir de sus eventos) — ver la tabla de patrones no aplicados.
+  - Guardar el incidente solo en la propuesta — el informe de la expedición dejaría de contar los incidentes.
+  - Mantener los incidentes en `ActivityTracking` y sumar otra lista para los de actividades pendientes — el mismo concepto en dos lugares.
+  - Copiar el itinerario original dentro de la propuesta — duplicaría la expedición original, que ya está guardada y no cambia.
+  - Un repositorio de incidentes con su propio generador de ids — el incidente es parte de la expedición y no se consulta suelto.
+- **Consecuencia:** el informe de una alternativa cuenta también los incidentes de la original. Una propuesta no se borra ni se edita después de decidida.
+
 ## Funcionalidades nuevas de la Entrega 2
 
 ### F1 — Actividades nocturnas
@@ -798,7 +894,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - `ExpeditionBuilder` reemplazó su `record` privado `PlannedActivity` y su lista de terminados por una sola lista de `PlannedNode`, y los dos caminos de alta (`schedule` y `addFinishedCopyOf`) quedaron en uno.
   - `ExpeditionReplanner` dejó de recorrer los ítems dos veces (terminados y pendientes) y de ordenarlos por inicio: le pide el plan al itinerario y solo decide qué pasa con cada actividad.
 - **Deuda técnica que se decidió no resolver:**
-  - **Un retraso dentro de un secuencial no corre a los hermanos siguientes.** Si la actividad retrasada pasa a pisar a la siguiente, la alternativa falla con `InvalidScheduleException` en vez de reprogramar el resto del bloque. Se aceptó porque correr a los hermanos es una política de reprogramación que el replanificador todavía no tiene (D33 descartó reagendar automáticamente). La Fase 4 lo va a necesitar para ofrecer la reprogramación de F3: ahí hay que definir cuánto se corre cada hermano y qué pasa con las ventanas.
+  - **Un retraso dentro de un secuencial no corre a los hermanos siguientes.** Si la actividad retrasada pasa a pisar a la siguiente, la alternativa falla con `InvalidScheduleException` en vez de reprogramar el resto del bloque. Se aceptó porque correr a los hermanos es una política de reprogramación que el replanificador todavía no tiene (D33 descartó reagendar automáticamente). La Fase 4 lo va a necesitar para ofrecer la reprogramación de F3: ahí hay que definir cuánto se corre cada hermano y qué pasa con las ventanas. **Resuelto en F3 (D46):** se corren por el mismo retraso los hermanos siguientes y los dependientes; si alguno sale de su ventana, la opción no se ofrece.
   - **Dependencias entre bloques.** Las dependencias son entre actividades; no se puede declarar que un bloque va después de otro. Se aceptó porque el enunciado no lo pide y se puede expresar con las dependencias de sus actividades o metiendo ambos en un secuencial. Habría que resolverlo si aparecen bloques reutilizables o dependencias que hoy obligan a repetirse en cada actividad.
   - **Editar un bloque ya agendado.** No se puede agregar un hijo, sacar una actividad ni moverla de un bloque a otro: un bloque se agenda entero y no tiene identificador propio. Se aceptó porque en borrador se puede rearmar el itinerario y, una vez aprobado, el cambio es una replanificación. Habría que resolverlo si la API necesita editar bloques, y ahí el bloque necesita un id.
   - **El árbol no se expone hacia afuera.** `ItineraryNode` no publica los hijos ni el tipo de nodo, y el informe no muestra la estructura. Queda para el endpoint de bloques, que todavía no existe.
@@ -812,6 +908,63 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - Los invariantes de D40 — `ItineraryBlocksTest` (`rejectsAnEmptyBlock`, `rejectsABlockWithAChildOutsideTheExpeditionPeriod`, `rejectsASequentialBlockWhoseChildrenOverlap`, `rejectsADependencyBetweenParallelBranchesEvenIfTheirPeriodsDoNotOverlap` y los demás).
   - La alternativa de una replanificación conserva los bloques — `ExpeditionReplannerTest.theAlternativeKeepsTheBlocksOfTheOriginal`.
 
+### F3 — Replanificación automática tras un incidente
+
+- **Decisiones:** D45, D46, D47, D48.
+- **Clases agregadas:**
+  - `business.interfaces.events.DomainEvent` y `EventSubscriber` — un evento de dominio y quien reacciona a un tipo de evento.
+  - `business.models.events.IncidentRegistered` — el evento que publica el registro de un incidente.
+  - `business.providers.EventPublisher` — puerto de salida para publicar eventos, con entrega síncrona.
+  - `business.providers.ReplanProposalRepository` — puerto de salida de las propuestas.
+  - `business.models.expeditions.IncidentId` e `IncidentReport` — el id que la expedición le da a cada incidente y lo que se informa desde el campo (descripción, fecha, recurso y retraso opcionales).
+  - `business.models.expeditions.ResourceAssignment` — un recurso con la forma de asignarlo.
+  - `business.models.replanning.ReplanProposal`, `ReplanProposalId`, `ReplanProposalStatus`, `ReplanOption` y `ReplanDecision` — la propuesta, sus opciones, su estado y la decisión.
+  - `business.interfaces.replanning.ReplanOptionGenerator` — genera las opciones de un tipo para un incidente.
+  - `business.replanning.RescheduleOptions`, `ResourceReplacementOptions` y `CancellationOptions` — los tres generadores; `OptionSummaries` arma sus resúmenes.
+  - `business.replanning.ResourceReplaced` — motivo de replanificación: cambia un recurso por otro en el mismo horario.
+  - `business.usecases.RegisterIncident` y `RegisterIncidentCommand` — registrar un incidente y obtener la propuesta.
+  - `business.usecases.ProposeReplan` — suscriptor que arma y guarda la propuesta.
+  - `business.usecases.DecideReplanProposal` y `ReplanDecisionCommand` — aceptar una opción o rechazar.
+  - `business.usecases.QueryReplanProposals` — consultar una propuesta o las de una expedición.
+  - `business.exceptions.NotAResponsibleException`, `ProposalAlreadyDecidedException` y `DuplicateReplanProposalException`.
+  - `adapters.driven.InMemoryEventPublisher` e `InMemoryReplanProposalRepository` (módulo `app`).
+  - `ReplanningConfig` (módulo `web`) — los beans de F3 en su propia `@Configuration` (D37).
+- **Clases modificadas:**
+  - `Incident` — suma id, actividad afectada, recurso y retraso informados.
+  - `Expedition` — `registerIncident` reemplaza a `reportIncident` y guarda la bitácora (`getIncidents`); suma `suspendToReplan` y `requireResponsible`; el constructor recibe los incidentes heredados.
+  - `ExpeditionBuilder` — suma `addInheritedIncident`.
+  - `ActivityTracking` — ya no guarda incidentes.
+  - `ItineraryNode`, `ItineraryItem`, `ItineraryBlock` y `SequentialBlock` — suman `itemsAfter`.
+  - `Itinerary` — suma `dependentsOf` y `movingWith`.
+  - `ReplannedActivity` — suma los recursos que la actividad gana (`additions`).
+  - `ExpeditionReplanner` — suma `canPlan`; aplica la cascada de cancelación y el arrastre de un retraso; rehace una actividad afectada que ya empezó; copia la bitácora de incidentes a la alternativa.
+  - `ExpeditionReporter` — toma los incidentes de la expedición.
+  - `Lookups` — suma la búsqueda de una propuesta.
+  - `FieldOpsConfig` (módulo `web`) — el `ExpeditionReplanner` pasa a ser un bean compartido.
+  - No se modificaron `ReplanReason`, `Delay`, `Cancellation`, `ResourceWithdrawn`, `ApproveExpedition`, `ReplanExpedition`, `ExpeditionStatus` ni las validaciones.
+- **Refactorizaciones realizadas:**
+  - `ExpeditionReplanner` pasó de una lista de ítems llevados a un mapa por ítem, para que la cascada pueda sacar o correr ítems ya cargados, y separó el armado de la alternativa (`draftOf`) de la verificación del estado, para reusarlo en `canPlan`.
+  - Los incidentes se movieron del seguimiento a la expedición (D48). Hizo falta porque una actividad pendiente no tiene seguimiento.
+  - Cambiaron tres tests del replanificador que esperaban el comportamiento anterior: la cancelación con dependientes (ahora cascada), el retraso dentro de un secuencial (ahora corre a los hermanos) y la actividad afectada ya terminada (ahora se rehace). También los tests de seguimiento, del informe y de integración que usaban `reportIncident`.
+- **Deuda técnica que se decidió no resolver:**
+  - **Entrega sin transacción ni reintentos.** Si el suscriptor falla, el incidente queda registrado sin propuesta. Se aceptó porque todo está en memoria y en el mismo hilo; con persistencia real hace falta una transacción o un outbox (D45).
+  - **Un incidente por propuesta.** Dos incidentes sobre la misma actividad generan dos propuestas, y aceptar una deja sin efecto a la otra. Habría que agruparlos si los incidentes encadenados se vuelven frecuentes.
+  - **El reemplazo es de a un recurso.** Un incidente nombra a lo sumo un recurso. Si se rompen dos cosas, son dos incidentes.
+  - **El retraso lo informa una persona.** El sistema no calcula cuánto correr una actividad; sin retraso informado no hay reprogramación.
+  - **La propuesta no se actualiza.** Las opciones se calculan al registrar el incidente. Si el itinerario cambia, aceptar vuelve a verificar y falla si la opción ya no se puede armar, pero no se ofrecen opciones nuevas.
+  - **Reemplazar la original a mano no deja sin efecto las propuestas pendientes.** Solo aceptar una propuesta lo hace; una replanificación manual aprobada deja las propuestas pendientes, que fallan al aceptarse porque la original ya no se puede reemplazar.
+  - **La API de F3 no existe todavía.** Los casos de uso están expuestos como beans; los endpoints esperan el esqueleto de la Fase 5.
+- **Criterios de aceptación:**
+  - Registrar un incidente sobre una expedición en ejecución genera una propuesta de replanificación — `IncidentReplanningTest.registeringAnIncidentOnAnExpeditionInExecutionGeneratesAReplanProposal`; con el publicador real, al volver de `RegisterIncident` la propuesta ya existe, `IncidentReplanningIntegrationTest`.
+  - El responsable puede aceptarla — `IncidentReplanningTest.theResponsibleCanAcceptAnOptionAndGetsTheAlternativeAsADraft`.
+  - El responsable puede rechazarla — `IncidentReplanningTest.theResponsibleCanRejectTheProposalAndTheExpeditionKeepsRunningAsItWas`.
+  - El plan original, el incidente y la decisión quedan auditados y consultables — `IncidentReplanningTest.theOriginalPlanTheIncidentAndTheDecisionStayAuditedAndQueryable` y `IncidentReplanningIntegrationTest.anIncidentInTheFieldEndsInAnApprovedAlternativeWithTheWholeHistoryQueryable`.
+  - Qué opciones se generan según el incidente y el itinerario — el parametrizado `ProposeReplanTest.offersTheOptionsThatMakeSenseAndCanBeBuilt`, y que toda opción ofrecida se puede armar, `neverOffersAnOptionThatCannotBeAccepted`; cada generador en `ReplanOptionGeneratorsTest`.
+  - Reglas de la decisión (solo un responsable, una vez, todo o nada, actividad en curso, propuestas que quedan sin efecto) — `DecideReplanProposalTest`.
+  - `RegisterIncident` publica el evento y el suscriptor guarda la propuesta, con Mockito — `RegisterIncidentTest`; el publicador en memoria, `InMemoryEventPublisherTest`.
+  - Contrato del repositorio de propuestas — `ReplanProposalRepositoryContract`, que corre `InMemoryReplanProposalRepositoryTest`.
+  - La cascada y el arrastre — `ItineraryCascadeTest` y los tests nuevos de `ExpeditionReplannerTest`; la bitácora de incidentes, `ExpeditionIncidentsTest`.
+
 ## Patrones que decidimos no aplicar
 
 | Patrón | Por qué no                                                                                                                                                                                              | Consecuencias |
@@ -821,9 +974,11 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 | Strategy de conversión entre sistemas de medida | Consideramos una posible extensión a futuro con más de un sistema de medida (ej. métrico e imperial: litros y galones, kilogramos y libras). Hoy hay un único sistema, así que `MeasurementUnit` es un enum simple y `Quantity` rechaza operar entre unidades distintas en vez de convertirlas. | Si se agrega otro sistema, habría que introducir una abstracción de conversión (ej. `UnitConverter`) que `Quantity` use para normalizar antes de sumar, restar o comparar. Como hoy toda la aritmética de unidades está encapsulada en `Quantity` (D8), el cambio queda en ese value object y no se propaga al resto del dominio. |
 | Servicio dedicado de asignación (`AsignacionService`) | El enunciado pide "proponer o realizar asignaciones", y ya está cubierto sin una clase intermedia: `ResourceCatalog` (D18) responde quién puede cubrir un requisito (Information Expert sobre el catálogo) y `Expedition.assignStaff`/`assignEquipment`/`assignSupply` (D19) realiza la asignación verificando el estado. Un servicio aparte solo delegaría en las dos sin agregar comportamiento propio. | Si aparece una regla propia de asignación (ej. elegir entre varios candidatos con un criterio de optimización, no solo listarlos), ahí se justifica introducir un servicio que la encapsule. |
 | Clean Architecture | La separación que necesitamos es adentro / afuera del dominio, y la hexagonal (D35) la da con menos piezas. Los anillos adicionales (entidades por un lado, casos de uso por otro, con modelos de entrada y salida propios) duplicarían clases sin que haya una regla que lo justifique en este dominio. | Si los casos de uso necesitaran protegerse de cambios de las entidades (por ejemplo, modelos de entrada y salida propios por caso de uso), habría que reconsiderarlo. |
-| DDD táctico completo | El dominio es un solo contexto con un agregado claro (`Expedition`) y los bloques que sirven ya están aplicados: entidades, value objects (D8), servicios de dominio y repositorio (D28). Bounded contexts, eventos de dominio y fábricas por agregado sumarían ceremonia sin un segundo contexto que las justifique. | Si aparece un segundo contexto con lenguaje propio (por ejemplo logística de flota separada de planificación), habría que separar módulos por contexto. |
+| DDD táctico completo | El dominio es un solo contexto con un agregado claro (`Expedition`) y los bloques que sirven ya están aplicados: entidades, value objects (D8), servicios de dominio y repositorio (D28). Bounded contexts, eventos de dominio y fábricas por agregado sumarían ceremonia sin un segundo contexto que las justifique. Desde F3 se usa un evento de dominio (`IncidentRegistered`, D45) porque el registro de un incidente y la propuesta son responsabilidades distintas, pero sin el resto del aparato: no hay bounded contexts ni eventos acumulados en el agregado. | Si aparece un segundo contexto con lenguaje propio (por ejemplo logística de flota separada de planificación), habría que separar módulos por contexto. |
 | Modo del bloque como `enum` (un solo bloque con `SEQUENTIAL` / `PARALLEL`) | Entre un bloque secuencial y uno paralelo cambia comportamiento: cómo se combina la duración, qué se exige a los hijos y si las ramas cuentan como simultáneas. Con un `enum`, cada una de esas preguntas sería un `if` sobre el modo repetido en el bloque, en la validación y en la replanificación. Son dos clases, `SequentialBlock` y `ParallelBlock`, sobre una base común (D39). | Hay una clase por forma de combinar. A cambio, sumar una forma nueva es sumar una clase y no revisar cada condicional. |
 | Visitor para recorrer el árbol del itinerario | Lo que se le pregunta a un nodo son pocas operaciones estables (duración, riesgo, consumo, hojas, si dos actividades corren en paralelo, el plan que conserva su forma), y cada una tiene una respuesta natural por tipo de nodo, así que van como métodos de `ItineraryNode` (D39). Un Visitor separaría cada operación en una clase aparte y obligaría a tocar todos los visitors al sumar un tipo de bloque, que es justo el cambio que F2 hace esperable. | Cada operación nueva sobre el árbol agrega un método a `ItineraryNode` y a sus implementaciones. Si las operaciones empiezan a crecer mucho más rápido que los tipos de nodo (por ejemplo varias exportaciones o vistas del árbol), convendría reconsiderarlo. |
+| Event Sourcing | La auditoría que pide F3 (plan original, incidente y decisión) ya queda con lo que hay: la expedición original no se reescribe (D25), la alternativa la referencia (D33) y la propuesta guarda el incidente y la decisión (D48). Reconstruir el estado de la expedición desde sus eventos obligaría a modelar cada cambio como evento, versionarlos y guardarlos, para responder lo mismo. | Si hiciera falta reconstruir el estado de una expedición en cualquier momento, o auditar cada asignación y transición y no solo las replanificaciones, habría que reconsiderarlo. |
+| Entrega asíncrona de eventos (bus o cola) | El criterio de F3 exige que la propuesta exista cuando vuelve el registro del incidente. Con un solo proceso y todo en memoria, la entrega síncrona del `InMemoryEventPublisher` lo garantiza sin reintentos ni orden de entrega que resolver (D45). | Si un suscriptor se vuelve lento o externo (avisar por correo, otro servicio), habría que sumar un adaptador asíncrono detrás del mismo `EventPublisher`, con un outbox para no perder eventos. |
 
 ## Supuestos
 
@@ -854,3 +1009,9 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 - El equipamiento de iluminación es un equipo de categoría `Lighting`, una unidad por actividad nocturna sin importar cuántas personas participen.
 - "Todo el personal asignado" son las personas asignadas a la actividad. La certificación de operación nocturna no se exige a los vehículos ni a los instrumentos, aunque también puedan tener certificaciones (D10).
 - Un bloque con un solo hijo es válido, y un bloque no tiene nombre ni identificador propio: el enunciado no pide referirse a un bloque, solo agruparlo y ejecutarlo (D39, D40).
+- Un incidente se registra sobre una actividad no terminada, pendiente o en curso, y solo con la expedición en ejecución (D23, D47). Puede nombrar un recurso asignado a esa actividad y un retraso estimado; los dos son opcionales.
+- El retraso de una reprogramación es el que informa quien registra el incidente: el enunciado no dice cuánto correr una actividad, y quien está en el campo es quien lo sabe (D46).
+- Una propuesta ofrece hasta tres candidatos de reemplazo, en el orden del catálogo: el enunciado no da un criterio para elegir entre ellos, así que decide el responsable (D46).
+- Cancelar una actividad cancela las que dependen de ella, y correrla corre lo que viene después en sus secuenciales y lo que depende de ella. Una rama paralela hermana no se corre (D46).
+- Aceptar una opción deja la alternativa en borrador; la original queda suspendida hasta que la alternativa se apruebe o se reanude la original (D47).
+- La fecha de una decisión la informa quien decide, como la de un incidente o una observación (D47).
