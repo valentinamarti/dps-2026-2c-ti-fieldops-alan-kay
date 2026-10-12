@@ -14,6 +14,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 - **Dónde:** `Activity` (en `business.models.activities`) + interfaz `ActivityRules` (en `business.interfaces.activities`); implementaciones `SampleCollectionRules` y `DivingRules` en `business.rules`.
 - **Por qué:** `Activity` es una única clase con los campos comunes obligatorios a todo tipo (nombre, ventana temporal, zona, dependencias), y delega en `ActivityRules` todo lo que varía según el tipo: duración estimada, riesgo, recursos y personal requerido. El enunciado pide que cada tipo tenga sus propias reglas, y agregar un tipo nuevo debe significar agregar una clase, no modificar un `if`/`switch` existente.
 - **Alternativas descartadas:** herencia (subclases de `Activity` por tipo) — mezclaría campos comunes con comportamiento variable en la misma jerarquía. `enum` + `switch` por tipo — antipatrón señalado en clase, viola Open/Closed.
+- **Revisado en D44:** ya son seis tipos (se sumaron `DroneSurveyRules`, `WildlifeObservationRules`, `WaterQualityMeasurementRules` y `TransferRules`) y cada uno se puede crear por su nombre con el registro de tipos. `ActivityRules` sumó dos preguntas con respuesta vacía por defecto (D43) y un Decorator la envuelve para la variante nocturna (D42). La decisión no cambia: agregar un tipo sigue siendo agregar una clase.
 
 
 ### D2 — Validaciones como objetos con severidad (Policy) + política de aprobación
@@ -126,6 +127,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 - **Dónde:** interfaz `Certifiable` y value object `Certifications`, usados por `Person`, `Vehicle` e `Instrument`.
 - **Por qué:** personas, vehículos e instrumentos pueden tener certificaciones. `Certifiable` permite que la validación de certificaciones faltantes pregunte `hasCertification` sin conocer la clase concreta ni hacer `instanceof`. La regla vive en `Certifications`, así que si una certificación gana reglas propias (ej. vencimiento) se cambia en un solo lugar.
 - **Alternativas descartadas:** agregar `hasCertification` a `ReusableResource`, que mezclaría dos preguntas distintas (disponibilidad y habilitación) y obligaría a cualquier recurso reutilizable futuro a tener certificaciones. Repetir un `Set<Certification>` con su lógica en cada clase quedó descartado por duplicación.
+- **Revisado en D43:** una actividad puede exigir certificaciones a cada persona asignada, y no solo a las que cubren un requisito de personal. La pregunta sigue pasando por `Certifiable.hasCertification`, sin conocer la clase concreta.
 
 
 ### D11 — Los datos propios de cada tipo de actividad viven en su regla; requisitos como value objects
@@ -139,6 +141,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 - **Alternativas descartadas:**
   - Pasar la `Activity` a cada método (`estimateDuration(Activity)`): hoy ninguna regla usa datos de la actividad, y además crea una dependencia circular entre `Activity` y sus reglas. Consecuencia: si una regla llega a necesitar un dato común (ej. la zona), hay que agregar el parámetro en todas las implementaciones.
   - Campos específicos de un tipo en `Activity` (ej. `depth` nullable): mezclaría datos de tipos distintos en una sola clase.
+- **Revisado en D43:** se dio el caso que anticipa la consecuencia de arriba. Los permisos que exige una actividad dependen de su zona, así que `ActivityRules.requiredPermitsIn(Zone)` recibe la zona como parámetro. Es el único método con parámetro; los demás no cambiaron.
 
 
 ### D12 — Requisitos de recursos separados por forma de uso, en espejo con los recursos
@@ -161,6 +164,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 - **Dónde:** `Zone.missingPermits(grantedPermits)` y `Zone.isAccessibleWith(grantedPermits)`.
 - **Por qué:** la `Zone` es la que sabe qué permisos exige, así que es la que compara contra los que tiene la expedición. La validación de permisos faltantes (D2) no necesita leer `requiredPermits` ni saber cómo se comparan: le pregunta a la zona. `missingPermits` devuelve **cuáles** faltan y no solo un booleano, porque el resultado de la validación tiene que poder decir qué permiso falta; `isAccessibleWith` es el atajo para cuando eso no interesa.
 - **Alternativas descartadas:** exponer `requiredPermits` con un getter y comparar afuera — repartiría la comparación entre la validación, la asignación y el informe. Devolver solo `boolean` — obligaría a recalcular la diferencia en el lugar donde se arma el mensaje de error.
+- **Revisado en D43:** la zona sigue siendo dueña de sus permisos y ahora también nombra el permiso especial que exige para un tipo de operación (`Zone.specialPermitFor`). Además de las zonas, una actividad puede exigir permisos en su zona, y `MissingPermitsValidation` reporta los dos.
 
 
 ### D14 — Las preguntas devuelven `boolean`, los comandos fallan con excepción
@@ -555,6 +559,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - Un método `save` en el repositorio — con el repositorio en memoria las entidades se modifican en el lugar. Cuando haya persistencia real hará falta.
 - **Consecuencia:**
   - `ScheduleActivityCommand` recibe la `Activity` ya armada: crearla requiere elegir su `ActivityRules` por tipo y parámetros, y eso lo resuelve el registro de tipos de la Fase 3. Hasta entonces el adaptador que agenda una actividad la construye.
+  - **Pendiente (Fase 3):** el registro de tipos ya existe (`ActivityTypeRegistry`, D44), pero `ScheduleActivityCommand` sigue recibiendo la `Activity` armada. Que reciba el tipo, los parámetros y el indicador de nocturna queda para la API: además de las reglas, armar la actividad exige resolver por id la zona y las dependencias, y eso se define con el endpoint.
   - `ValidateExpedition` y `ApproveExpedition` reciben cada uno su lista de reglas adicionales; hoy ambas están vacías en `FieldOpsConfig`.
   - Los tests del repositorio se podrán reutilizar contra el adaptador JPA cuando exista.
 
@@ -632,7 +637,141 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - Detectarlo al reservar — la reserva corta en el primer problema con una excepción en vez de reportarlo junto con los demás (D22).
 - **Consecuencia:** saber si dos actividades corren en paralelo recorre el árbol por cada par. Con el tamaño de un itinerario no pesa; si pesara, el itinerario podría calcular una vez los pares paralelos.
 
+### D42 — La actividad nocturna es un Decorator de las reglas de cualquier tipo (Entrega 2, F1)
+
+- **Origen:** F1 pide una variante nocturna con requisitos propios: certificación de operación nocturna para todo el personal asignado, permiso especial por zona, equipamiento de iluminación y un factor de riesgo adicional. Los informes tienen que incluirla sin condicionales nuevos por tipo. Cualquier tipo de actividad puede hacerse de noche, y los tipos ya eran un Strategy (D1).
+- **Patrón / principio:** Decorator sobre el Strategy de D1 + Open/Closed.
+- **Dónde:** en `business.rules`: `ActivityRulesDecorator` (abstracta) y `NightOperationRules`. `RiskLevel.EXTREME` y `RiskLevel.next()`.
+- **Por qué:**
+  - "Nocturna" no es un tipo más: es algo que se le suma a un tipo. `NightOperationRules` implementa `ActivityRules` y envuelve otra `ActivityRules`: le pregunta a la regla envuelta y le agrega lo propio. Un buceo nocturno es `new NightOperationRules(new DivingRules(30))`, y lo mismo vale para los otros cinco tipos y para los que se agreguen.
+  - Lo que suma: un `ReusableRequirement` de categoría `Lighting` al equipamiento, la certificación `Night operations` para todo el personal asignado y el permiso especial de la zona (D43), y un nivel más de riesgo. La duración, los consumibles y los requisitos de personal se delegan sin cambios.
+  - `Activity` sigue delegando en sus reglas sin saber que están envueltas (D1). Las validaciones, el estimador y el informe hacen las mismas preguntas de siempre y reciben respuestas distintas: ninguno pregunta si una actividad es nocturna, y no hay `instanceof` ni `if` por variante. `ExpeditionReporter`, `ExpeditionEstimator`, `RiskToleranceValidation` y `MissingResourcesValidation` no se tocaron: la iluminación que falta la reporta la regla de recursos como cualquier equipo, y el riesgo mayor lo levanta la de tolerancia como advertencia.
+  - `ActivityRulesDecorator` delega **todos** los métodos de `ActivityRules`, incluidos los que tienen respuesta por defecto. Si un decorador heredara el `default` de la interfaz, respondería vacío y perdería lo que aporta la regla envuelta (por ejemplo, las certificaciones que exige otro decorador). Con la base, un decorador nuevo solo redefine lo que cambia y no puede olvidarse de un método. Es el mismo esquema que `ScheduledResource` (D9) e `ItineraryBlock` (D39): la interfaz es el contrato y la clase abstracta, la implementación compartida.
+  - El factor de riesgo es "un nivel más" porque `RiskLevel` es una escala ordinal, sin una magnitud que multiplicar. `RiskLevel.next()` devuelve el nivel siguiente y se queda en el máximo. Se agregó `EXTREME` por encima de `HIGH`: sin él, un buceo profundo (`HIGH`) tendría el mismo riesgo de día que de noche y la estimación no reflejaría el factor nocturno. Todo lo que compara riesgos lo hace por orden (`isAbove`, el máximo de un bloque), así que el nivel nuevo no obligó a tocar nada.
+- **Alternativas descartadas:**
+  - Una clase nocturna por tipo (`NightDivingRules`, `NightSampleCollectionRules`, ...) — duplica cada tipo: seis clases más hoy y una más por cada tipo futuro, con las mismas cuatro reglas nocturnas copiadas en cada una.
+  - Un booleano `night` en `Activity` con condicionales — cada validación, el estimador y el informe tendrían que preguntar `if (activity.isNight())`. Es justo lo que la consigna pide evitar, y cada variante nueva sumaría otro booleano y otra ronda de condicionales.
+  - Herencia (`NightDivingRules extends DivingRules`) — la misma explosión de clases, y además ata la variante a cada tipo concreto: no se le puede aplicar a un tipo que todavía no existe ni combinar con otra variante.
+  - Agregar la certificación nocturna a cada `StaffRequirement` de la regla base — ver D43.
+  - Que cada tipo implemente su variante (un método `atNight()` en `ActivityRules`) — obligaría a cada tipo a conocer las reglas nocturnas y a repetirlas.
+- **Consecuencia:**
+  - Otra variante transversal (por ejemplo, una operación en altura) es otra clase que extiende `ActivityRulesDecorator`, y se puede apilar sobre la nocturna.
+  - Nada impide envolver dos veces la misma regla: el riesgo subiría dos niveles y la iluminación quedaría pedida dos veces. El registro de tipos envuelve una sola vez (D44); queda como deuda técnica de F1.
+  - Una regla envuelta no dice que es nocturna. Es a propósito, para que nadie decida por eso; si hace falta mostrarlo (por ejemplo en la respuesta de la API), el dato tiene que viajar aparte.
+  - `EXTREME` es un valor nuevo de un `enum` que la API va a serializar: un cliente que conocía tres niveles tiene que aceptar el cuarto.
+
+### D43 — Permisos y certificaciones que exige la actividad (Entrega 2, F1, extiende D10 y D13)
+
+- **Origen:** dos de los requisitos de F1 no entraban en el modelo. Las certificaciones se pedían por requisito de personal (`StaffRequirement`, D11) y la validación contaba calificados contra el cupo, así que una persona de más sin la certificación pasaba. Los permisos solo los exigía la zona (D13), a toda expedición que trabajara en ella.
+- **Patrón / principio:** Strategy (D1) con respuesta por defecto + Information Expert (D13, D17) + identidad del hallazgo por regla y sujeto (D32).
+- **Dónde:** `ActivityRules.requiredCertificationsForAllStaff()` y `requiredPermitsIn(Zone)`, con respuesta vacía por defecto; `Activity.requiredCertificationsForAllStaff()`, `admits(Certifiable)`, `requiredPermits()` y `missingPermits(grantedPermits)`; `Zone.specialPermitFor(operation)`; `MissingCertificationsValidation` y `MissingPermitsValidation`; el caso de uso `FindAssignmentCandidates`.
+- **Por qué:**
+  - Son dos preguntas nuevas a las reglas de una actividad, y las dos tienen una respuesta por defecto: nada. Los seis tipos y los dobles de prueba que implementan `ActivityRules` no cambiaron; solo responde algo distinto quien lo necesita, hoy `NightOperationRules` (D42).
+  - **Certificación para todo el personal.** No es un requisito de cupo sino una condición para participar. La actividad dice qué certificaciones exige a cada persona asignada y `Activity.admits` responde si una persona puede participar, con el mismo criterio que `StaffRequirement.qualifies` (D17): decide quien conoce el requisito. `MissingCertificationsValidation` suma una crítica por cada persona asignada a la que la actividad no admite, con sujeto actividad + persona (D32). Así, una tercera persona sin la certificación en un buceo nocturno de dos buzos se reporta aunque el cupo esté cubierto, y el mensaje dice quién es.
+  - **Permiso especial por zona.** La zona sigue siendo la dueña de sus permisos (D13): `Zone.specialPermitFor("night operations")` devuelve el permiso que esa zona exige para ese tipo de operación. La regla nocturna no arma el permiso: se lo pide a la zona de la actividad.
+  - **Cómo se llama el permiso.** Es un `Permit` como cualquier otro, con el nombre `<operación> in zone <id de la zona>`; para la zona `z-1`, `night operations in zone z-1`. La operación se normaliza como en D34 (sin espacios alrededor y en minúsculas) y el id de la zona va tal cual. Lleva el id y no el nombre de la zona porque el id es único (`ZoneRepository` rechaza uno repetido) y dos zonas pueden llamarse igual (D15). Como la zona es parte del nombre, el permiso de una zona es otro permiso para cualquier otra y no la cubre. Quien concede el permiso lo obtiene de `zone.specialPermitFor(...)` o lo escribe con esa convención, y lo agrega a los permisos concedidos como cualquier otro (`ExpeditionBuilder.addPermit`, `CreateExpeditionCommand.grantedPermits`). No hubo que cambiar `Permit`, la expedición ni los comandos.
+  - `requiredPermitsIn(Zone)` recibe la zona en vez de que la regla la guarde: D11 ya preveía agregar el parámetro si una regla necesitaba un dato común de la actividad. La zona sigue siendo un dato de `Activity`, que la pasa al preguntar (`Activity.requiredPermits()`), y unas mismas reglas sirven en cualquier zona.
+  - `MissingPermitsValidation` reporta, además de los permisos de las zonas (con sujeto expedición, como antes), los que exige cada actividad pendiente y la expedición no tiene concedidos, como crítica con sujeto actividad. Mira solo las pendientes por el criterio de D33: lo que ya se hizo no se vuelve a validar. La comparación la hace `Activity.missingPermits`, en espejo con `Zone.missingPermits` (D13).
+  - `FindAssignmentCandidates` ofrece para cada requisito de personal solo a quienes la actividad admite. Sin eso, el catálogo propondría para una actividad nocturna personas que la validación después rechaza.
+  - No hay reglas nuevas: son las mismas dos, con una definición más amplia de "falta una certificación" y "falta un permiso" (mismo criterio que D41). `ApprovalPolicy` no se tocó y las reglas obligatorias siguen siendo siete (D31).
+- **Alternativas descartadas:**
+  - Agregar la certificación nocturna a cada `StaffRequirement` de la regla base, como proponía el plan — no cubre lo que pide la consigna ("todo el personal asignado"): la validación cuenta calificados contra el cupo y la persona de más pasa. Y sumada a la exigencia por persona, la misma falta saldría reportada dos veces, una por requisito y otra por persona.
+  - Agregar el permiso nocturno a los `requiredPermits` de la zona — se le exigiría a toda expedición que trabaje en la zona, aunque no tenga ninguna actividad nocturna.
+  - Un permiso genérico `Night operations`, sin zona — el permiso de una zona cubriría a todas las demás.
+  - Agregar la zona como campo de `Permit` — cambiaría un value object que usan la zona, la expedición y los comandos, y la forma de conceder un permiso, para un caso que el nombre ya resuelve.
+  - Que el decorador reciba la zona en el constructor — duplicaría un dato de `Activity` y permitiría reglas armadas para una zona dentro de una actividad de otra.
+  - Una regla de validación nueva para los requisitos nocturnos — tendría que preguntar si la actividad es nocturna, o repetir lo que ya hacen las dos reglas existentes.
+  - Rechazar al asignar a una persona sin la certificación — las asignaciones cambian mientras se planifica y un borrador puede estar incompleto a propósito (D21).
+- **Consecuencia:**
+  - El nombre del permiso especial es una convención de texto y los permisos se comparan por nombre exacto (D8): concederlo mal escrito deja la crítica en pie, como pasa con cualquier permiso. Si los permisos ganan reglas propias (vigencia, autoridad que los emite), el lugar para cambiarlo es `Permit`.
+  - Si una regla y un requisito de personal piden la misma certificación, la falta se reporta por los dos caminos. Hoy no pasa: ningún tipo pide `Night operations` en un `StaffRequirement`.
+
+### D44 — Registro de tipos de actividad y cuatro tipos nuevos (Entrega 2, F1, extiende D1)
+
+- **Origen:** la demostración pide seis tipos de actividad y había dos. Además, la API y el cargador del seed reciben el tipo como texto: hace falta pasar del nombre de un tipo y sus parámetros a una `ActivityRules` (D38 lo había dejado pendiente).
+- **Patrón / principio:** Registry + cada tipo como un objeto que sabe crear sus reglas + Open/Closed; el nombre del tipo es un value object que se normaliza (D34).
+- **Dónde:** interfaz `ActivityType` (en `business.interfaces.activities`); `ActivityTypeName` y `ActivityParameters` (en `business.models.activities`); en `business.rules`: `ActivityTypeRegistry`, `SingleParameterActivityType` y las reglas nuevas `DroneSurveyRules`, `WildlifeObservationRules`, `WaterQualityMeasurementRules` y `TransferRules`; la constante `TYPE` de cada una de las seis reglas; `UnknownActivityTypeException` e `InvalidActivityParametersException` (en `business.exceptions`); el caso de uso `QueryActivityTypes`; los beans `ActivityTypeRegistry` y `QueryActivityTypes` en `FieldOpsConfig`.
+- **Por qué:**
+  - Los cuatro tipos nuevos siguen a los dos que había (D11): cada uno recibe su dato propio en el constructor, lo valida y calcula con constantes con nombre. Los seis tipos, con el nombre y el parámetro con que se piden al registro:
+
+    | Tipo | Parámetro | Duración | Riesgo | Personal | Equipamiento | Consumibles |
+    |---|---|---|---|---|---|---|
+    | `sample collection` | `sampleCount` | 1 h + 20 min por muestra | bajo | 1 persona | 1 `cooler` | 1 `sample container` por muestra |
+    | `diving` | `maxDepthMeters` | 45 min + 2 min por metro | medio; alto a más de 30 m | 2 con `diving` | 1 `boat` y 2 `oxygen tank` | 20 litros de `fuel` |
+    | `drone survey` | `areaHectares` | 30 min + 3 min por hectárea | bajo; medio a más de 50 ha | 1 con `drone pilot` | 1 `drone` | ninguno |
+    | `wildlife observation` | `observationPoints` | 30 min + 45 min por punto | bajo | 2 personas | 2 `binoculars` | ninguno |
+    | `water quality measurement` | `stationCount` | 30 min + 15 min por estación | bajo | 1 con `water analysis` | 1 `multiparameter probe` | 1 `reagent kit` por estación |
+    | `transfer` | `distanceKilometers` | 30 min + 2 min por kilómetro | bajo; medio a más de 100 km | 1 con `off-road driving` | 1 `truck` | 0,15 litros de `fuel` por kilómetro |
+
+  - Cada tipo es un objeto `ActivityType`: dice su nombre, los nombres de sus parámetros y cómo crear sus reglas (`rulesWith`). `ActivityTypeRegistry` guarda los tipos por nombre y le pide las reglas al que corresponde. No hay `switch` ni `if` por tipo: el código que busca un tipo y crea sus reglas no cambia cuando se suma uno.
+  - La descripción de cada tipo vive en su regla, como constante `TYPE` (`DivingRules.TYPE`). El nombre del tipo y el de su parámetro son datos propios del tipo (D11) y quedan al lado del constructor que describen.
+  - Los seis tipos toman un entero, así que comparten una implementación, `SingleParameterActivityType` (nombre, parámetro y una referencia al constructor), en vez de seis clases iguales. Un tipo con otra forma (dos parámetros, o ninguno) implementa `ActivityType` directamente.
+  - El nombre del tipo es un value object, `ActivityTypeName`, que se normaliza al construirse igual que las categorías y las certificaciones (D34): `Diving`, `diving` y ` DIVING ` son el mismo tipo. Los nombres de los parámetros no se normalizan: son identificadores (`maxDepthMeters`) y se comparan tal cual, como los publica la consulta de tipos.
+  - Pedir mal un tipo falla con una excepción de dominio. `UnknownActivityTypeException` nombra el tipo pedido y lista los disponibles. `InvalidActivityParametersException` dice qué tipo no se pudo crear y por qué: falta el parámetro, o su valor no sirve. La validación del valor sigue estando en la regla (D16): el tipo traduce su `IllegalArgumentException` y le agrega el contexto.
+  - La variante nocturna se pide con un indicador: `rulesFor(tipo, parámetros, atNight)` envuelve la regla base en `NightOperationRules` (D42). Es el único lugar que arma la variante a partir de un pedido, y la envuelve una sola vez.
+  - El dominio define cuáles son los tipos disponibles (`ActivityTypeRegistry.withStandardTypes()`), con el mismo criterio que las reglas obligatorias de aprobación (D31). El constructor recibe la lista, así que los tests arman registros chicos; dos tipos con el mismo nombre se rechazan.
+  - `QueryActivityTypes` lista los tipos disponibles con sus parámetros, para que la API pueda publicarlos (D38).
+- **Alternativas descartadas:**
+  - Un `switch` por nombre en el registro, o un `enum` de tipos con un `switch` — cada tipo nuevo obligaría a modificar el código que crea las reglas. Es el antipatrón que D1 ya había descartado.
+  - Una clase `ActivityType` por tipo (`DivingType`, `TransferType`, ...) — seis clases que solo cambian en un nombre y un constructor.
+  - Descubrir los tipos por reflexión o recorriendo el classpath — esconde qué tipos existen y falla recién en ejecución.
+  - Armar el registro en `web` con beans de Spring — el cargador del seed y los tests del dominio lo necesitan sin Spring, y el dominio no puede depender de `web` (D36, D37).
+  - Registrar la variante nocturna como tipos aparte (`night diving`, ...) — duplicaría cada entrada y volvería a atar la variante a cada tipo (D42).
+  - Parámetros como texto libre (`Map<String, String>`) — habría que interpretarlos dentro del dominio, y hoy todos son enteros.
+- **Consecuencia:**
+  - Sumar un tipo es escribir su regla con su `TYPE` y agregar una línea a `withStandardTypes()`.
+  - Los parámetros son enteros. Si un tipo necesita otro dato (un decimal, un texto), hay que ampliar `ActivityParameters`.
+  - `ScheduleActivityCommand` sigue recibiendo la `Activity` ya armada (D38). Que reciba el tipo, los parámetros y el indicador de nocturna queda pendiente para la API, porque además hay que resolver por id la zona y las dependencias.
+
 ## Funcionalidades nuevas de la Entrega 2
+
+### F1 — Actividades nocturnas
+
+- **Decisiones:** D42, D43, D44.
+- **Clases agregadas:**
+  - `business.rules.ActivityRulesDecorator` — base abstracta de los decoradores de `ActivityRules`: delega todos los métodos en la regla que envuelve.
+  - `business.rules.NightOperationRules` — la variante nocturna: suma iluminación, certificación para todo el personal y permiso de la zona, y sube un nivel el riesgo.
+  - `business.rules.DroneSurveyRules`, `WildlifeObservationRules`, `WaterQualityMeasurementRules` y `TransferRules` — los cuatro tipos de actividad que faltaban.
+  - `business.interfaces.activities.ActivityType` — un tipo de actividad: su nombre, sus parámetros y cómo crear sus reglas.
+  - `business.rules.SingleParameterActivityType` — implementación de `ActivityType` para los tipos que toman un entero.
+  - `business.rules.ActivityTypeRegistry` — del nombre de un tipo y sus parámetros a una `ActivityRules`, con la variante nocturna si se pide.
+  - `business.models.activities.ActivityTypeName` y `ActivityParameters` — el nombre normalizado de un tipo y los parámetros con que se lo pide.
+  - `business.exceptions.UnknownActivityTypeException` e `InvalidActivityParametersException` — un tipo que no existe y un parámetro que falta o no sirve.
+  - `business.usecases.QueryActivityTypes` — lista los tipos disponibles con sus parámetros.
+- **Clases modificadas:**
+  - `ActivityRules` — suma `requiredCertificationsForAllStaff()` y `requiredPermitsIn(Zone)`, con respuesta vacía por defecto.
+  - `Activity` — expone las dos preguntas nuevas (`requiredCertificationsForAllStaff`, `requiredPermits`) y responde `admits(persona)` y `missingPermits(concedidos)`.
+  - `RiskLevel` — suma `EXTREME` y `next()`.
+  - `Zone` — suma `specialPermitFor(operación)`.
+  - `MissingCertificationsValidation` — además de los requisitos de personal, reporta a cada persona asignada que la actividad no admite.
+  - `MissingPermitsValidation` — además de los permisos de las zonas, reporta los de cada actividad pendiente.
+  - `FindAssignmentCandidates` — ofrece solo al personal que la actividad admite.
+  - `DivingRules` y `SampleCollectionRules` — suman la constante `TYPE`.
+  - `FieldOpsConfig` (módulo `web`) — expone `ActivityTypeRegistry` y `QueryActivityTypes` como beans (D37).
+  - No se modificaron `ExpeditionReporter`, `ExpeditionEstimator`, `RiskToleranceValidation`, `MissingResourcesValidation`, `ApprovalPolicy` ni `ItineraryItem`.
+- **Refactorizaciones realizadas:**
+  - `MissingPermitsValidation` separó en dos métodos lo que reporta por zona y lo que reporta por actividad, con el texto del mensaje en una constante que comparten. Hizo falta para sumar el segundo origen sin duplicar el mensaje.
+  - En `MissingCertificationsValidation`, el método que arma la lista de nombres pasó de recibir un `StaffRequirement` a recibir el conjunto de certificaciones, para usarlo también con las que se exigen a todo el personal.
+  - No hubo que reestructurar nada más: los tests de la Entrega 1 y de F2 pasan sin cambios.
+- **Deuda técnica que se decidió no resolver:**
+  - **Nada impide envolver dos veces una regla fuera del registro.** `new NightOperationRules(new NightOperationRules(regla))` sube el riesgo dos niveles y pide la iluminación dos veces. Se aceptó porque el único camino que arma la variante a partir de un pedido es el registro, que envuelve una vez. Habría que resolverlo si aparecen más decoradores o si otro código empieza a armar reglas envueltas por su cuenta.
+  - **Una regla base que ya pida iluminación la pediría dos veces.** Los dos requisitos se evalúan por separado, así que un mismo equipo cubre ambos (el mismo límite que ya tiene el personal, ver supuestos). Hoy ningún tipo base pide `Lighting`.
+  - **`ScheduleActivityCommand` no usa el registro.** Sigue recibiendo la `Activity` armada (D38, D44). Se resuelve con el endpoint de alta de actividad, que tiene que definir cómo llegan la zona y las dependencias.
+  - **Una actividad no dice que es nocturna, ni de qué tipo es.** Es lo que evita los condicionales, pero la respuesta de la API no puede mostrarlo a partir del dominio. Si hace falta, el dato viaja en la respuesta o en una descripción que las reglas publiquen, no en un `isNight()`.
+  - **El permiso especial se identifica por una convención de nombre.** Alcanza mientras un permiso sea solo un nombre (D43). Habría que resolverlo si los permisos pasan a tener vigencia o emisor.
+  - **Los parámetros de un tipo son enteros.** Alcanza para los seis tipos; un tipo con otro dato obliga a ampliar `ActivityParameters` (D44).
+  - **El horario de una actividad nocturna no se verifica.** La actividad se declara nocturna y nada comprueba que su horario agendado sea de noche (ver supuestos).
+- **Criterios de aceptación:**
+  - Puede crearse una expedición con al menos una actividad nocturna — `CreateExpeditionTest.createsAnExpeditionWithANightActivity`, con la actividad armada por el registro.
+  - La validación exige la certificación — `MissingCertificationsValidationTest.flagsEachPersonAssignedToANightActivityWithoutTheNightCertification` y, para la persona de más con el cupo cubierto, `flagsAnExtraPersonWithoutTheNightCertificationEvenIfTheHeadcountIsCovered`.
+  - La validación exige el permiso — `MissingPermitsValidationTest.flagsANightActivityWhoseZonePermitWasNotGranted`; que el permiso de otra zona no lo cubre, `theNightPermitOfAnotherZoneDoesNotCoverTheActivity`.
+  - Las dos faltas impiden aprobar, y con todo en regla la actividad pasa las siete reglas — `ApprovalPolicyTest.aNightActivityWithoutItsCertificationAndItsPermitPreventsTheApproval` y `aNightActivityWithItsCertificationItsPermitAndLightingPassesTheMandatoryRules`.
+  - La iluminación que falta la reporta la regla de recursos sin haberla tocado — `MissingResourcesValidationTest.aNightActivityIsMissingEquipmentUntilItGetsLighting`.
+  - La estimación de riesgo refleja el factor nocturno — `ExpeditionEstimatorTest.theRiskEstimateReflectsTheNightFactor` y `anActivityThatIsAlreadyHighRiskByDayIsExtremeAtNight`; por cada nivel base, incluido el máximo, el parametrizado `NightOperationRulesTest.raisesTheRiskOfTheBaseRulesOneLevelAndStaysAtTheMaximum`.
+  - Los informes existentes incluyen la variante sin condicionales nuevos por tipo — `ExpeditionReporterTest.theReportOfAnExpeditionWithANightActivityReflectsItsRisk`; `ExpeditionReporter` no se modificó.
+  - Una actividad nocturna dentro de un bloque se valida y se estima igual que suelta — `ItineraryBlocksTest.aNightActivityInsideABlockIsValidatedAndEstimatedLikeALooseOne`.
+  - El decorador sobre cada uno de los seis tipos base suma la certificación, la iluminación y el permiso, y conserva la duración y los consumibles — el parametrizado `NightOperationRulesTest.addsTheCertificationTheLightingAndThePermitAndKeepsTheDurationAndTheSupplies`.
+  - Los cuatro tipos nuevos y el registro — `DroneSurveyRulesTest`, `WildlifeObservationRulesTest`, `WaterQualityMeasurementRulesTest`, `TransferRulesTest`, `ActivityTypeRegistryTest` (cada tipo por nombre, la variante nocturna, tipo desconocido, parámetro faltante o inválido) y `QueryActivityTypesTest`.
 
 ### F2 — Bloques de actividades secuenciales y paralelos
 
@@ -677,7 +816,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 
 | Patrón | Por qué no                                                                                                                                                                                              | Consecuencias |
 |--------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|
-| Decorator | Para "advertencia aceptada con justificación" alcanza con `AcceptedWarning`, un `record` que referencia el resultado y le suma responsable y justificación (D22). No hace falta que la advertencia aceptada se comporte como un `ValidationResult`. | Si más adelante se necesita apilar comportamiento sobre un resultado de validación (ej. distintos tipos de aceptación con reglas propias), habría que reconsiderarlo. |
+| Decorator (para las advertencias aceptadas) | Para "advertencia aceptada con justificación" alcanza con `AcceptedWarning`, un `record` que referencia el resultado y le suma responsable y justificación (D22). No hace falta que la advertencia aceptada se comporte como un `ValidationResult`. El patrón sí se usa en F1, donde hay que sumar comportamiento a las reglas de cualquier tipo de actividad (`NightOperationRules`, D42): ahí lo decorado tiene que seguir respondiendo como una `ActivityRules`. | Si más adelante se necesita apilar comportamiento sobre un resultado de validación (ej. distintos tipos de aceptación con reglas propias), habría que reconsiderarlo. |
 | State (máquina de estados formal) | Las transiciones válidas son una tabla dentro de `ExpeditionStatus` (D20). Lo que depende del estado son unas pocas preguntas: si el itinerario se puede modificar (D19), si se registra seguimiento (D23), si se puede terminar (D29) y si se puede reemplazar (D33); las dos últimas se responden con la misma tabla de transiciones. Una clase por estado agregaría siete clases para responder esas cuatro preguntas. | Si cada estado empieza a habilitar o prohibir muchas operaciones distintas (ej. qué se puede registrar en ejecución o durante una suspensión), los chequeos de estado se repetirían en `Expedition` y convendría pasar a State. |
 | Strategy de conversión entre sistemas de medida | Consideramos una posible extensión a futuro con más de un sistema de medida (ej. métrico e imperial: litros y galones, kilogramos y libras). Hoy hay un único sistema, así que `MeasurementUnit` es un enum simple y `Quantity` rechaza operar entre unidades distintas en vez de convertirlas. | Si se agrega otro sistema, habría que introducir una abstracción de conversión (ej. `UnitConverter`) que `Quantity` use para normalizar antes de sumar, restar o comparar. Como hoy toda la aritmética de unidades está encapsulada en `Quantity` (D8), el cambio queda en ese value object y no se propaga al resto del dominio. |
 | Servicio dedicado de asignación (`AsignacionService`) | El enunciado pide "proponer o realizar asignaciones", y ya está cubierto sin una clase intermedia: `ResourceCatalog` (D18) responde quién puede cubrir un requisito (Information Expert sobre el catálogo) y `Expedition.assignStaff`/`assignEquipment`/`assignSupply` (D19) realiza la asignación verificando el estado. Un servicio aparte solo delegaría en las dos sin agregar comportamiento propio. | Si aparece una regla propia de asignación (ej. elegir entre varios candidatos con un criterio de optimización, no solo listarlos), ahí se justifica introducir un servicio que la encapsule. |
@@ -708,4 +847,10 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 - Un bloque paralelo declara que sus ramas pueden ejecutarse a la vez. Por eso dos ramas no comparten un recurso reutilizable ni tienen dependencias entre sí, aunque sus horarios agendados no se pisen (D40, D41).
 - La duración estimada de un bloque sale de la duración estimada de sus actividades (D4), no de su período agendado: el período dice cuándo ocurre y la estimación, cuánto trabajo hay.
 - El consumo estimado de un bloque paralelo es la suma del de sus ramas y no el máximo: los consumibles se gastan aunque las actividades corran a la vez.
+- Los valores de `DroneSurveyRules`, `WildlifeObservationRules`, `WaterQualityMeasurementRules` y `TransferRules` (tiempos, umbrales de riesgo, personal, equipamiento y consumo) son ilustrativos, igual que los de los dos tipos de la Entrega 1: el enunciado no los define.
+- Una actividad nocturna se declara como tal al crearla; no se infiere de su horario. El enunciado la describe como una variante con requisitos propios, y cuándo es de noche depende del lugar y de la época, que el modelo no conoce. Nada verifica que su horario agendado caiga de noche.
+- El permiso especial de operación nocturna es uno por zona y se llama `night operations in zone <id de la zona>`, en minúsculas y con el id tal cual (D43). Lo exige la actividad nocturna y no la zona: una expedición sin actividades nocturnas en esa zona no lo necesita.
+- El factor de riesgo nocturno es un nivel más sobre el riesgo del tipo base, con `EXTREME` como máximo (D42): el enunciado pide un factor adicional y no lo cuantifica.
+- El equipamiento de iluminación es un equipo de categoría `Lighting`, una unidad por actividad nocturna sin importar cuántas personas participen.
+- "Todo el personal asignado" son las personas asignadas a la actividad. La certificación de operación nocturna no se exige a los vehículos ni a los instrumentos, aunque también puedan tener certificaciones (D10).
 - Un bloque con un solo hijo es válido, y un bloque no tiene nombre ni identificador propio: el enunciado no pide referirse a un bloque, solo agruparlo y ejecutarlo (D39, D40).

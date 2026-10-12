@@ -48,16 +48,16 @@ The project is a multi-module Maven build following a hexagonal architecture (se
 
 ```
 domain/src/main/java/ar/edu/itba/dps/fieldops/business
-├── interfaces      # domain contracts: ActivityRules, ItineraryNode, ReplanReason, resources, ValidationRule
+├── interfaces      # domain contracts: ActivityRules, ActivityType, ItineraryNode, ReplanReason, resources, ValidationRule
 ├── models          # entities and value objects (activities, common, estimation, expeditions, report, resources, validation, zones)
 ├── providers       # output ports: ExpeditionRepository, ZoneRepository
-├── rules           # ActivityRules implementations, one per activity type
+├── rules           # ActivityRules implementations, one per activity type, the night decorator (NightOperationRules) and the ActivityTypeRegistry
 ├── validations     # ValidationRule implementations and the ApprovalPolicy
 ├── estimations     # ExpeditionEstimator
 ├── reports         # ExpeditionReporter
 ├── replanning      # ExpeditionReplanner and the replan reasons: Cancellation, Delay, ResourceWithdrawn
 ├── services        # ResourceReservations
-├── usecases        # input ports: commands and operations by id (create, schedule, assign, transition, approve, track, finish, replan) and queries (get, list, validate, estimate, report, candidates)
+├── usecases        # input ports: commands and operations by id (create, schedule, assign, transition, approve, track, finish, replan) and queries (get, list, validate, estimate, report, candidates, activity types)
 └── exceptions      # domain exceptions
 app/src/main/java/ar/edu/itba/dps/fieldops/adapters/driven     # InMemoryExpeditionRepository, InMemoryZoneRepository
 web/src/main/java/ar/edu/itba/dps/fieldops                     # FieldOpsApplication, FieldOpsConfig
