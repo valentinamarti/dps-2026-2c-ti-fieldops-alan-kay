@@ -346,18 +346,41 @@ flowchart LR
 
 Aceptar no reemplaza el plan en el acto: crea la alternativa en borrador, que pasa por revisión y aprobación como define D33.
 
+**Estado (rama `assignment-2-phase-4`, sobre `main` con las fases 1, 2 y 3 mergeadas):** dominio, adaptadores y wiring hechos, con sus tests y sus entradas de `DESIGN.md`. `mvn -B clean verify` pasa con 607 tests (582 domain, 20 app, 5 web); antes eran 524. Falta la parte de API (endpoints y su test), que espera el esqueleto de la Fase 5.
+
+Qué hay y dónde:
+
+- **Incidente:** `Incident` con id (`IncidentId(expedición, número)`), actividad afectada, y recurso y retraso opcionales. Se informa con `IncidentReport.of(descripción, fecha).affecting(recurso).delayingBy(retraso)`. La expedición guarda la bitácora (`registerIncident`, `getIncidents`); `reportIncident` y los incidentes de `ActivityTracking` se eliminaron.
+- **Evento:** `DomainEvent`, `EventSubscriber<E>`, `IncidentRegistered`, puerto `EventPublisher` y adaptador `InMemoryEventPublisher` (en `app`), síncrono.
+- **Propuesta:** `ReplanProposal` (pendiente, aceptada, rechazada, `SUPERSEDED`), `ReplanOption(motivo, resumen)` numeradas desde 1, `ReplanDecision`. Puerto `ReplanProposalRepository` con `InMemoryReplanProposalRepository` (en `app`) y su contrato.
+- **Generadores:** `RescheduleOptions` (si el incidente trae retraso), `ResourceReplacementOptions` (si nombra un recurso; hasta tres candidatos del catálogo) y `CancellationOptions` (siempre, en cascada). Solo se ofrecen las que `ExpeditionReplanner.canPlan` puede armar.
+- **Casos de uso:** `RegisterIncident` (devuelve la propuesta), `ProposeReplan` (el suscriptor), `DecideReplanProposal` (`accept`, `reject`) y `QueryReplanProposals`.
+- **`web`:** `ReplanningConfig` con los beans de F3; el `ExpeditionReplanner` pasó a ser un bean en `FieldOpsConfig`.
+
+Cambios respecto del plan y cosas que las otras fases tienen que saber:
+
+- **La deuda de F2 quedó resuelta:** un retraso corre por el mismo tiempo lo que viene después en sus secuenciales y lo que depende de la actividad. Cancelar cancela en cascada lo que depende de ella. Vale también para `ReplanExpedition` manual (D46).
+- **La actividad afectada puede haber empezado.** Para aceptar hay que cerrarla antes con su resultado real; la alternativa la rehace según la opción (D47).
+- **Nuevo motivo `ResourceReplaced`** y `ResourceAssignment`; `ReplannedActivity` suma `additions`.
+- **La alternativa hereda los incidentes** de la original (D48).
+- **Para la Fase 5:**
+  - Endpoints a escribir: registrar un incidente (devuelve la propuesta), consultar una propuesta y las de una expedición, aceptar una opción por número y rechazar. Aceptar y rechazar reciben responsable por id, justificación y fecha (`ReplanDecisionCommand`).
+  - Excepciones nuevas para el mapeo de errores: `NotAResponsibleException` (403 o 422, a definir), `ProposalAlreadyDecidedException` (409), `DuplicateReplanProposalException` (409). Una opción o propuesta inexistente es `NotFoundException` (404). Registrar un incidente inválido es `InvalidTrackingException` (400).
+  - Para la demo: registrar el incidente con retraso o recurso para que la propuesta tenga más de una opción.
+- D45 a D48 escritas en `DESIGN.md`, con notas en D15, D20, D23, D24, D25, D33 y D40, la subsección de F3, dos filas en patrones no aplicados (Event Sourcing y entrega asíncrona) y seis supuestos nuevos.
+
 ### Diseño
 
-- [ ] `Incident` suma qué afecta: la actividad y, si corresponde, el recurso. Hoy solo tiene descripción y fecha.
-- [ ] Evento `IncidentRegistered` y puerto de salida `EventPublisher` en el dominio. Las entidades no publican: lo hace el caso de uso `RegisterIncident`, después de guardar el incidente en la expedición.
-- [ ] Adaptador driven `InMemoryEventPublisher` en `app`, con entrega síncrona a los suscriptores que registra la configuración.
-- [ ] Suscriptor que arma y guarda la propuesta.
-- [ ] `ReplanProposal`: expedición original, incidente, actividad afectada, opciones, estado (pendiente, aceptada, rechazada) y decisión (responsable, opción elegida, justificación, fecha).
-- [ ] Puerto `ReplanProposalRepository` y su adaptador en memoria.
-- [ ] Un generador por tipo de opción, en una lista inyectada, para que sumar un tipo sea sumar una clase. Cada opción envuelve un `ReplanReason` existente: reprogramación con `Delay`, reemplazo de recurso a partir de `ResourceWithdrawn`, cancelación parcial con `Cancellation`.
-- [ ] Casos de uso para aceptar y rechazar. Aceptar verifica que quien decide sea responsable de la expedición y ejecuta `ReplanExpedition` con el motivo de la opción elegida.
-- [ ] Consultas de auditoría: propuesta por id y propuestas de una expedición. El vínculo entre original y alternativa ya existe (`getReplacement`, `getReplacedExpedition`).
-- [ ] La alternativa conserva los bloques de la original, con lo que deja la Fase 2.
+- [x] `Incident` suma qué afecta: la actividad y, si corresponde, el recurso. Hoy solo tiene descripción y fecha.
+- [x] Evento `IncidentRegistered` y puerto de salida `EventPublisher` en el dominio. Las entidades no publican: lo hace el caso de uso `RegisterIncident`, después de guardar el incidente en la expedición.
+- [x] Adaptador driven `InMemoryEventPublisher` en `app`, con entrega síncrona a los suscriptores que registra la configuración.
+- [x] Suscriptor que arma y guarda la propuesta.
+- [x] `ReplanProposal`: expedición original, incidente, actividad afectada, opciones, estado (pendiente, aceptada, rechazada) y decisión (responsable, opción elegida, justificación, fecha).
+- [x] Puerto `ReplanProposalRepository` y su adaptador en memoria.
+- [x] Un generador por tipo de opción, en una lista inyectada, para que sumar un tipo sea sumar una clase. Cada opción envuelve un `ReplanReason` existente: reprogramación con `Delay`, reemplazo de recurso a partir de `ResourceWithdrawn`, cancelación parcial con `Cancellation`.
+- [x] Casos de uso para aceptar y rechazar. Aceptar verifica que quien decide sea responsable de la expedición y ejecuta `ReplanExpedition` con el motivo de la opción elegida.
+- [x] Consultas de auditoría: propuesta por id y propuestas de una expedición. El vínculo entre original y alternativa ya existe (`getReplacement`, `getReplacedExpedition`).
+- [x] La alternativa conserva los bloques de la original, con lo que deja la Fase 2.
 
 El código actual choca con el criterio de aceptación en cuatro lugares. Hay que resolverlos y documentarlos como revisión de D33:
 
@@ -366,20 +389,22 @@ El código actual choca con el criterio de aceptación en cuatro lugares. Hay qu
 - **Candidatos de reemplazo.** D33 descartó elegir el reemplazo automáticamente. Ahora se ofrecen los candidatos de `ResourceCatalog` para el requisito que cubría el recurso: definir cuántos y en qué orden. `ResourceWithdrawn` hoy retira el recurso pero no asigna otro.
 - **Opciones que no se pueden armar.** Un `Delay` que saca la actividad de su ventana y una cancelación con dependientes agendados hoy fallan con `InvalidScheduleException`. Esas opciones no se ofrecen. Falta definir cuánto se corre una reprogramación.
 
+**Resueltos:** la propuesta se genera en ejecución y aceptar suspende (D47); el incidente puede afectar a una actividad pendiente o en curso, y la en curso se cierra antes de aceptar y se rehace (D47); una opción por candidato del catálogo, hasta tres, en orden del catálogo (D46); el retraso lo informa el incidente, corre a hermanos y dependientes, y cancelar cae en cascada; lo que igual no se puede armar no se ofrece (D46).
+
 ### API
 
-- [ ] Registrar un incidente sobre una actividad. La respuesta incluye la propuesta generada.
-- [ ] Consultar las propuestas de una expedición y una propuesta por id.
-- [ ] Aceptar una opción y rechazar la propuesta.
+- [ ] Registrar un incidente sobre una actividad. La respuesta incluye la propuesta generada. **Pendiente:** `RegisterIncident` ya existe y está expuesto como bean.
+- [ ] Consultar las propuestas de una expedición y una propuesta por id. **Pendiente:** `QueryReplanProposals`.
+- [ ] Aceptar una opción y rechazar la propuesta. **Pendiente:** `DecideReplanProposal`.
 
 ### Tests
 
-- [ ] Unitarios con Mockito: `RegisterIncident` publica el evento; el suscriptor guarda la propuesta.
-- [ ] Integración con el publicador real: al volver de `RegisterIncident` la propuesta ya existe.
-- [ ] Parametrizado: qué opciones se generan según lo que afecta el incidente y el estado del itinerario.
-- [ ] Un test por criterio de aceptación: el incidente genera la propuesta; aceptar; rechazar; original, incidente y decisión consultables después.
-- [ ] Contrato de repositorio para `ReplanProposalRepository`.
-- [ ] Test de API del flujo completo.
+- [x] Unitarios con Mockito: `RegisterIncident` publica el evento; el suscriptor guarda la propuesta.
+- [x] Integración con el publicador real: al volver de `RegisterIncident` la propuesta ya existe.
+- [x] Parametrizado: qué opciones se generan según lo que afecta el incidente y el estado del itinerario.
+- [x] Un test por criterio de aceptación: el incidente genera la propuesta; aceptar; rechazar; original, incidente y decisión consultables después.
+- [x] Contrato de repositorio para `ReplanProposalRepository`.
+- [ ] Test de API del flujo completo. **Pendiente**, con los endpoints.
 
 ### `DESIGN.md`
 
@@ -389,7 +414,7 @@ El código actual choca con el criterio de aceptación en cuatro lugares. Hay qu
 - D48: auditoría. Alternativa descartada: Event Sourcing, que va a la tabla de patrones no aplicados.
 - Subsección F3: clases agregadas, clases modificadas (`Incident`, `Expedition`, `ExpeditionReplanner`, `ResourceWithdrawn`, `ExpeditionReporter`), refactorizaciones y deuda técnica. Candidatas a deuda: entrega sin reintentos ni transacción, un solo incidente por propuesta.
 
-**Terminado cuando:** los tres criterios de aceptación tienen test, y después de aceptar o rechazar se pueden consultar el plan original, el incidente y la decisión.
+**Terminado cuando:** los tres criterios de aceptación tienen test, y después de aceptar o rechazar se pueden consultar el plan original, el incidente y la decisión. Hoy se cumple todo en el dominio; queda la API.
 
 ## Fase 5: API REST, demo y documentación
 
@@ -530,7 +555,7 @@ La fecha de entrega es el pendiente que más condiciona el plan: el calendario d
 | ~~Los cuatro tipos de actividad~~ | Resuelto en la Fase 3: relevamiento con dron, observación de fauna, medición de calidad de agua y traslado (D44) | Seed de la demo |
 | ~~Nivel de riesgo por encima de `HIGH`~~ | Resuelto en la Fase 3: se agregó `EXTREME` (D42) | F1 |
 | ~~Dónde vive el conflicto en paralelo~~ | Resuelto en la Fase 2: en `ResourceOverlapValidation`, sin regla nueva (D41) | F2 |
-| Incidente sobre una actividad en curso o pendiente | Fase 4 con el grupo | F3 |
+| ~~Incidente sobre una actividad en curso o pendiente~~ | Resuelto en la Fase 4: las dos; una en curso se cierra antes de aceptar y la alternativa la rehace (D47) | F3 |
 | Formato del guion (`demo.http` o `demo.sh`) | Fase 5 | Demo |
 | Persistencia real y frontend | El grupo | Tests de repositorio y entregable de frontend |
 
