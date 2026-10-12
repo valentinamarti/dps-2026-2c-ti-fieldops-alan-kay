@@ -6,11 +6,12 @@ import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionBuilder;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.PlannedNode;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
@@ -43,9 +44,18 @@ public class ExpeditionReplanner {
         final var builder = sameGeneralDataAs(original)
                 .withReplacedExpedition(original.getId())
                 .withReplanReason(reason);
-        finishedItemsOf(original).forEach(builder::addFinishedItem);
-        carried.forEach(item -> builder.addActivity(item.source().getActivity(), item.period()));
+        original.getItinerary().planKeepingStructure(item -> planOf(item, carried)).forEach(builder::addNode);
         return builder;
+    }
+
+    private Optional<PlannedNode> planOf(ItineraryItem item, List<CarriedItem> carried) {
+        if (item.isFinished()) {
+            return Optional.of(PlannedNode.finished(item));
+        }
+        return carried.stream()
+                .filter(candidate -> candidate.source().equals(item))
+                .findFirst()
+                .map(candidate -> PlannedNode.activity(item.getActivity(), candidate.period()));
     }
 
     private ExpeditionBuilder sameGeneralDataAs(Expedition original) {
@@ -65,9 +75,7 @@ public class ExpeditionReplanner {
                 .map(item -> new CarriedItem(item, item.getScheduledPeriod(), _ -> true));
         final var affected = reason.replan(affectedItem).stream()
                 .map(replanned -> new CarriedItem(affectedItem, replanned.period(), replanned.keeps()));
-        return Stream.concat(pending, affected)
-                .sorted(Comparator.comparing(item -> item.period().start()))
-                .toList();
+        return Stream.concat(pending, affected).toList();
     }
 
     private void copyAssignments(CarriedItem carried, Expedition alternative) {
@@ -81,10 +89,6 @@ public class ExpeditionReplanner {
     private Stream<ItineraryItem> pendingItemsOf(Expedition original, ItineraryItem affectedItem) {
         return original.getItinerary().getItems().stream()
                 .filter(item -> !item.equals(affectedItem) && !item.isStarted());
-    }
-
-    private Stream<ItineraryItem> finishedItemsOf(Expedition original) {
-        return original.getItinerary().getItems().stream().filter(ItineraryItem::isFinished);
     }
 
     private void requireOwnItem(Expedition original, ItineraryItem affectedItem) {
