@@ -4,10 +4,13 @@ import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
 import lombok.Getter;
 
 import java.util.Collection;
+import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 public class Zone {
+
+    private static final String SPECIAL_PERMIT_NAME = "%s in zone %s";
 
     @Getter
     private final String id;
@@ -29,5 +32,13 @@ public class Zone {
 
     public boolean isAccessibleWith(Collection<Permit> grantedPermits) {
         return missingPermits(grantedPermits).isEmpty();
+    }
+
+    /**
+     * The permit this zone asks for a kind of operation. It carries the zone id, so the one of another zone is a different permit.
+     */
+    public Permit specialPermitFor(String operation) {
+        final var normalized = DomainArguments.requireText(operation, "operation").strip().toLowerCase(Locale.ROOT);
+        return new Permit(SPECIAL_PERMIT_NAME.formatted(normalized, id));
     }
 }
