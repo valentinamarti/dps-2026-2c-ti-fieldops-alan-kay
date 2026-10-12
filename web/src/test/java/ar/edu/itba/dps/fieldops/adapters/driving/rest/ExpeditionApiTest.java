@@ -61,9 +61,7 @@ class ExpeditionApiTest {
 
     @Test
     void createsAnExpeditionInDraftAndSaysWhereToFindIt() throws Exception {
-        final var id = createCoastalSurvey();
-
-        api.perform(post("/api/expeditions").contentType(MediaType.APPLICATION_JSON).content(COASTAL_SURVEY))
+        final var created = api.perform(post("/api/expeditions").contentType(MediaType.APPLICATION_JSON).content(COASTAL_SURVEY))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", containsString("/api/expeditions/")))
                 .andExpect(jsonPath("$.name").value("Coastal survey"))
@@ -72,9 +70,11 @@ class ExpeditionApiTest {
                 .andExpect(jsonPath("$.responsibleIds[0]").value("p-1"))
                 .andExpect(jsonPath("$.restrictions.maxParticipants").value(10))
                 .andExpect(jsonPath("$.restrictions.riskTolerance").value("MEDIUM"))
-                .andExpect(jsonPath("$.period.start").value("2026-10-01T00:00:00"));
+                .andExpect(jsonPath("$.period.start").value("2026-10-01T00:00:00"))
+                .andReturn().getResponse().getContentAsString();
 
-        api.perform(get("/api/expeditions/{id}", id)).andExpect(status().isOk());
+        api.perform(get("/api/expeditions/{id}", JsonPath.read(created, "$.id").toString()))
+                .andExpect(status().isOk());
     }
 
     /**
