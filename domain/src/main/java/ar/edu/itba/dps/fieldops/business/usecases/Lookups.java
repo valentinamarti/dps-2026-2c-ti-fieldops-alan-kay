@@ -9,8 +9,11 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposal;
+import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposalId;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
+import ar.edu.itba.dps.fieldops.business.providers.ReplanProposalRepository;
 
 /**
  * Turns the ids a use case receives into the objects it works with, or fails with {@link NotFoundException}.
@@ -22,6 +25,10 @@ final class Lookups {
 
     static Expedition expedition(ExpeditionRepository repository, ExpeditionId id) {
         return repository.findById(id).orElseThrow(() -> new NotFoundException("expedition", id));
+    }
+
+    static ReplanProposal proposal(ReplanProposalRepository repository, ReplanProposalId id) {
+        return repository.findById(id).orElseThrow(() -> new NotFoundException("replan proposal", id));
     }
 
     static ItineraryItem item(Expedition expedition, ActivityId activityId) {

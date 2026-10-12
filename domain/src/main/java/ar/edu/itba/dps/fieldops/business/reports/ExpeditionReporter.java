@@ -3,7 +3,6 @@ package ar.edu.itba.dps.fieldops.business.reports;
 import ar.edu.itba.dps.fieldops.business.estimations.ExpeditionEstimator;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
-import ar.edu.itba.dps.fieldops.business.models.expeditions.Incident;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.report.ExpeditionReport;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
@@ -30,7 +29,7 @@ public class ExpeditionReporter {
                 (int) items.stream().filter(ItineraryItem::isFinished).count(),
                 estimator.estimate(expedition),
                 actualConsumption(items),
-                incidents(items),
+                expedition.getIncidents(),
                 expedition.getAcceptedWarnings());
     }
 
@@ -44,12 +43,5 @@ public class ExpeditionReporter {
                 .forEach(item -> item.getActivity().requiredSupplies().forEach(requirement -> item.supplyFor(requirement)
                         .ifPresent(supply -> consumed.merge(requirement.category(), requirement.quantity(), Quantity::plus))));
         return consumed;
-    }
-
-    private List<Incident> incidents(List<ItineraryItem> items) {
-        return items.stream()
-                .flatMap(item -> item.getTracking().stream())
-                .flatMap(tracking -> tracking.getIncidents().stream())
-                .toList();
     }
 }

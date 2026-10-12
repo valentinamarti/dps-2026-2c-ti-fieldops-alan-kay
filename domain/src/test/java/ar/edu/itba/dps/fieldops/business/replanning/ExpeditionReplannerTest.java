@@ -6,6 +6,9 @@ import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionExcep
 import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.IncidentReport;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.ResourceAssignment;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
@@ -75,12 +78,33 @@ class ExpeditionReplannerTest {
     }
 
     @Test
-    void failsWhenAScheduledActivityDependsOnTheAffectedOne() {
+    void cancellingAnActivityAlsoCancelsWhatDependsOnItDirectlyOrNot() {
         final var dependency = sampling("a-1", coast, hours(8, 18));
         final var dependent = sampling("a-2", coast, hours(8, 18), dependency);
-        final var affectedItem = expedition.schedule(dependency, hours(9, 11));
-        expedition.schedule(dependent, hours(12, 14));
+        final var indirect = sampling("a-3", coast, hours(8, 18), dependent);
+        final var unrelated = sampling("a-4", coast, hours(8, 18));
+        final var affectedItem = expedition.schedule(dependency, hours(9, 10));
+        expedition.schedule(dependent, hours(10, 11));
+        expedition.schedule(indirect, hours(11, 12));
+        expedition.schedule(unrelated, hours(12, 13));
         approve();
+
+        final var alternative = replanner.planAlternative(expedition, affectedItem, new Cancellation());
+
+        assertEquals(List.of(unrelated), alternative.getItinerary().getItems().stream().map(ItineraryItem::getActivity).toList());
+    }
+
+    @Test
+    void aCancellationCannotDropADependentThatAlreadyStarted() {
+        final var dependency = sampling("a-1", coast, hours(0, 24));
+        final var dependent = sampling("a-2", coast, hours(0, 24), dependency);
+        final var affectedItem = expedition.schedule(dependency, hours(12, 14));
+        final var dependentItem = expedition.schedule(dependent, hours(15, 17));
+        approve();
+        expedition.start();
+        expedition.startActivity(dependentItem, LocalDateTime.of(2026, 10, 1, 9, 0));
+        expedition.finishActivity(dependentItem, LocalDateTime.of(2026, 10, 1, 10, 0), "Done out of order");
+        expedition.suspend();
 
         assertThrows(InvalidScheduleException.class, () -> replanner.planAlternative(expedition, affectedItem, new Cancellation()));
     }
@@ -228,16 +252,36 @@ class ExpeditionReplannerTest {
     }
 
     @Test
-    void anActivityThatAlreadyHappenedCannotBeTheAffectedOne() {
-        final var doneItem = expedition.schedule(sampling("a-1", coast, hours(0, 24)), hours(9, 11));
+    void anAffectedActivityThatAlreadyHappenedIsRedoneWhenTheReasonBringsItBack() {
+        final var interrupted = sampling("a-1", coast, hours(0, 24));
+        final var doneItem = expedition.schedule(interrupted, hours(9, 11));
         approve();
         expedition.start();
         expedition.startActivity(doneItem, LocalDateTime.of(2026, 10, 1, 9, 0));
-        expedition.finishActivity(doneItem, LocalDateTime.of(2026, 10, 1, 11, 0), "Samples taken");
+        expedition.finishActivity(doneItem, LocalDateTime.of(2026, 10, 1, 10, 0), "Aborted: current too strong");
         expedition.suspend();
 
-        assertThrows(IllegalArgumentException.class,
-                () -> replanner.planAlternative(expedition, doneItem, new Delay(Duration.ofHours(1))));
+        final var alternative = replanner.planAlternative(expedition, doneItem, new Delay(Duration.ofHours(3)));
+
+        final var redone = alternative.getItinerary().itemFor(interrupted).orElseThrow();
+        assertFalse(redone.isStarted());
+        assertEquals(hours(12, 14), redone.getScheduledPeriod());
+        assertTrue(doneItem.isFinished());
+    }
+
+    @Test
+    void anAffectedActivityThatAlreadyHappenedStaysClosedWhenItIsCancelled() {
+        final var interrupted = sampling("a-1", coast, hours(0, 24));
+        final var doneItem = expedition.schedule(interrupted, hours(9, 11));
+        approve();
+        expedition.start();
+        expedition.startActivity(doneItem, LocalDateTime.of(2026, 10, 1, 9, 0));
+        expedition.finishActivity(doneItem, LocalDateTime.of(2026, 10, 1, 10, 0), "Aborted: current too strong");
+        expedition.suspend();
+
+        final var alternative = replanner.planAlternative(expedition, doneItem, new Cancellation());
+
+        assertTrue(alternative.getItinerary().itemFor(interrupted).orElseThrow().isFinished());
     }
 
     @Test
@@ -345,16 +389,135 @@ class ExpeditionReplannerTest {
     }
 
     @Test
-    void aDelayThatBreaksTheOrderOfASequentialBlockCannotBePlanned() {
+    void aDelayMovesTheRestOfItsSequentialBlockByTheSameAmount() {
+        final var affected = sampling("a-1", coast, hours(0, 24));
+        final var next = sampling("a-2", coast, hours(0, 24));
+        final var parallelBranch = sampling("a-3", coast, hours(0, 24));
+        final var last = sampling("a-4", coast, hours(0, 24));
+        expedition.schedule(sequential(
+                activity(affected, hours(9, 11)),
+                parallel(activity(next, hours(11, 13)), activity(parallelBranch, hours(11, 12))),
+                activity(last, hours(14, 15))));
+        approve();
+        final var affectedItem = expedition.getItinerary().itemFor(affected).orElseThrow();
+
+        final var alternative = replanner.planAlternative(expedition, affectedItem, new Delay(Duration.ofHours(1)));
+
+        final var itinerary = alternative.getItinerary();
+        assertEquals(hours(10, 12), itinerary.itemFor(affected).orElseThrow().getScheduledPeriod());
+        assertEquals(hours(12, 14), itinerary.itemFor(next).orElseThrow().getScheduledPeriod());
+        assertEquals(hours(12, 13), itinerary.itemFor(parallelBranch).orElseThrow().getScheduledPeriod());
+        assertEquals(hours(15, 16), itinerary.itemFor(last).orElseThrow().getScheduledPeriod());
+    }
+
+    @Test
+    void aDelayInsideAnInnerBlockMovesWhatComesAfterItInTheOuterSequentialBlock() {
+        final var affected = sampling("a-1", coast, hours(0, 24));
+        final var sibling = sampling("a-2", coast, hours(0, 24));
+        final var after = sampling("a-3", coast, hours(0, 24));
+        expedition.schedule(sequential(
+                parallel(activity(affected, hours(9, 11)), activity(sibling, hours(9, 11))),
+                activity(after, hours(11, 12))));
+        approve();
+        final var affectedItem = expedition.getItinerary().itemFor(affected).orElseThrow();
+
+        final var alternative = replanner.planAlternative(expedition, affectedItem, new Delay(Duration.ofHours(2)));
+
+        final var itinerary = alternative.getItinerary();
+        assertEquals(hours(9, 11), itinerary.itemFor(sibling).orElseThrow().getScheduledPeriod());
+        assertEquals(hours(13, 14), itinerary.itemFor(after).orElseThrow().getScheduledPeriod());
+    }
+
+    @Test
+    void aDelayMovesWhatDependsOnTheActivityAndWhatComesAfterThoseDependents() {
+        final var affected = sampling("a-1", coast, hours(0, 24));
+        final var dependent = sampling("a-2", coast, hours(0, 24), affected);
+        final var afterDependent = sampling("a-3", coast, hours(0, 24));
+        final var unrelated = sampling("a-4", coast, hours(0, 24));
+        final var affectedItem = expedition.schedule(affected, hours(9, 10));
+        expedition.schedule(sequential(activity(dependent, hours(10, 11)), activity(afterDependent, hours(11, 12))));
+        expedition.schedule(unrelated, hours(10, 11));
+        approve();
+
+        final var alternative = replanner.planAlternative(expedition, affectedItem, new Delay(Duration.ofHours(1)));
+
+        final var itinerary = alternative.getItinerary();
+        assertEquals(hours(11, 12), itinerary.itemFor(dependent).orElseThrow().getScheduledPeriod());
+        assertEquals(hours(12, 13), itinerary.itemFor(afterDependent).orElseThrow().getScheduledPeriod());
+        assertEquals(hours(10, 11), itinerary.itemFor(unrelated).orElseThrow().getScheduledPeriod());
+    }
+
+    @Test
+    void aDelayThatPushesAFollowerOutOfItsWindowCannotBePlanned() {
         final var affected = sampling("a-1", coast, hours(0, 24));
         expedition.schedule(sequential(
                 activity(affected, hours(9, 11)),
-                activity(sampling("a-2", coast, hours(0, 24)), hours(11, 13))));
+                activity(sampling("a-2", coast, hours(8, 14)), hours(11, 13))));
         approve();
         final var affectedItem = expedition.getItinerary().itemFor(affected).orElseThrow();
 
         assertThrows(InvalidScheduleException.class,
+                () -> replanner.planAlternative(expedition, affectedItem, new Delay(Duration.ofHours(2))));
+    }
+
+    @Test
+    void aDelayCannotMoveAFollowerThatAlreadyStarted() {
+        final var affected = sampling("a-1", coast, hours(0, 24));
+        final var follower = sampling("a-2", coast, hours(0, 24));
+        expedition.schedule(sequential(activity(affected, hours(12, 13)), activity(follower, hours(13, 14))));
+        approve();
+        expedition.start();
+        final var followerItem = expedition.getItinerary().itemFor(follower).orElseThrow();
+        expedition.startActivity(followerItem, LocalDateTime.of(2026, 10, 1, 9, 0));
+        expedition.finishActivity(followerItem, LocalDateTime.of(2026, 10, 1, 10, 0), "Done early");
+        expedition.suspend();
+        final var affectedItem = expedition.getItinerary().itemFor(affected).orElseThrow();
+
+        assertThrows(InvalidScheduleException.class,
                 () -> replanner.planAlternative(expedition, affectedItem, new Delay(Duration.ofHours(1))));
+    }
+
+    @Test
+    void aResourceReplacedSwapsTheWithdrawnResourceForItsReplacement() {
+        final var affectedActivity = sampling("a-1", coast, hours(8, 18));
+        final var affectedItem = expedition.schedule(affectedActivity, hours(12, 14));
+        final var sickWorker = person("p-2");
+        final var replacement = person("p-3");
+        expedition.assignStaff(affectedItem, sickWorker);
+        approve();
+
+        final var alternative = replanner.planAlternative(expedition, affectedItem,
+                new ResourceReplaced(sickWorker.getId(), ResourceAssignment.of(replacement)));
+
+        final var kept = alternative.getItinerary().itemFor(affectedActivity).orElseThrow();
+        assertEquals(hours(12, 14), kept.getScheduledPeriod());
+        assertEquals(Set.of(replacement), kept.getAssignedStaff());
+    }
+
+    @Test
+    void theAlternativeKeepsTheIncidentsOfTheOriginal() {
+        final var affectedItem = expedition.schedule(sampling("a-1", coast, hours(8, 18)), hours(12, 14));
+        approve();
+        expedition.start();
+        final var incident = expedition.registerIncident(affectedItem,
+                IncidentReport.of("Storm forecast", LocalDateTime.of(2026, 10, 1, 9, 0)));
+        expedition.suspend();
+
+        final var alternative = replanner.planAlternative(expedition, affectedItem, new Cancellation());
+
+        assertEquals(List.of(incident), alternative.getIncidents());
+    }
+
+    @Test
+    void canPlanTellsWhetherTheAlternativeCanBeBuiltWithoutLookingAtTheStatusOfTheOriginal() {
+        final var affectedItem = expedition.schedule(sampling("a-1", coast, hours(8, 18)), hours(15, 17));
+        approve();
+        expedition.start();
+
+        assertTrue(replanner.canPlan(expedition, affectedItem, new Delay(Duration.ofHours(1))));
+        assertFalse(replanner.canPlan(expedition, affectedItem, new Delay(Duration.ofHours(2))));
+        assertEquals(List.of(), repository.findAll());
+        assertEquals(ExpeditionStatus.IN_EXECUTION, expedition.getStatus());
     }
 
     @Test

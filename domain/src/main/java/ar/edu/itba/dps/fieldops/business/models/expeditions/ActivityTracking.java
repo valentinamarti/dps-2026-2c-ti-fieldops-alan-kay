@@ -19,7 +19,6 @@ public class ActivityTracking {
     @Getter
     private String result;
     private final List<Observation> observations = new ArrayList<>();
-    private final List<Incident> incidents = new ArrayList<>();
 
     ActivityTracking(LocalDateTime startedAt) {
         this.startedAt = Objects.requireNonNull(startedAt, "startedAt is required");
@@ -30,7 +29,6 @@ public class ActivityTracking {
         copy.finishedAt = finishedAt;
         copy.result = result;
         copy.observations.addAll(observations);
-        copy.incidents.addAll(incidents);
         return copy;
     }
 
@@ -40,10 +38,6 @@ public class ActivityTracking {
 
     public List<Observation> getObservations() {
         return Collections.unmodifiableList(observations);
-    }
-
-    public List<Incident> getIncidents() {
-        return Collections.unmodifiableList(incidents);
     }
 
     void requireCanFinish(LocalDateTime at, String result) {
@@ -65,9 +59,5 @@ public class ActivityTracking {
 
     void record(Observation observation) {
         observations.add(Objects.requireNonNull(observation, "observation is required"));
-    }
-
-    void record(Incident incident) {
-        incidents.add(Objects.requireNonNull(incident, "incident is required"));
     }
 }

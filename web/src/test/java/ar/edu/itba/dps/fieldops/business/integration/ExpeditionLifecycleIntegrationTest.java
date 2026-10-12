@@ -9,7 +9,7 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionBuilder;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionRestrictions;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
-import ar.edu.itba.dps.fieldops.business.models.expeditions.Incident;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.IncidentReport;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
@@ -161,7 +161,7 @@ class ExpeditionLifecycleIntegrationTest {
 
         expedition.start();
         expedition.startActivity(diveItem, LocalDateTime.of(2026, 10, 1, 9, 10));
-        expedition.reportIncident(diveItem, new Incident("Current stronger than forecast", LocalDateTime.of(2026, 10, 1, 10, 0)));
+        expedition.registerIncident(diveItem, IncidentReport.of("Current stronger than forecast", LocalDateTime.of(2026, 10, 1, 10, 0)));
         expedition.finishActivity(diveItem, LocalDateTime.of(2026, 10, 1, 12, 0), "Reef mapped");
         expedition.startActivity(surveyItem, LocalDateTime.of(2026, 10, 1, 13, 0));
         expedition.finishActivity(surveyItem, LocalDateTime.of(2026, 10, 1, 15, 0), "Six samples collected");

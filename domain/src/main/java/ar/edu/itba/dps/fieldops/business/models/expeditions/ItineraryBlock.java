@@ -57,6 +57,11 @@ public abstract class ItineraryBlock implements ItineraryNode {
     }
 
     @Override
+    public List<ItineraryItem> itemsAfter(ItineraryItem item) {
+        return children.stream().flatMap(child -> child.itemsAfter(item).stream()).toList();
+    }
+
+    @Override
     public Optional<PlannedNode> planKeepingStructure(Function<ItineraryItem, Optional<PlannedNode>> itemPlans) {
         final var plans = children.stream().flatMap(child -> child.planKeepingStructure(itemPlans).stream()).toList();
         return plans.isEmpty() ? Optional.empty() : Optional.of(planOf(plans));

@@ -7,6 +7,7 @@ import ar.edu.itba.dps.fieldops.business.exceptions.InsufficientStockException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidTrackingException;
+import ar.edu.itba.dps.fieldops.business.exceptions.NotAResponsibleException;
 import ar.edu.itba.dps.fieldops.business.exceptions.UnacceptedWarningException;
 import ar.edu.itba.dps.fieldops.business.interfaces.itinerary.ItineraryNode;
 import ar.edu.itba.dps.fieldops.business.interfaces.replanning.ReplanReason;
@@ -17,6 +18,7 @@ import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
+import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.validation.AcceptedWarning;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
 import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
@@ -25,11 +27,14 @@ import ar.edu.itba.dps.fieldops.business.validations.ApprovalPolicy;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class Expedition {
 
@@ -55,13 +60,14 @@ public class Expedition {
     private ExpeditionStatus status = ExpeditionStatus.DRAFT;
     @Getter
     private List<AcceptedWarning> acceptedWarnings = List.of();
+    private final List<Incident> incidents = new ArrayList<>();
     private final ExpeditionId replacedExpedition;
     private final ReplanReason replanReason;
     private ExpeditionId replacement;
 
     Expedition(ExpeditionId id, String name, TimePeriod period, List<String> objectives, Set<Zone> zones,
                Set<Person> responsibles, ExpeditionRestrictions restrictions, Set<Permit> grantedPermits,
-               ExpeditionId replacedExpedition, ReplanReason replanReason) {
+               ExpeditionId replacedExpedition, ReplanReason replanReason, List<Incident> inheritedIncidents) {
         this.id = Objects.requireNonNull(id, "id is required");
         this.name = DomainArguments.requireText(name, "name");
         this.period = Objects.requireNonNull(period, "period is required");
@@ -73,6 +79,7 @@ public class Expedition {
         this.grantedPermits = DomainArguments.requireSet(grantedPermits, "grantedPermits");
         this.replacedExpedition = replacedExpedition;
         this.replanReason = replanReason;
+        this.incidents.addAll(DomainArguments.requireList(inheritedIncidents, "inheritedIncidents"));
     }
 
     public ItineraryItem schedule(Activity activity, TimePeriod scheduledPeriod) {
@@ -167,6 +174,24 @@ public class Expedition {
         requireCanTransitionTo(ExpeditionStatus.REPLACED);
     }
 
+    /**
+     * Leaves the expedition ready to be replaced: one in execution is suspended first, so the field stops
+     * following a plan that is about to change (D47). Nothing changes if it cannot be replaced.
+     */
+    public void suspendToReplan() {
+        requireNoActivityInProgress();
+        if (status.canTransitionTo(ExpeditionStatus.SUSPENDED)) {
+            transitionTo(ExpeditionStatus.SUSPENDED);
+        }
+        requireCanTransitionTo(ExpeditionStatus.REPLACED);
+    }
+
+    public void requireResponsible(Person person) {
+        if (!responsibles.contains(person)) {
+            throw new NotAResponsibleException(person.getId(), id);
+        }
+    }
+
     public void startActivity(ItineraryItem item, LocalDateTime at) {
         inExecution(item).start(at);
     }
@@ -185,8 +210,36 @@ public class Expedition {
         inExecution(item).startedTracking().record(observation);
     }
 
-    public void reportIncident(ItineraryItem item, Incident incident) {
-        inExecution(item).startedTracking().record(incident);
+    /**
+     * Registers what went wrong with an activity that has not finished yet, pending or in progress. The incident
+     * may name a resource, which has to be one assigned to that activity.
+     */
+    public Incident registerIncident(ItineraryItem item, IncidentReport report) {
+        Objects.requireNonNull(report, "report is required");
+        final var affected = inExecution(item);
+        if (affected.isFinished()) {
+            throw new InvalidTrackingException("%s already finished".formatted(affected.getActivity().getName()));
+        }
+        report.resource().ifPresent(resource -> requireAssigned(affected, resource));
+        final var incident = Incident.registered(new IncidentId(id, incidents.size() + 1), affected.getActivity().getId(), report);
+        incidents.add(incident);
+        return incident;
+    }
+
+    /**
+     * The incidents of the whole trip, in the order they were registered. An alternative starts with the ones of
+     * the expedition it replaces.
+     */
+    public List<Incident> getIncidents() {
+        return Collections.unmodifiableList(incidents);
+    }
+
+    private void requireAssigned(ItineraryItem item, ResourceId resource) {
+        final var assigned = Stream.concat(item.getAssignedReusableResources().stream(), item.getAssignedSupplies().stream())
+                .anyMatch(candidate -> candidate.getId().equals(resource));
+        if (!assigned) {
+            throw new InvalidTrackingException("%s is not assigned to %s".formatted(resource, item.getActivity().getName()));
+        }
     }
 
     private void consumeAssignedSupplies(ItineraryItem item) {

@@ -8,7 +8,7 @@ import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
-import ar.edu.itba.dps.fieldops.business.models.expeditions.Incident;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.IncidentReport;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
@@ -115,13 +115,12 @@ class ExpeditionReporterTest {
         execute(List.of());
         expedition.startActivity(morning, at(9));
         expedition.startActivity(afternoon, at(14));
-        expedition.reportIncident(morning, new Incident("One jar broke", at(10)));
-        expedition.reportIncident(afternoon, new Incident("The boat engine failed", at(15)));
+        final var jarBroke = expedition.registerIncident(morning, IncidentReport.of("One jar broke", at(10)));
+        final var engineFailed = expedition.registerIncident(afternoon, IncidentReport.of("The boat engine failed", at(15)));
 
         final var report = reporter.reportOf(expedition);
 
-        assertEquals(List.of(new Incident("One jar broke", at(10)), new Incident("The boat engine failed", at(15))),
-                report.incidents());
+        assertEquals(List.of(jarBroke, engineFailed), report.incidents());
     }
 
     @Test
