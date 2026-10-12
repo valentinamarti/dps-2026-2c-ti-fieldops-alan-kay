@@ -41,4 +41,10 @@ public interface ItineraryNode {
      * and so is a node left with nothing inside.
      */
     Optional<PlannedNode> planKeepingStructure(Function<ItineraryItem, Optional<PlannedNode>> itemPlans);
+
+    /**
+     * The answer of an operation that tells the kinds of node apart, which is the only thing a node of the
+     * itinerary does not answer by itself (D54).
+     */
+    <T> T accept(ItineraryNodeVisitor<T> visitor);
 }

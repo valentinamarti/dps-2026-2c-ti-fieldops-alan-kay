@@ -3,6 +3,7 @@ package ar.edu.itba.dps.fieldops.business.models.expeditions;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidTrackingException;
 import ar.edu.itba.dps.fieldops.business.interfaces.itinerary.ItineraryNode;
+import ar.edu.itba.dps.fieldops.business.interfaces.itinerary.ItineraryNodeVisitor;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.DepletableResource;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.Equipment;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.ReusableResource;
@@ -92,6 +93,11 @@ public class ItineraryItem implements ItineraryNode {
     @Override
     public Optional<PlannedNode> planKeepingStructure(Function<ItineraryItem, Optional<PlannedNode>> itemPlans) {
         return itemPlans.apply(this);
+    }
+
+    @Override
+    public <T> T accept(ItineraryNodeVisitor<T> visitor) {
+        return visitor.activity(this);
     }
 
     public Set<Person> getAssignedStaff() {

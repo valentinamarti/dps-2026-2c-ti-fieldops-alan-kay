@@ -2,6 +2,7 @@ package ar.edu.itba.dps.fieldops.business.models.expeditions;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
 import ar.edu.itba.dps.fieldops.business.interfaces.itinerary.ItineraryNode;
+import ar.edu.itba.dps.fieldops.business.interfaces.itinerary.ItineraryNodeVisitor;
 
 import java.time.Duration;
 import java.util.List;
@@ -32,6 +33,11 @@ public final class SequentialBlock extends ItineraryBlock {
                         children().get(position).itemsAfter(item).stream(),
                         children().subList(position + 1, children().size()).stream().flatMap(child -> child.leaves().stream())).toList())
                 .orElse(List.of());
+    }
+
+    @Override
+    public <T> T accept(ItineraryNodeVisitor<T> visitor) {
+        return visitor.sequence(this, acceptedChildren(visitor));
     }
 
     @Override
