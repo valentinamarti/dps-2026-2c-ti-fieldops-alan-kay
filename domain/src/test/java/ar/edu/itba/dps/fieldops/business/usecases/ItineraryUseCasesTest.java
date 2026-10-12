@@ -13,6 +13,7 @@ import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Optional;
 
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
@@ -23,6 +24,8 @@ import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.samp
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.supply;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
 import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.UNITS;
+import static ar.edu.itba.dps.fieldops.business.models.expeditions.PlannedNode.activity;
+import static ar.edu.itba.dps.fieldops.business.models.expeditions.PlannedNode.parallel;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -40,6 +43,7 @@ class ItineraryUseCasesTest {
     private final Expedition expedition = expeditionIn(coast, person("p-1")).build(new SequentialExpeditionRepository());
 
     private final ScheduleActivity scheduleActivity = new ScheduleActivity(repository);
+    private final ScheduleBlock scheduleBlock = new ScheduleBlock(repository);
     private final AssignResources assignResources = new AssignResources(repository, catalog);
     private final FindAssignmentCandidates candidates = new FindAssignmentCandidates(repository, catalog);
 
@@ -65,6 +69,28 @@ class ItineraryUseCasesTest {
         final var command = new ScheduleActivityCommand(new ExpeditionId("e-404"), sampling("a-1", coast, hours(0, 24)), hours(9, 11));
 
         assertThrows(NotFoundException.class, () -> scheduleActivity.schedule(command));
+    }
+
+    @Test
+    void schedulesTheBlockInTheExpeditionTheIdPointsTo() {
+        final var dive = sampling("a-1", coast, hours(0, 24));
+        final var transect = sampling("a-2", coast, hours(0, 24));
+
+        final var block = scheduleBlock.schedule(new ScheduleBlockCommand(expedition.getId(),
+                parallel(activity(dive, hours(9, 11)), activity(transect, hours(9, 12)))));
+
+        final var itinerary = expedition.getItinerary();
+        assertEquals(List.of(block), itinerary.getNodes());
+        assertEquals(hours(9, 12), block.getScheduledPeriod());
+        assertTrue(itinerary.runInParallel(itinerary.itemFor(dive).orElseThrow(), itinerary.itemFor(transect).orElseThrow()));
+    }
+
+    @Test
+    void schedulingABlockInAnUnknownExpeditionFails() {
+        final var command = new ScheduleBlockCommand(new ExpeditionId("e-404"),
+                parallel(activity(sampling("a-1", coast, hours(0, 24)), hours(9, 11))));
+
+        assertThrows(NotFoundException.class, () -> scheduleBlock.schedule(command));
     }
 
     @Test
