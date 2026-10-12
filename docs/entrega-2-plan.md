@@ -446,22 +446,36 @@ Y una decisión que queda abierta: **el dominio no dice de qué tipo es una acti
 
 ### PR 5a: esqueleto de la API
 
-- [ ] Paquete `adapters.driving.rest` en `web`, con un controller por recurso.
-- [ ] DTOs de entrada y salida como `record`, separados del dominio, con sus mappers. Ninguna entidad se serializa directo.
-- [ ] Un `@RestControllerAdvice` que traduce las excepciones de dominio a HTTP con un formato de error único (`ProblemDetail`).
-- [ ] springdoc para generar OpenAPI y Swagger UI. Verificar la versión compatible con el Spring Boot del proyecto.
-- [ ] Un endpoint completo de punta a punta como ejemplo del resto, con su test de API.
-- [ ] Prefijo `/api`, y convención para las operaciones que no son CRUD: son sub-recursos en `POST` (`/approval`, `/suspension`), no verbos en la URL. Queda en D49.
+- [x] Paquete `adapters.driving.rest` en `web`, con un controller por recurso.
+- [x] DTOs de entrada y salida como `record`, separados del dominio, con sus mappers. Ninguna entidad se serializa directo.
+- [x] Un `@RestControllerAdvice` que traduce las excepciones de dominio a HTTP con un formato de error único (`ProblemDetail`).
+- [x] springdoc para generar OpenAPI y Swagger UI. Verificar la versión compatible con el Spring Boot del proyecto.
+- [x] Un endpoint completo de punta a punta como ejemplo del resto, con su test de API.
+- [x] Prefijo `/api`, y convención para las operaciones que no son CRUD: son sub-recursos en `POST` (`/approval`, `/suspension`), no verbos en la URL. Queda en D49.
 
 Mapeo de errores, con las dieciocho excepciones que hay hoy en `business.exceptions`:
 
 | Excepción de dominio | HTTP |
 | --- | --- |
 | Argumento inválido (`IllegalArgumentException`, `NullPointerException` de los constructores), `InvalidScheduleException`, `InvalidTrackingException`, `UnknownActivityTypeException`, `InvalidActivityParametersException` | 400 |
-| `NotAResponsibleException` | 403, o 422 si se prefiere tratarlo como regla de negocio. **A definir en 5a** |
 | `NotFoundException` (recurso, zona, expedición, actividad agendada, propuesta u opción inexistente) | 404 |
 | `InvalidStatusTransitionException`, `ExpeditionNotEditableException`, `ActivitiesInProgressException`, `ResourceUnavailableException`, `DuplicateExpeditionException`, `DuplicateResourceException`, `DuplicateZoneException`, `DuplicateReplanProposalException`, `ProposalAlreadyDecidedException` | 409 |
-| `ExpeditionNotApprovableException` (con la lista de críticos en el cuerpo), `UnacceptedWarningException`, `InsufficientStockException` | 422 |
+| `ExpeditionNotApprovableException` (con la lista de críticos en el cuerpo), `UnacceptedWarningException`, `InsufficientStockException`, `NotAResponsibleException` | 422 |
+
+`NotAResponsibleException` quedó en 422 y no en 403: resuelto en el PR 5a, el porqué está en D49.
+
+**Estado (rama `assignment-2-phase-5`, sobre `main` con las fases 1 a 4 mergeadas):** esqueleto hecho. `mvn -B clean verify` pasa con 638 tests (582 domain, 20 app, 36 web); antes eran 607 y los 582 de `domain` y los 20 de `app` siguen pasando sin tocarlos. Lo que quedó:
+
+- `web/src/main/java/ar/edu/itba/dps/fieldops/adapters/driving/rest/` con `ExpeditionController`, `DomainExceptionHandler`, `OpenApiConfig`, el subpaquete `dtos` (`CreateExpeditionRequest`, `ExpeditionResponse`, `PeriodDto`, `RestrictionsDto`) y el subpaquete `mappers` (`ExpeditionMapper`). D49 documenta las decisiones.
+- Tests: `ExpeditionApiTest` (7, con el contexto completo, los adaptadores en memoria y `@DirtiesContext`, reusando los fixtures del `test-jar` de `domain`), `DomainExceptionHandlerTest` (22: el parametrizado de las veinte entradas del mapeo, el 500 de una excepción sin clasificar y uno que falla si aparece una excepción en `business.exceptions` sin fila en la tabla) y `OpenApiDocumentationTest` (2).
+- Dependencias nuevas en `web/pom.xml`: `springdoc-openapi-starter-webmvc-ui` 3.1.1 y, en tests, `spring-boot-webmvc-test`, que es donde Spring Boot 4 mudó `@AutoConfigureMockMvc` (ya no está en `spring-boot-test-autoconfigure`).
+
+Qué cambió respecto del plan:
+
+- **`-parameters` en el compilador de `web`.** Spring resuelve `@PathVariable` por el nombre del parámetro y javac no lo conserva por defecto; como el build no hereda de `spring-boot-starter-parent`, nadie lo había puesto. Sin el flag, `GET /api/expeditions/{id}` devolvía 400. Está en `web/pom.xml`, no toca a los otros módulos.
+- **La lista de críticos de `ExpeditionNotApprovableException` viaja en el mensaje, no como un arreglo en el cuerpo.** La excepción solo guarda el texto ya unido; para exponerla estructurada tiene que conservar los `ValidationResult`, que es un cambio en `domain`. Queda para el PR que escribe `POST /api/expeditions/{id}/approval`.
+- **La convención de sub-recursos está decidida y escrita en D49, pero todavía no hay ningún endpoint que no sea CRUD**: los cinco de estados, el de aprobación, el de cierre y los dos de decisión de propuesta son del PR 5b.
+- **El README se corrigió solo donde quedaba falso** (decía que el proyecto no expone endpoints). La reescritura completa sigue siendo del cierre de la fase.
 
 ### PR 5b: endpoints de los requisitos funcionales
 
@@ -607,7 +621,7 @@ La fecha de entrega es el pendiente que más condiciona el plan: el calendario d
 | ~~Formato del guion (`demo.http` o `demo.sh`)~~ | Resuelto en la Fase 5: `demo.http`, y un test de API que recorre el mismo guion | Demo |
 | ~~Quién escribe los endpoints de F1, F2 y F3~~ | Resuelto el 12/10: los absorbe la Fase 5, con sus tests y los cambios de dominio que habilitan | Fase 5 |
 | Cómo se serializa el árbol del itinerario | Fase 5, en el PR que escribe el endpoint del itinerario. Se agrega a D49 ahí; el 5a no lo necesita | Endpoint del itinerario |
-| Si `NotAResponsibleException` es 403 o 422 | Fase 5, en el PR 5a | Endpoints de decisión de F3 |
+| ~~Si `NotAResponsibleException` es 403 o 422~~ | Resuelto en el PR 5a: 422, porque hoy quién decide llega como un id en el cuerpo y no de una credencial (D49) | Endpoints de decisión de F3 |
 | Persistencia real | El grupo | Tests de repositorio |
 | Frontend mínimo | El grupo. **Fuera del alcance de la Fase 5**, que entrega API, Swagger y guion | Entregable de frontend y checklist |
 

@@ -33,8 +33,9 @@ If Maven picks another JDK, point `JAVA_HOME` to JDK 25:
 
 ### Scope
 
-Compilable Java project containing the domain models, contracts (interfaces), services and use cases, along with their tests, and a Spring Boot application that wires them.
-It does not include a REST API (there are no endpoints yet), real persistence, frontend, security or deployment.
+Compilable Java project containing the domain models, contracts (interfaces), services and use cases, along with their tests, and a Spring Boot application that wires them and exposes them over a REST API.
+
+The API is still a skeleton: the expedition resource (`POST /api/expeditions`, `GET /api/expeditions`, `GET /api/expeditions/{id}`), the error format every resource shares and the OpenAPI document. The remaining endpoints, the demo data, real persistence, frontend, security and deployment are not included yet.
 
 ## Structure
 
@@ -44,7 +45,7 @@ The project is a multi-module Maven build following a hexagonal architecture (se
 | --- | --- | --- |
 | `domain` | All of `business.*`: model, rules, validations, services, use cases (input ports) and `business.providers` (output ports). Publishes a `test-jar` with shared fixtures | No frameworks. The enforcer bans `org.springframework*`, direct or transitive |
 | `app` | `adapters.driven`: driven adapters, today the in-memory repositories (`InMemoryExpeditionRepository`, `InMemoryZoneRepository`, `InMemoryReplanProposalRepository`) and the synchronous `InMemoryEventPublisher` | `domain` |
-| `web` | Spring Boot application (`FieldOpsApplication`) and the `@Configuration` classes that wire the use cases (composition root, D37): `FieldOpsConfig` and `ReplanningConfig` (F3) | `domain`, `app` |
+| `web` | Spring Boot application (`FieldOpsApplication`), the `@Configuration` classes that wire the use cases (composition root, D37) — `FieldOpsConfig` and `ReplanningConfig` (F3) — and `adapters.driving.rest`: the REST adapter with its controllers, DTOs, mappers and the mapping of domain exceptions to HTTP (D49) | `domain`, `app` |
 
 ```
 domain/src/main/java/ar/edu/itba/dps/fieldops/business
@@ -61,6 +62,7 @@ domain/src/main/java/ar/edu/itba/dps/fieldops/business
 └── exceptions      # domain exceptions
 app/src/main/java/ar/edu/itba/dps/fieldops/adapters/driven     # in-memory repositories and InMemoryEventPublisher
 web/src/main/java/ar/edu/itba/dps/fieldops                     # FieldOpsApplication, FieldOpsConfig, ReplanningConfig
+web/src/main/java/.../adapters/driving/rest                    # controllers, DomainExceptionHandler, OpenApiConfig, and the dtos and mappers subpackages
 */src/test/java/...                                            # unit tests per module and end-to-end integration tests in web
 DESIGN.md                                                      # design decisions (in Spanish)
 ```
@@ -81,7 +83,14 @@ mvn -B install -DskipTests    # once, and after changing domain or app: puts the
 mvn spring-boot:run -pl web
 ```
 
-The application starts Tomcat on port 8080. It exposes no endpoints yet, so you will only see the startup log. Stop it with `Ctrl+C`.
+The application starts Tomcat on port 8080:
+
+| URL | What it is |
+| --- | --- |
+| <http://localhost:8080/swagger-ui.html> | Swagger UI, where the endpoints can be tried |
+| <http://localhost:8080/v3/api-docs> | The OpenAPI document springdoc generates from the controllers |
+
+There is no seed yet, so the catalog and the zones start empty and creating an expedition answers `404` until the endpoints that register them exist. Stop the application with `Ctrl+C`.
 
 To run the packaged jar instead:
 
