@@ -199,8 +199,8 @@ class ScheduleActivityTest {
     }
 
     /**
-     * The command has ten components and each test varies one or two, so they are built here instead of
-     * repeating in every test the eight that never change.
+     * The description of an activity has nine components and each test varies one or two, so they are built
+     * here instead of repeating in every test the seven that never change.
      */
     private static final class CommandBuilder {
 
@@ -254,8 +254,9 @@ class ScheduleActivityTest {
         }
 
         private ScheduleActivityCommand build() {
-            return new ScheduleActivityCommand(expeditionId, activityId, "Activity " + activityId, hours(0, 24),
-                    scheduledPeriod, zoneId, dependencyIds, typeName, parameters, atNight);
+            return new ScheduleActivityCommand(expeditionId, new PlannedActivityCommand(activityId,
+                    "Activity " + activityId, hours(0, 24), scheduledPeriod, zoneId, dependencyIds, typeName,
+                    parameters, atNight));
         }
     }
 }

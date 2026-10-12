@@ -48,7 +48,8 @@ class ItineraryUseCasesTest {
 
     private final ScheduleActivity scheduleActivity =
             new ScheduleActivity(repository, mock(ZoneRepository.class), ActivityTypeRegistry.withStandardTypes());
-    private final ScheduleBlock scheduleBlock = new ScheduleBlock(repository);
+    private final ScheduleBlock scheduleBlock =
+            new ScheduleBlock(repository, mock(ZoneRepository.class), ActivityTypeRegistry.withStandardTypes());
     private final AssignResources assignResources = new AssignResources(repository, catalog);
     private final FindAssignmentCandidates candidates = new FindAssignmentCandidates(repository, catalog);
 
@@ -82,8 +83,8 @@ class ItineraryUseCasesTest {
         final var dive = sampling("a-1", coast, hours(0, 24));
         final var transect = sampling("a-2", coast, hours(0, 24));
 
-        final var block = scheduleBlock.schedule(new ScheduleBlockCommand(expedition.getId(),
-                parallel(activity(dive, hours(9, 11)), activity(transect, hours(9, 12)))));
+        final var block = scheduleBlock.schedule(expedition.getId(),
+                parallel(activity(dive, hours(9, 11)), activity(transect, hours(9, 12))));
 
         final var itinerary = expedition.getItinerary();
         assertEquals(List.of(block), itinerary.getNodes());
@@ -93,10 +94,10 @@ class ItineraryUseCasesTest {
 
     @Test
     void schedulingABlockInAnUnknownExpeditionFails() {
-        final var command = new ScheduleBlockCommand(new ExpeditionId("e-404"),
-                parallel(activity(sampling("a-1", coast, hours(0, 24)), hours(9, 11))));
+        final var unknown = new ExpeditionId("e-404");
+        final var block = parallel(activity(sampling("a-1", coast, hours(0, 24)), hours(9, 11)));
 
-        assertThrows(NotFoundException.class, () -> scheduleBlock.schedule(command));
+        assertThrows(NotFoundException.class, () -> scheduleBlock.schedule(unknown, block));
     }
 
     @Test
