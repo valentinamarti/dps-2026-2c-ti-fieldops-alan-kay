@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 public class ResourceCatalog {
@@ -35,6 +36,30 @@ public class ResourceCatalog {
     public void addSupply(DepletableResource supply) {
         register(supply);
         supplies.add(supply);
+    }
+
+    public Optional<Person> findStaff(ResourceId id) {
+        return staff.stream().filter(person -> person.getId().equals(id)).findFirst();
+    }
+
+    public Optional<Equipment> findEquipment(ResourceId id) {
+        return equipment.stream().filter(item -> item.getId().equals(id)).findFirst();
+    }
+
+    public Optional<DepletableResource> findSupply(ResourceId id) {
+        return supplies.stream().filter(supply -> supply.getId().equals(id)).findFirst();
+    }
+
+    public List<Person> allStaff() {
+        return List.copyOf(staff);
+    }
+
+    public List<Equipment> allEquipment() {
+        return List.copyOf(equipment);
+    }
+
+    public List<DepletableResource> allSupplies() {
+        return List.copyOf(supplies);
     }
 
     public List<Person> availableStaffFor(StaffRequirement requirement, TimePeriod period) {

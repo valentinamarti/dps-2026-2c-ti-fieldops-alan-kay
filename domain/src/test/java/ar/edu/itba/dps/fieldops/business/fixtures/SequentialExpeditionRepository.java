@@ -5,7 +5,8 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -14,7 +15,7 @@ import java.util.Optional;
  */
 public class SequentialExpeditionRepository implements ExpeditionRepository {
 
-    private final Map<ExpeditionId, Expedition> expeditions = new HashMap<>();
+    private final Map<ExpeditionId, Expedition> expeditions = new LinkedHashMap<>();
     private int issued = 0;
 
     @Override
@@ -33,5 +34,10 @@ public class SequentialExpeditionRepository implements ExpeditionRepository {
     @Override
     public Optional<Expedition> findById(ExpeditionId id) {
         return Optional.ofNullable(expeditions.get(id));
+    }
+
+    @Override
+    public List<Expedition> findAll() {
+        return List.copyOf(expeditions.values());
     }
 }

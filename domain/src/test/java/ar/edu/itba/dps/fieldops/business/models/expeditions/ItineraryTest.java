@@ -93,4 +93,12 @@ class ItineraryTest {
         assertTrue(morning.overlapsWith(noon));
         assertFalse(noon.overlapsWith(afternoon));
     }
+
+    @Test
+    void findsAnItemByTheIdOfItsActivity() {
+        final var morning = itinerary.add(sampling("Morning", WHOLE_DAY), hours(8, 10));
+
+        assertEquals(morning, itinerary.itemFor(new ActivityId("a-Morning")).orElseThrow());
+        assertTrue(itinerary.itemFor(new ActivityId("a-Night")).isEmpty());
+    }
 }

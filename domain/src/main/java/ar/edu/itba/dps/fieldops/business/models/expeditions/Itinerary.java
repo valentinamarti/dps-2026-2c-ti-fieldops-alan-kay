@@ -2,6 +2,7 @@ package ar.edu.itba.dps.fieldops.business.models.expeditions;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
+import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 
 import java.util.ArrayList;
@@ -22,6 +23,10 @@ public class Itinerary {
 
     public Optional<ItineraryItem> itemFor(Activity activity) {
         return items.stream().filter(item -> item.isFor(activity)).findFirst();
+    }
+
+    public Optional<ItineraryItem> itemFor(ActivityId activityId) {
+        return items.stream().filter(item -> item.getActivity().getId().equals(activityId)).findFirst();
     }
 
     public boolean contains(ItineraryItem item) {

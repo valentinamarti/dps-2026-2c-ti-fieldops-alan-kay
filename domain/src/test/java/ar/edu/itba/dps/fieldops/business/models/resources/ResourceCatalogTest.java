@@ -15,7 +15,9 @@ import java.util.Set;
 
 import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.LITERS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ResourceCatalogTest {
 
@@ -91,5 +93,42 @@ class ResourceCatalogTest {
         final var candidates = catalog.suppliesCovering(new DepletableRequirement(FUEL, Quantity.of("20", LITERS)));
 
         assertEquals(List.of(fullTank), candidates);
+    }
+
+    @Test
+    void findsEachKindOfResourceByItsId() {
+        final var diver = new Person(new ResourceId("p-1"), "Ana", Set.of());
+        final var boat = new Vehicle(new ResourceId("v-1"), "Albatros", BOAT, "ABC 123", Set.of());
+        final var tank = new Depletable(new ResourceId("d-1"), "Diesel", FUEL, Quantity.of("50", LITERS));
+        catalog.addStaff(diver);
+        catalog.addEquipment(boat);
+        catalog.addSupply(tank);
+
+        assertSame(diver, catalog.findStaff(new ResourceId("p-1")).orElseThrow());
+        assertSame(boat, catalog.findEquipment(new ResourceId("v-1")).orElseThrow());
+        assertSame(tank, catalog.findSupply(new ResourceId("d-1")).orElseThrow());
+    }
+
+    @Test
+    void findsNothingWhenTheIdBelongsToAnotherKindOfResource() {
+        catalog.addStaff(new Person(new ResourceId("p-1"), "Ana", Set.of()));
+
+        assertTrue(catalog.findEquipment(new ResourceId("p-1")).isEmpty());
+        assertTrue(catalog.findSupply(new ResourceId("p-1")).isEmpty());
+        assertTrue(catalog.findStaff(new ResourceId("p-404")).isEmpty());
+    }
+
+    @Test
+    void listsEveryResourceItHolds() {
+        final var diver = new Person(new ResourceId("p-1"), "Ana", Set.of());
+        final var boat = new Vehicle(new ResourceId("v-1"), "Albatros", BOAT, "ABC 123", Set.of());
+        final var tank = new Depletable(new ResourceId("d-1"), "Diesel", FUEL, Quantity.of("50", LITERS));
+        catalog.addStaff(diver);
+        catalog.addEquipment(boat);
+        catalog.addSupply(tank);
+
+        assertEquals(List.of(diver), catalog.allStaff());
+        assertEquals(List.of(boat), catalog.allEquipment());
+        assertEquals(List.of(tank), catalog.allSupplies());
     }
 }
