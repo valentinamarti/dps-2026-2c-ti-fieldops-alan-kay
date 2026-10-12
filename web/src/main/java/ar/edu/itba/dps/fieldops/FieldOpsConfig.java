@@ -85,8 +85,9 @@ public class FieldOpsConfig {
     }
 
     @Bean
-    ScheduleActivity scheduleActivity(ExpeditionRepository repository) {
-        return new ScheduleActivity(repository);
+    ScheduleActivity scheduleActivity(ExpeditionRepository repository, ZoneRepository zones,
+                                      ActivityTypeRegistry types) {
+        return new ScheduleActivity(repository, zones, types);
     }
 
     @Bean

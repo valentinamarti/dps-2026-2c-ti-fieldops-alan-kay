@@ -11,6 +11,8 @@ import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
+import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
+import ar.edu.itba.dps.fieldops.business.rules.ActivityTypeRegistry;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -44,7 +46,8 @@ class ItineraryUseCasesTest {
     private final Zone coast = zone("z-1");
     private final Expedition expedition = expeditionIn(coast, person("p-1")).build(new SequentialExpeditionRepository());
 
-    private final ScheduleActivity scheduleActivity = new ScheduleActivity(repository);
+    private final ScheduleActivity scheduleActivity =
+            new ScheduleActivity(repository, mock(ZoneRepository.class), ActivityTypeRegistry.withStandardTypes());
     private final ScheduleBlock scheduleBlock = new ScheduleBlock(repository);
     private final AssignResources assignResources = new AssignResources(repository, catalog);
     private final FindAssignmentCandidates candidates = new FindAssignmentCandidates(repository, catalog);
@@ -55,7 +58,7 @@ class ItineraryUseCasesTest {
     }
 
     private ItineraryItem scheduleSampling() {
-        return scheduleActivity.schedule(new ScheduleActivityCommand(expedition.getId(), sampling("a-1", coast, hours(0, 24)), hours(9, 11)));
+        return scheduleActivity.schedule(expedition.getId(), sampling("a-1", coast, hours(0, 24)), hours(9, 11));
     }
 
     @Test
@@ -68,9 +71,10 @@ class ItineraryUseCasesTest {
 
     @Test
     void schedulingInAnUnknownExpeditionFails() {
-        final var command = new ScheduleActivityCommand(new ExpeditionId("e-404"), sampling("a-1", coast, hours(0, 24)), hours(9, 11));
+        final var unknown = new ExpeditionId("e-404");
+        final var activity = sampling("a-1", coast, hours(0, 24));
 
-        assertThrows(NotFoundException.class, () -> scheduleActivity.schedule(command));
+        assertThrows(NotFoundException.class, () -> scheduleActivity.schedule(unknown, activity, hours(9, 11)));
     }
 
     @Test
@@ -163,7 +167,7 @@ class ItineraryUseCasesTest {
         catalog.addStaff(dayWorker);
         catalog.addStaff(nightWorker);
         catalog.addEquipment(lamp);
-        scheduleActivity.schedule(new ScheduleActivityCommand(expedition.getId(), nightSampling("a-2", coast, hours(0, 24)), hours(20, 22)));
+        scheduleActivity.schedule(expedition.getId(), nightSampling("a-2", coast, hours(0, 24)), hours(20, 22));
 
         final var offer = candidates.candidatesFor(expedition.getId(), new ActivityId("a-2"));
 
