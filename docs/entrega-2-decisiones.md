@@ -21,7 +21,7 @@ Estado: decisiones tomadas antes de implementar. Sirven de base para las entrada
 | F2 — Bloques | **Composite con interfaz común** entre actividad (hoja) y bloque (compuesto). Duración: suma en secuencial, máximo en paralelo. La validación detecta conflictos de recursos entre actividades paralelas del mismo bloque. Implica refactorizar `Itinerary`, `ItineraryItem` y `ResourceOverlapValidation`. |
 | F3 — Replanificación automática | **Evento de dominio `IncidentRegistered` + `EventPublisher` (puerto del dominio), entrega síncrona en memoria**, así al volver el registro del incidente la propuesta ya existe. **Se generan varias propuestas** (reprogramación, reemplazo de recursos, cancelación parcial) y el responsable elige o rechaza. Auditoría: plan original, incidente y decisión consultables. |
 
-Punto a resolver al implementar F3: D33 descartó elegir automáticamente el reemplazo de un recurso por falta de criterio en el enunciado. Al generar varias propuestas hay que definir qué candidatos ofrece el catálogo y documentarlo en `../../../../Downloads/DESIGN.md`.
+Punto a resolver al implementar F3: D33 descartó elegir automáticamente el reemplazo de un recurso por falta de criterio en el enunciado. Al generar varias propuestas hay que definir qué candidatos ofrece el catálogo y documentarlo en `DESIGN.md`.
 
 ## Demo
 
