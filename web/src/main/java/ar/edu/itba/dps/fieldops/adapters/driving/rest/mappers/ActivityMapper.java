@@ -68,23 +68,31 @@ public final class ActivityMapper {
                 activity.estimatedDuration().toMinutes(),
                 activity.estimatedRisk(),
                 activity.requiredStaff().stream().map(ActivityMapper::toDto).toList(),
+                // In the order each was assigned, the same reasoning as the dependencies above.
+                item.getAssignedStaff().stream().map(person -> person.getId().value()).toList(),
                 activity.requiredEquipment().stream().map(ActivityMapper::toDto).toList(),
+                item.getAssignedEquipment().stream().map(equipment -> equipment.getId().value()).toList(),
                 activity.requiredSupplies().stream().map(ActivityMapper::toDto).toList(),
+                item.getAssignedSupplies().stream().map(supply -> supply.getId().value()).toList(),
                 Mappings.sorted(activity.requiredCertificationsForAllStaff().stream().map(Certification::name)),
                 Mappings.sorted(activity.requiredPermits().stream().map(Permit::name)));
     }
 
-    private static StaffRequirementDto toDto(StaffRequirement requirement) {
+    /**
+     * Package-private so {@link AssignmentCandidatesMapper} can pair the same requirement with its candidates
+     * (D56), instead of repeating the translation.
+     */
+    static StaffRequirementDto toDto(StaffRequirement requirement) {
         return new StaffRequirementDto(
                 requirement.headcount(),
                 Mappings.sorted(requirement.certifications().stream().map(Certification::name)));
     }
 
-    private static EquipmentRequirementDto toDto(ReusableRequirement requirement) {
+    static EquipmentRequirementDto toDto(ReusableRequirement requirement) {
         return new EquipmentRequirementDto(requirement.category().name(), requirement.count());
     }
 
-    private static SupplyRequirementDto toDto(DepletableRequirement requirement) {
+    static SupplyRequirementDto toDto(DepletableRequirement requirement) {
         return new SupplyRequirementDto(requirement.category().name(), Mappings.toDto(requirement.quantity()));
     }
 }
