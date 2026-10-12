@@ -20,11 +20,13 @@ import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.completeAssignments;
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.diving;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
@@ -32,6 +34,9 @@ import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.samp
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.supply;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
 import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.UNITS;
+import static ar.edu.itba.dps.fieldops.business.models.expeditions.PlannedNode.activity;
+import static ar.edu.itba.dps.fieldops.business.models.expeditions.PlannedNode.parallel;
+import static ar.edu.itba.dps.fieldops.business.models.expeditions.PlannedNode.sequential;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -140,5 +145,24 @@ class ExpeditionReporterTest {
         assertEquals(ExpeditionStatus.FINISHED, report.status());
         assertEquals(Map.of(SAMPLE_CONTAINER, Quantity.of("6", UNITS)), report.actualConsumption());
         assertTrue(report.isComplete());
+    }
+
+    @Test
+    void theReportOfAnExpeditionWithBlocksUsesTheDurationEachBlockEstimates() {
+        expedition.schedule(parallel(
+                activity(sampling("a-3", coast, hours(0, 24)), hours(17, 19)),
+                activity(diving("a-4", coast, hours(0, 24), 10), hours(17, 19))));
+        expedition.schedule(sequential(
+                activity(sampling("a-5", coast, hours(0, 24)), hours(19, 21)),
+                activity(diving("a-6", coast, hours(0, 24), 10), hours(21, 23))));
+
+        final var report = reporter.reportOf(expedition);
+
+        final var looseActivities = Duration.ofMinutes(120 + 120);
+        final var longestOfTheParallelBlock = Duration.ofMinutes(120);
+        final var sumOfTheSequentialBlock = Duration.ofMinutes(120 + 65);
+        assertEquals(looseActivities.plus(longestOfTheParallelBlock).plus(sumOfTheSequentialBlock), report.estimate().totalDuration());
+        assertEquals(6, report.scheduledActivities());
+        assertEquals(RiskLevel.MEDIUM, report.estimate().overallRisk());
     }
 }
