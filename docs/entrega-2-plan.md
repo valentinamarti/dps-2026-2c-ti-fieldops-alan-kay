@@ -1,10 +1,10 @@
 # Plan de implementación — Entrega 2 FieldOps
 
-11/10/2026 · Complementa `claude/entrega-2-decisiones.md`.
+11/10/2026 · Complementa `docs/entrega-2-decisiones.md`.
 
 ## Resumen
 
-La Entrega 2 se reparte en cinco fases, una por integrante: una base que se mergea primero (Fase 1) y cuatro que avanzan en paralelo sobre ella. Cada fase termina con su PR en verde, sus tests y sus entradas de `../../../../Downloads/DESIGN.md` escritas en el mismo PR.
+La Entrega 2 se reparte en cinco fases, una por integrante: una base que se mergea primero (Fase 1) y cuatro que avanzan en paralelo sobre ella. Cada fase termina con su PR en verde, sus tests y sus entradas de `DESIGN.md` escritas en el mismo PR.
 
 | Fase | Qué entrega | Entradas de `DESIGN.md` | Responsable |
 | --- | --- | --- | --- |
@@ -24,7 +24,7 @@ Supuestos del plan, tomados de las decisiones del 11/10:
 
 ## Punto de partida
 
-El repo es hoy un solo módulo Maven (`field-ops`, JDK 25) con el dominio de la Entrega 1: 282 tests (11 parametrizados), `../../../../Downloads/DESIGN.md` con D1 a D34 y `Main.wire()` como composition root. No tiene Spring, API ni `.github/`.
+El repo es hoy un solo módulo Maven (`field-ops`, JDK 25) con el dominio de la Entrega 1: 282 tests (11 parametrizados), `DESIGN.md` con D1 a D34 y `Main.wire()` como composition root. No tiene Spring, API ni `.github/`.
 
 | Requisito de la consigna | Qué hay hoy | Qué falta | Fase |
 | --- | --- | --- | --- |
@@ -80,7 +80,7 @@ Hay dos dependencias cruzadas. La Fase 4 rebasea sobre la Fase 2, porque la alte
 | `ExpeditionReplanner` | 2 y 4 | La Fase 2 deja la forma de copiar la estructura de bloques. La Fase 4 la usa |
 | `ApprovalPolicy.MANDATORY_RULES` | 2 y 3 | Cada fase agrega una línea |
 | `ExpeditionReporter`, `ExpeditionReport` | 2 y 4 | Se agregan campos al final, sin reordenar |
-| `../../../../Downloads/DESIGN.md` | Todas | Números reservados. Cada fase edita solo sus entradas y su subsección |
+| `DESIGN.md` | Todas | Números reservados. Cada fase edita solo sus entradas y su subsección |
 | Configuración de beans en `web` | 1, 4 y 5 | Una clase `@Configuration` por área |
 
 Se trabaja con una rama por fase y PR chicos, sin push directo a `main`.
@@ -113,7 +113,7 @@ Cambios respecto del plan:
 - D35, D36 y D37 escritas en `DESIGN.md`, con las filas de Clean Architecture y DDD en patrones no aplicados. La separación entre la interfaz del caso de uso y su implementación quedó **descartada** en D35: los casos de uso siguen siendo clases concretas en `domain`.
 - README actualizado (módulos, compilar, ejecutar, CI). Para `mvn spring-boot:run -pl web` hace falta un `mvn install -DskipTests` previo.
 
-- [x] Convertir el `../pom.xml` raíz en parent (`packaging pom`) con `dependencyManagement`, enforcer de JDK 25, compiler y Lombok. Declarar los módulos `domain`, `app` y `web`.
+- [x] Convertir el `pom.xml` raíz en parent (`packaging pom`) con `dependencyManagement`, enforcer de JDK 25, compiler y Lombok. Declarar los módulos `domain`, `app` y `web`.
 - [x] Mover `business.*` y sus tests a `domain`, sin renombrar paquetes. Verificar que su `pom` no trae Spring.
 - [x] Mover `InMemoryExpeditionRepository` a `app` como adaptador driven.
 - [x] Publicar los fixtures de test de `domain` (`ExpeditionFixtures`, `SequentialExpeditionRepository`) como `test-jar`, para que `app` y `web` los reutilicen.
@@ -161,7 +161,7 @@ Cambios respecto del plan y cosas que las otras fases tienen que saber:
 - [x] Contrato de repositorio: una clase abstracta de test por puerto, que hoy corre contra el adaptador en memoria y después contra JPA.
 - [x] Parametrizado de las transiciones de estado expuestas por los casos de uso.
 
-### `../../../../Downloads/DESIGN.md`
+### `DESIGN.md`
 
 - D35: arquitectura hexagonal. Tabla de correspondencia entre los paquetes de la Entrega 1 y puertos y adaptadores. Alternativas descartadas: Clean Architecture y DDD.
 - D36: multi-módulo Maven para que el compilador haga cumplir la dependencia. Alternativa descartada: un módulo con paquetes y un test de arquitectura.
@@ -206,7 +206,7 @@ Dos puntos a decidir y documentar:
 - [ ] Invariantes: bloque vacío, hijo fuera del período, secuencial con hijos solapados.
 - [ ] Test de API del endpoint de bloques.
 
-### `../../../../Downloads/DESIGN.md`
+### `DESIGN.md`
 
 - D39: Composite en el itinerario. Alternativas descartadas: `enum` de modo con condicionales, bloque como subtipo de `Activity`, lista plana con un id de grupo.
 - D40: qué se rechaza al armar un bloque y qué detecta la validación. Extiende D21.
@@ -253,7 +253,7 @@ Tres huecos del modelo actual que esta fase tiene que cerrar:
 - [ ] El informe de una expedición con actividad nocturna sale de `ExpeditionReporter` sin modificarlo.
 - [ ] Test de API del alta de una actividad nocturna.
 
-### `../../../../Downloads/DESIGN.md`
+### `DESIGN.md`
 
 - D42: Decorator sobre `ActivityRules`. Alternativas descartadas: una clase nocturna por tipo (duplica cada tipo), un booleano en `Activity` con condicionales, herencia.
 - D43: permisos y certificaciones que exige la actividad. Extiende D10 y D13.
@@ -316,7 +316,7 @@ El código actual choca con el criterio de aceptación en cuatro lugares. Hay qu
 - [ ] Contrato de repositorio para `ReplanProposalRepository`.
 - [ ] Test de API del flujo completo.
 
-### `../../../../Downloads/DESIGN.md`
+### `DESIGN.md`
 
 - D45: evento de dominio y `EventPublisher` síncrono. Alternativas descartadas: que `RegisterIncident` llame directo al replanificador, usar el publicador de Spring dentro del dominio, entrega asíncrona.
 - D46: propuesta con varias opciones y un generador por tipo. Revisa el último punto de D33 y define los candidatos del catálogo.
@@ -378,11 +378,11 @@ Los endpoints de bloques, de actividad nocturna y de incidentes y propuestas los
 ### README y cierre
 
 - [ ] Reescribir el README: requisitos, cómo compilar, ejecutar y probar, estructura de módulos, cómo correr la demo, contratos de la API (tabla de endpoints y enlace a Swagger UI), CI y regla de protección de rama.
-- [ ] Revisión final de `../../../../Downloads/DESIGN.md`: numeración, referencias cruzadas, párrafo de modelo de dominio, tabla de patrones no aplicados y supuestos.
+- [ ] Revisión final de `DESIGN.md`: numeración, referencias cruzadas, párrafo de modelo de dominio, tabla de patrones no aplicados y supuestos.
 - [ ] Correr la demo completa desde un clon limpio.
 - [ ] Anotar la URL del repo y el hash del commit de entrega.
 
-### `../../../../Downloads/DESIGN.md`
+### `DESIGN.md`
 
 - D49: la API como adaptador driving, con DTOs propios y el mapeo de errores fuera del dominio. Alternativas descartadas: serializar entidades, anotar excepciones de dominio con códigos HTTP.
 - D50: seed como datos con un cargador genérico. Alternativas descartadas: clases Java de demo, `data.sql` antes de tener persistencia.
@@ -390,7 +390,7 @@ Los endpoints de bloques, de actividad nocturna y de incidentes y propuestas los
 
 **Terminado cuando:** un clon limpio compila, pasa los tests, arranca con el perfil `demo` y el guion corre de principio a fin.
 
-## `../../../../Downloads/DESIGN.md`: qué escribe cada fase
+## `DESIGN.md`: qué escribe cada fase
 
 Cada fase escribe sus entradas en el mismo PR que el código, con numeración reservada para que no haya choques. La consigna pide dos cosas distintas: las decisiones (patrón, dónde, por qué, alternativas, patrones no aplicados) y, por cada funcionalidad nueva, clases agregadas y modificadas, refactorizaciones y deuda técnica.
 
@@ -477,16 +477,16 @@ La fecha de entrega es el pendiente que más condiciona el plan: el calendario d
 - **F3 depende de F2.** Si los bloques se demoran, la Fase 4 avanza sobre el itinerario plano y suma la copia de bloques al final.
 - **Calendario de clases.** Rest API se dicta el 20/10 y Spring Data el 27/10. Si la entrega es antes, la API se hace sin esa clase.
 
-Si la fecha es el 13/10, el orden de recorte recomendado es: primero el dominio de F1, F2 y F3 con sus tests y su `../../../../Downloads/DESIGN.md`, después la API de los flujos que usa la demo, y al final el resto de los endpoints.
+Si la fecha es el 13/10, el orden de recorte recomendado es: primero el dominio de F1, F2 y F3 con sus tests y su `DESIGN.md`, después la API de los flujos que usa la demo, y al final el resto de los endpoints.
 
 ### Checklist de entrega
 
 - [ ] URL del repositorio y hash del último commit.
 - [ ] Código organizado en dominio, casos de uso, infraestructura y API REST según la arquitectura hexagonal.
-- [ ] F1, F2 y F3 implementadas, con test por criterio de aceptación y su subsección en `../../../../Downloads/DESIGN.md`.
+- [ ] F1, F2 y F3 implementadas, con test por criterio de aceptación y su subsección en `DESIGN.md`.
 - [ ] Tests unitarios, parametrizados, de repositorio y de API corriendo en la CI.
 - [ ] La CI bloquea el merge de un PR que falla.
 - [ ] Datos de demostración repetibles: seed y guion.
 - [ ] README con instrucciones para compilar, ejecutar y probar, y los contratos de la API.
-- [ ] `../../../../Downloads/DESIGN.md` con D35 a D51, patrones no aplicados, supuestos y la sección por funcionalidad.
+- [ ] `DESIGN.md` con D35 a D51, patrones no aplicados, supuestos y la sección por funcionalidad.
 - [ ] Frontend mínimo, cuando se defina.
