@@ -374,6 +374,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - Alguien tiene que armar el grafo: `Main.wire()` (en el paquete raíz) crea el repositorio en memoria, el servicio de reservas, el replanificador y los casos de uso, y los entrega juntos en `FieldOps`. Es el único lugar que conoce las implementaciones concretas, como `InMemoryExpeditionRepository`; el negocio solo conoce la interfaz `ExpeditionRepository`. Como esta entrega no tiene interfaz de usuario, `main` solo arma el grafo.
   - El test de integración usa `Main.wire()` y recorre el ciclo a través de los casos de uso: crear, aprobar, ejecutar y terminar; y también replanificar en el campo (suspender, replanificar con un retraso, aprobar la alternativa y terminarla).
 - **Consecuencia:** `Expedition.approve` y `Expedition.finish` siguen siendo públicos y no tocan los calendarios; la aprobación y la finalización completas son las de los casos de uso.
+- **Nota (Entrega 2):** `Main.wire()` y `FieldOps` ya no existen: el armado del grafo pasó a la `@Configuration` `FieldOpsConfig` del módulo `web`, y el test de integración recibe los casos de uso inyectados con `@SpringBootTest` (D37). El resto de esta decisión sigue vigente.
 
 ### D29 — No se termina una expedición con actividades en curso (corrección de la Entrega 1)
 
@@ -476,6 +477,56 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - Fecha de otorgamiento y vencimiento de las certificaciones — ninguna regla la usa hoy.
 - **Consecuencia:** un error de tipeo o un sinónimo ("bote" en vez de "boat") sigue siendo otra categoría y se reporta como "falta equipo". Si el catálogo crece, la salida es un catálogo de categorías en `ResourceCatalog` y `Certification(nombre, vencimiento)`.
 
+### D35 — Arquitectura hexagonal: puertos y adaptadores (Entrega 2)
+
+- **Origen:** la Entrega 2 pide organizar el código según la arquitectura hexagonal (dominio, casos de uso, infraestructura y API REST). La Entrega 1 ya tenía la separación en paquetes (`business`, `providers`, `Main`); esta decisión la nombra y la hace cumplir.
+- **Patrón / principio:** arquitectura hexagonal (puertos y adaptadores) + inversión de dependencias: el negocio define las interfaces que necesita y la infraestructura las implementa.
+- **Dónde:** en el código de la Entrega 1 no se renombró nada; cambia el rol que se le da a cada paquete:
+
+  | Entrega 1 | Entrega 2 |
+  |---|---|
+  | `business` (modelo, reglas, validaciones, servicios) | Hexágono (módulo `domain`) |
+  | `business.providers` (`ExpeditionRepository`) | Puertos de salida |
+  | `business.usecases` | Puertos de entrada |
+  | `providers/InMemoryExpeditionRepository` | Adaptador driven, `adapters.driven` (módulo `app`) |
+  | `Main.wire()` | `@Configuration` `FieldOpsConfig` (módulo `web`, D37) |
+
+- **Por qué:**
+  - Los paquetes de la Entrega 1 ya apuntaban en esa dirección: el negocio solo conoce la interfaz del repositorio (D28) y nada de `business` importa una implementación. Solo faltaba darle nombre a cada pieza para que los adaptadores nuevos (REST, persistencia) se ubiquen sin discutirlo.
+  - Se conservaron los nombres de paquete (`business.*`) para que el trabajo en paralelo sobre el dominio no genere conflictos de rutas al integrarse.
+- **Alternativas descartadas:**
+  - Clean Architecture — sumaría anillos (entidades, casos de uso, adaptadores, frameworks) que para este tamaño de dominio no se distinguen del hexágono; ver la tabla de patrones no aplicados.
+  - DDD táctico completo (agregados, eventos, módulos por contexto) — el dominio es un solo contexto y los conceptos que sirven ya están (entidades, value objects, servicios); ver la tabla de patrones no aplicados.
+  - Separar la interfaz de cada caso de uso (puerto de entrada) de su implementación — en este PR los casos de uso siguen siendo clases concretas en `domain`. Una interfaz por caso de uso con una sola implementación no agrega nada hoy; el adaptador REST depende de la clase.
+- **Consecuencia:** si aparece un segundo adaptador driving que necesite sustituir un caso de uso (por ejemplo para mockearlo), la salida es extraer la interfaz de ese caso de uso y mover la implementación a `app`.
+
+### D36 — Multi-módulo Maven para que el compilador haga cumplir la dependencia (Entrega 2)
+
+- **Origen:** una arquitectura hexagonal solo vale si la dependencia hacia adentro no se puede romper por descuido. Con paquetes de un mismo módulo, cualquier clase puede importar cualquier otra.
+- **Patrón / principio:** módulos como fronteras (Dependency Rule): las dependencias apuntan siempre hacia el dominio.
+- **Dónde:** pom raíz padre con tres módulos: `domain` (todo `business.*`, sin frameworks), `app` (`adapters.driven`, depende de `domain`) y `web` (Spring Boot, depende de `domain` y `app`). `domain` publica un `test-jar` con los fixtures (`ExpeditionFixtures`, `SequentialExpeditionRepository`) que reutilizan `app` y `web`. El pom de `domain` declara la regla `bannedDependencies` del enforcer, que prohíbe `org.springframework*` de forma directa y transitiva.
+- **Por qué:**
+  - Si `domain` importa una clase de `app` o `web`, no compila: no hace falta recordar la regla, la hace cumplir el compilador. Agregar Spring al dominio por error (directo o arrastrado por otra dependencia) rompe el build por la regla del enforcer.
+  - Los fixtures de test se comparten como `test-jar` en vez de duplicarse.
+  - Para evitar un ciclo `domain` <-> `app`, tres tests de `domain` que usaban `InMemoryExpeditionRepository` (ahora en `app`) pasaron a usar `SequentialExpeditionRepository`; es solo el tipo del repositorio de test, no cambia lo que prueban.
+- **Alternativas descartadas:**
+  - Un solo módulo con paquetes y un test de arquitectura (ArchUnit) — la regla se verifica recién al correr los tests y se puede olvidar o debilitar; en módulos, romperla es un error de compilación.
+- **Consecuencia:** hay tres poms para mantener y los cambios entre capas pasan por los límites de módulo. A cambio, sumar un adaptador nuevo (por ejemplo persistencia JPA) es sumar un módulo sin tocar `domain`.
+
+### D37 — Spring solo en `web`; la `@Configuration` es el composition root (Entrega 2)
+
+- **Origen:** la Entrega 2 usa Spring Boot para la API REST. D28 había dejado el armado del grafo en `Main.wire()`, único lugar que conocía las implementaciones concretas.
+- **Patrón / principio:** composition root (Clase 3) + inyección de dependencias; el contenedor de Spring es un detalle de infraestructura, no del negocio.
+- **Dónde:** en el módulo `web`: `FieldOpsApplication` (`@SpringBootApplication`) y `FieldOpsConfig` (`@Configuration`), que expone como beans el `ExpeditionRepository` (`InMemoryExpeditionRepository`), un `ResourceReservations` compartido, los casos de uso `CreateExpedition`, `ApproveExpedition` (con `List.of()` de reglas adicionales), `ReplanExpedition` (con `ExpeditionReplanner`) y `FinishExpedition`, y el `ExpeditionReporter`. Se eliminaron `Main` y `FieldOps` (que solo agrupaba los objetos para el `main`). El BOM `spring-boot-dependencies` se importa solo en el pom de `web`.
+- **Por qué:**
+  - Los casos de uso reciben todo por constructor, así que el dominio no necesita anotaciones: `FieldOpsConfig` hace con `@Bean` lo mismo que hacía `wire()` y las clases de `business` no cambian.
+  - Spring queda confinado a `web`: `domain` y `app` no lo traen, y el enforcer lo verifica (D36).
+  - El test de integración recibe los casos de uso inyectados con `@SpringBootTest` en lugar de llamar a `Main.wire()`; el comportamiento que prueba es el mismo. Como el repositorio y las reservas son beans compartidos, cada test levanta un contexto nuevo (`@DirtiesContext`) para no heredar estado, equivalente a llamar a `wire()` en cada test.
+- **Alternativas descartadas:**
+  - Anotar las clases de `business` con `@Service` / `@Component` — acoplaría el hexágono al framework y rompería D36.
+  - Mantener `Main.wire()` y exponer sus resultados como beans — dos composition roots que mantener sincronizados.
+- **Consecuencia:** cada área puede aportar su propia `@Configuration` en `web` sin tocar las demás. Los beans son singletons, por lo que el estado en memoria se comparte entre pedidos hasta que haya persistencia.
+
 ## Patrones que decidimos no aplicar
 
 | Patrón | Por qué no                                                                                                                                                                                              | Consecuencias |
@@ -484,6 +535,8 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 | State (máquina de estados formal) | Las transiciones válidas son una tabla dentro de `ExpeditionStatus` (D20). Lo que depende del estado son unas pocas preguntas: si el itinerario se puede modificar (D19), si se registra seguimiento (D23), si se puede terminar (D29) y si se puede reemplazar (D33); las dos últimas se responden con la misma tabla de transiciones. Una clase por estado agregaría siete clases para responder esas cuatro preguntas. | Si cada estado empieza a habilitar o prohibir muchas operaciones distintas (ej. qué se puede registrar en ejecución o durante una suspensión), los chequeos de estado se repetirían en `Expedition` y convendría pasar a State. |
 | Strategy de conversión entre sistemas de medida | Consideramos una posible extensión a futuro con más de un sistema de medida (ej. métrico e imperial: litros y galones, kilogramos y libras). Hoy hay un único sistema, así que `MeasurementUnit` es un enum simple y `Quantity` rechaza operar entre unidades distintas en vez de convertirlas. | Si se agrega otro sistema, habría que introducir una abstracción de conversión (ej. `UnitConverter`) que `Quantity` use para normalizar antes de sumar, restar o comparar. Como hoy toda la aritmética de unidades está encapsulada en `Quantity` (D8), el cambio queda en ese value object y no se propaga al resto del dominio. |
 | Servicio dedicado de asignación (`AsignacionService`) | El enunciado pide "proponer o realizar asignaciones", y ya está cubierto sin una clase intermedia: `ResourceCatalog` (D18) responde quién puede cubrir un requisito (Information Expert sobre el catálogo) y `Expedition.assignStaff`/`assignEquipment`/`assignSupply` (D19) realiza la asignación verificando el estado. Un servicio aparte solo delegaría en las dos sin agregar comportamiento propio. | Si aparece una regla propia de asignación (ej. elegir entre varios candidatos con un criterio de optimización, no solo listarlos), ahí se justifica introducir un servicio que la encapsule. |
+| Clean Architecture | La separación que necesitamos es adentro / afuera del dominio, y la hexagonal (D35) la da con menos piezas. Los anillos adicionales (entidades por un lado, casos de uso por otro, con modelos de entrada y salida propios) duplicarían clases sin que haya una regla que lo justifique en este dominio. | Si los casos de uso necesitaran protegerse de cambios de las entidades (por ejemplo, modelos de entrada y salida propios por caso de uso), habría que reconsiderarlo. |
+| DDD táctico completo | El dominio es un solo contexto con un agregado claro (`Expedition`) y los bloques que sirven ya están aplicados: entidades, value objects (D8), servicios de dominio y repositorio (D28). Bounded contexts, eventos de dominio y fábricas por agregado sumarían ceremonia sin un segundo contexto que las justifique. | Si aparece un segundo contexto con lenguaje propio (por ejemplo logística de flota separada de planificación), habría que separar módulos por contexto. |
 
 ## Supuestos
 
