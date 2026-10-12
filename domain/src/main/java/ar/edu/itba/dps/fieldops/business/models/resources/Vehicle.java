@@ -16,7 +16,9 @@ public class Vehicle extends ScheduledResource implements Equipment, Certifiable
     private final String name;
     @Getter
     private final String licensePlate;
+    @Getter
     private final ResourceCategory category;
+    @Getter
     private final Certifications certifications;
 
     public Vehicle(ResourceId id, String name, ResourceCategory category, String licensePlate, Set<Certification> certifications) {

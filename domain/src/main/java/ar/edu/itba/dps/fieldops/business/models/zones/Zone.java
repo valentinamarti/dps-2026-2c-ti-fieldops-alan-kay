@@ -16,6 +16,7 @@ public class Zone {
     private final String id;
     @Getter
     private final String name;
+    @Getter
     private final Set<Permit> requiredPermits;
 
     public Zone(String id, String name, Set<Permit> requiredPermits) {

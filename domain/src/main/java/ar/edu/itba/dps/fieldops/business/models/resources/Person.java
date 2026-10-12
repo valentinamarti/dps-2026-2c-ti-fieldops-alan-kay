@@ -13,6 +13,7 @@ public class Person extends ScheduledResource implements Certifiable {
     private final ResourceId id;
     @Getter
     private final String name;
+    @Getter
     private final Certifications certifications;
 
     public Person(ResourceId id, String name, Set<Certification> certifications) {
