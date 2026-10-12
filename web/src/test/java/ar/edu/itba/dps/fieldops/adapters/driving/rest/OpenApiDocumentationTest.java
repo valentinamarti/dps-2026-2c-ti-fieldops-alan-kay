@@ -34,6 +34,22 @@ class OpenApiDocumentationTest {
     }
 
     @Test
+    void publishesTheCatalogAndTheZonesWithASubResourceForTheUnavailabilities() throws Exception {
+        api.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/staff'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/vehicles/{id}'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/instruments'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/supplies'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/equipment'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/zones/{id}'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/staff/{id}/unavailabilities'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/supplies/{id}/unavailabilities']").doesNotExist())
+                .andExpect(jsonPath("$.components.schemas.EquipmentCatalogResponse").exists())
+                .andExpect(jsonPath("$.components.schemas.UnavailabilityDto").exists());
+    }
+
+    @Test
     void servesSwaggerUi() throws Exception {
         api.perform(get("/swagger-ui/index.html")).andExpect(status().isOk());
     }
