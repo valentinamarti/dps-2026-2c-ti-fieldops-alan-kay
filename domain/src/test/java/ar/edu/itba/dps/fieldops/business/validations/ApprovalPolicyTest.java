@@ -4,6 +4,7 @@ import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository
 import ar.edu.itba.dps.fieldops.business.interfaces.validation.ValidationRule;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
+import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.validation.RuleId;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
@@ -12,11 +13,15 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.completeAssignments;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.diving;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.sampling;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
+import static ar.edu.itba.dps.fieldops.business.models.expeditions.PlannedNode.activity;
+import static ar.edu.itba.dps.fieldops.business.models.expeditions.PlannedNode.parallel;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -70,5 +75,21 @@ class ApprovalPolicyTest {
     @Test
     void anExpeditionWithOnlyWarningsCanBeApproved() {
         assertTrue(policyAdding(_ -> List.of(RISKY_DIVE)).validate(expedition).canBeApproved());
+    }
+
+    @Test
+    void aResourceConflictInAParallelBlockIsReportedOnceAndPreventsTheApproval() {
+        final var first = sampling("a-1", coast, hours(0, 24));
+        final var second = sampling("a-2", coast, hours(0, 24));
+        final var worker = person("p-2");
+        expedition.schedule(parallel(activity(first, hours(9, 11)), activity(second, hours(9, 11))));
+        expedition.getItinerary().getItems().forEach(item -> expedition.assignStaff(item, worker));
+        completeAssignments(expedition);
+
+        final var result = policyAdding().validate(expedition);
+
+        final var expected = ValidationResult.critical(ResourceOverlapValidation.ID, ValidationSubject.of(new ActivityId("a-1"), new ResourceId("p-2")), "p-2 is assigned to Sampling a-1 and Sampling a-2 at the same time");
+        assertEquals(List.of(expected), result.results());
+        assertFalse(result.canBeApproved());
     }
 }
