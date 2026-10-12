@@ -76,6 +76,18 @@ class OpenApiDocumentationTest {
     }
 
     @Test
+    void publishesTheAssignmentOfResourcesAndTheCandidatesOfAScheduledActivity() throws Exception {
+        api.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/expeditions/{expeditionId}/activities/{activityId}/staff'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/expeditions/{expeditionId}/activities/{activityId}/equipment'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/expeditions/{expeditionId}/activities/{activityId}/supplies'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/expeditions/{expeditionId}/activities/{activityId}/candidates'].get").exists())
+                .andExpect(jsonPath("$.components.schemas.AssignResourceRequest").exists())
+                .andExpect(jsonPath("$.components.schemas.AssignmentCandidatesResponse").exists());
+    }
+
+    @Test
     void servesSwaggerUi() throws Exception {
         api.perform(get("/swagger-ui/index.html")).andExpect(status().isOk());
     }

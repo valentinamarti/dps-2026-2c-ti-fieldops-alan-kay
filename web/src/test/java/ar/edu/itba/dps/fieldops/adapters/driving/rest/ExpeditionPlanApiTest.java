@@ -19,14 +19,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Validating and estimating an expedition over HTTP, without approving it. It covers the second acceptance
  * criterion of F2 (the duration of a sequential block is the sum of its parts and of a parallel one, the
- * maximum) through {@code GET /estimate}.
- *
- * <p>The third criterion, the resource conflict between parallel activities of the same block, needs
- * resources assigned to an activity, and assigning them has no endpoint yet (it is the tramo of the
- * assignments that follows this one). It stays covered by the domain test that already exists
- * ({@code ResourceOverlapValidationTest.detectsAResourceConflictBetweenParallelActivitiesOfTheSameBlock}); this
- * file only checks that {@code GET /validation} reaches the same rules through HTTP, with a finding that does
- * not need an assignment.
+ * maximum) through {@code GET /estimate}, and the third (the resource conflict between parallel activities of
+ * the same block) through {@code GET /validation}, now that {@code AssignmentController} can assign the
+ * shared resource that triggers it.
  *
  * <p>The whole wiring of {@code FieldOpsConfig} with the in-memory adapters and no mocks (D37).
  */
@@ -108,6 +103,45 @@ class ExpeditionPlanApiTest {
                 .andExpect(jsonPath("$.warnings").isEmpty());
     }
 
+    /**
+     * The third acceptance criterion of F2 over HTTP: two activities of the same parallel block cannot share a
+     * reusable resource, not even when (as here) their periods overlap outright (D41). It needs a resource
+     * assigned to each activity, which {@code AssignmentController} now exposes.
+     */
+    @Test
+    void theValidationReportsAResourceConflictBetweenParallelActivitiesOfTheSameBlock() throws Exception {
+        final var expedition = anExpeditionInTheCoastalReef();
+        api.perform(post("/api/staff").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"id": "p-2", "name": "Lee", "certifications": []}
+                        """))
+                .andExpect(status().isCreated());
+
+        api.perform(post("/api/expeditions/{expeditionId}/blocks", expedition)
+                .contentType(MediaType.APPLICATION_JSON).content("""
+                        {
+                          "type": "parallel",
+                          "children": [
+                            {"activity": %s},
+                            {"activity": %s}
+                          ]
+                        }
+                        """.formatted(
+                        activity("a-1", 9, 11, "Sample collection", "{\"sampleCount\": 1}"),
+                        activity("a-2", 9, 11, "Sample collection", "{\"sampleCount\": 1}"))))
+                .andExpect(status().isCreated());
+
+        assign(expedition, "a-1", "p-2").andExpect(status().isNoContent());
+        assign(expedition, "a-2", "p-2").andExpect(status().isNoContent());
+
+        api.perform(get("/api/expeditions/{id}/validation", expedition))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.canBeApproved").value(false))
+                .andExpect(jsonPath("$.criticals[?(@.rule == 'resource-overlap')].message")
+                        .value(Matchers.hasItem("p-2 is assigned to Activity a-1 and Activity a-2 at the same time")))
+                .andExpect(jsonPath("$.criticals[?(@.rule == 'resource-overlap')].subject.resourceId")
+                        .value(Matchers.everyItem(Matchers.is("p-2"))));
+    }
+
     @Test
     void answersNotFoundWhenValidatingAnExpeditionThatDoesNotExist() throws Exception {
         api.perform(get("/api/expeditions/{id}/validation", "e-404"))
@@ -118,6 +152,14 @@ class ExpeditionPlanApiTest {
     private ResultActions scheduleActivity(String expeditionId, String body) throws Exception {
         return api.perform(post("/api/expeditions/{expeditionId}/activities", expeditionId)
                 .contentType(MediaType.APPLICATION_JSON).content(body));
+    }
+
+    private ResultActions assign(String expeditionId, String activityId, String personId) throws Exception {
+        return api.perform(post("/api/expeditions/{expeditionId}/activities/{activityId}/staff",
+                        expeditionId, activityId)
+                .contentType(MediaType.APPLICATION_JSON).content("""
+                        {"resourceId": "%s"}
+                        """.formatted(personId)));
     }
 
     private static String activity(String id, int fromHour, int toHour, String type, String parameters) {
