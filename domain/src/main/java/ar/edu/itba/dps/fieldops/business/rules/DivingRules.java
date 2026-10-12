@@ -1,6 +1,7 @@
 package ar.edu.itba.dps.fieldops.business.rules;
 
 import ar.edu.itba.dps.fieldops.business.interfaces.activities.ActivityRules;
+import ar.edu.itba.dps.fieldops.business.interfaces.activities.ActivityType;
 import ar.edu.itba.dps.fieldops.business.models.activities.DepletableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.ReusableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
@@ -16,6 +17,8 @@ import java.util.Set;
 import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.LITERS;
 
 public class DivingRules implements ActivityRules {
+
+    public static final ActivityType TYPE = new SingleParameterActivityType("Diving", "maxDepthMeters", DivingRules::new);
 
     private static final Duration BRIEFING_TIME = Duration.ofMinutes(45);
     private static final Duration TIME_PER_METER = Duration.ofMinutes(2);
