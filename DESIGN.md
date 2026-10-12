@@ -374,7 +374,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - Alguien tiene que armar el grafo: `Main.wire()` (en el paquete raíz) crea el repositorio en memoria, el servicio de reservas, el replanificador y los casos de uso, y los entrega juntos en `FieldOps`. Es el único lugar que conoce las implementaciones concretas, como `InMemoryExpeditionRepository`; el negocio solo conoce la interfaz `ExpeditionRepository`. Como esta entrega no tiene interfaz de usuario, `main` solo arma el grafo.
   - El test de integración usa `Main.wire()` y recorre el ciclo a través de los casos de uso: crear, aprobar, ejecutar y terminar; y también replanificar en el campo (suspender, replanificar con un retraso, aprobar la alternativa y terminarla).
 - **Consecuencia:** `Expedition.approve` y `Expedition.finish` siguen siendo públicos y no tocan los calendarios; la aprobación y la finalización completas son las de los casos de uso.
-- **Nota (Entrega 2):** `Main.wire()` y `FieldOps` ya no existen: el armado del grafo pasó a la `@Configuration` `FieldOpsConfig` del módulo `web`, y el test de integración recibe los casos de uso inyectados con `@SpringBootTest` (D37). El resto de esta decisión sigue vigente.
+- **Nota (Entrega 2):** `Main.wire()` y `FieldOps` ya no existen: el armado del grafo pasó a la `@Configuration` `FieldOpsConfig` del módulo `web`, y el test de integración recibe los casos de uso inyectados con `@SpringBootTest` (D37). D38 suma casos de uso y entrada por id a los de esta decisión. El resto de esta decisión sigue vigente.
 
 ### D29 — No se termina una expedición con actividades en curso (corrección de la Entrega 1)
 
@@ -526,6 +526,32 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - Anotar las clases de `business` con `@Service` / `@Component` — acoplaría el hexágono al framework y rompería D36.
   - Mantener `Main.wire()` y exponer sus resultados como beans — dos composition roots que mantener sincronizados.
 - **Consecuencia:** cada área puede aportar su propia `@Configuration` en `web` sin tocar las demás. Los beans son singletons, por lo que el estado en memoria se comparte entre pedidos hasta que haya persistencia.
+
+### D38 — Casos de uso con comandos por id y consultas (Entrega 2, amplía D28)
+
+- **Origen:** el adaptador REST recibe ids y no debería armar objetos de dominio ni cargar expediciones por su cuenta. En la Entrega 1 solo cuatro operaciones eran casos de uso y recibían la `Expedition` o un `ExpeditionBuilder` ya armados; el resto (agendar, asignar, cambiar de estado, seguir) se llamaba directo sobre la entidad.
+- **Patrón / principio:** caso de uso con comando (`record`) o ids como entrada (D28), repositorio como puerto de salida (D35) e Information Expert: los casos de uso resuelven los ids y la entidad sigue aplicando las reglas.
+- **Dónde:** en `business.usecases`:
+  - Comandos: `CreateExpeditionCommand` (zonas y responsables por id), `ScheduleActivityCommand` y `WarningAcceptance` (regla, sujeto, responsable por id y justificación).
+  - Operaciones: `ScheduleActivity`, `AssignResources` (personal, equipo y consumible), `TransitionExpedition` (enviar a revisión, devolver a borrador, iniciar, suspender, reanudar) y `TrackActivity` (iniciar, finalizar y observar).
+  - Consultas: `QueryExpeditions`, `ValidateExpedition` (corre las reglas de aprobación sin aprobar), `EstimateExpedition`, `ReportExpedition` y `FindAssignmentCandidates`, que devuelve para cada requisito de una actividad los candidatos del catálogo.
+  - Los casos de uso de D28 suman una variante por id: `ApproveExpedition.approve(id, aceptaciones)`, `FinishExpedition.finish(id)` y `ReplanExpedition.replan(id, actividad, motivo)`. Las variantes que reciben el objeto siguen existiendo.
+  - Puertos y búsquedas que hacían falta: `ExpeditionRepository.findAll()`, `ZoneRepository` (con `InMemoryZoneRepository` en `app`), búsqueda por id en `ResourceCatalog` (`findStaff`, `findEquipment`, `findSupply`) y `Itinerary.itemFor(ActivityId)`. `FieldOpsConfig` expone un único `ResourceCatalog` compartido.
+  - `NotFoundException` para un id que no existe, y una clase auxiliar privada del paquete (`Lookups`) que resuelve los ids.
+- **Por qué:**
+  - Los casos de uso son la frontera: el adaptador REST solo traduce el pedido a ids o a un comando, y todo lo que pasa después ocurre dentro del hexágono.
+  - Una aceptación de advertencia por id se arma contra las advertencias que la expedición levanta en ese momento. Si no existe esa advertencia, falla con `NotFoundException` en vez de ignorarse: una aceptación vieja no debería quedar como si hubiera cubierto algo.
+  - Cada caso de uso depende de los puertos que usa (D35). Los tests unitarios usan Mockito para el repositorio y entidades reales.
+  - Los repositorios tienen un test de contrato (`ExpeditionRepositoryContract`, `ZoneRepositoryContract`) que hoy corre contra el adaptador en memoria y después correrá contra JPA.
+- **Alternativas descartadas:**
+  - Una clase por transición de estado — cinco clases de una línea cada una; `TransitionExpedition` las agrupa porque todas hacen lo mismo (buscar y llamar a la entidad).
+  - Que el adaptador REST busque la expedición y llame a la entidad — duplicaría en cada adaptador la resolución de ids y los errores de "no existe".
+  - Reemplazar las variantes que reciben el objeto — rompería los tests y el uso de la Entrega 1 sin necesidad.
+  - Un método `save` en el repositorio — con el repositorio en memoria las entidades se modifican en el lugar. Cuando haya persistencia real hará falta.
+- **Consecuencia:**
+  - `ScheduleActivityCommand` recibe la `Activity` ya armada: crearla requiere elegir su `ActivityRules` por tipo y parámetros, y eso lo resuelve el registro de tipos de la Fase 3. Hasta entonces el adaptador que agenda una actividad la construye.
+  - `ValidateExpedition` y `ApproveExpedition` reciben cada uno su lista de reglas adicionales; hoy ambas están vacías en `FieldOpsConfig`.
+  - Los tests del repositorio se podrán reutilizar contra el adaptador JPA cuando exista.
 
 ## Patrones que decidimos no aplicar
 

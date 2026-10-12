@@ -50,16 +50,16 @@ The project is a multi-module Maven build following a hexagonal architecture (se
 domain/src/main/java/ar/edu/itba/dps/fieldops/business
 ├── interfaces      # domain contracts: ActivityRules, ReplanReason, resources, ValidationRule
 ├── models          # entities and value objects (activities, common, estimation, expeditions, report, resources, validation, zones)
-├── providers       # output ports: ExpeditionRepository
+├── providers       # output ports: ExpeditionRepository, ZoneRepository
 ├── rules           # ActivityRules implementations, one per activity type
 ├── validations     # ValidationRule implementations and the ApprovalPolicy
 ├── estimations     # ExpeditionEstimator
 ├── reports         # ExpeditionReporter
 ├── replanning      # ExpeditionReplanner and the replan reasons: Cancellation, Delay, ResourceWithdrawn
 ├── services        # ResourceReservations
-├── usecases        # CreateExpedition, ApproveExpedition, ReplanExpedition, FinishExpedition
+├── usecases        # input ports: commands and operations by id (create, schedule, assign, transition, approve, track, finish, replan) and queries (get, list, validate, estimate, report, candidates)
 └── exceptions      # domain exceptions
-app/src/main/java/ar/edu/itba/dps/fieldops/adapters/driven     # InMemoryExpeditionRepository
+app/src/main/java/ar/edu/itba/dps/fieldops/adapters/driven     # InMemoryExpeditionRepository, InMemoryZoneRepository
 web/src/main/java/ar/edu/itba/dps/fieldops                     # FieldOpsApplication, FieldOpsConfig
 */src/test/java/...                                            # unit tests per module and an end-to-end integration test in web
 DESIGN.md                                                      # design decisions (in Spanish)
