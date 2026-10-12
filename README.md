@@ -48,7 +48,7 @@ The project is a multi-module Maven build following a hexagonal architecture (se
 
 ```
 domain/src/main/java/ar/edu/itba/dps/fieldops/business
-├── interfaces      # domain contracts: ActivityRules, ReplanReason, resources, ValidationRule
+├── interfaces      # domain contracts: ActivityRules, ItineraryNode, ReplanReason, resources, ValidationRule
 ├── models          # entities and value objects (activities, common, estimation, expeditions, report, resources, validation, zones)
 ├── providers       # output ports: ExpeditionRepository, ZoneRepository
 ├── rules           # ActivityRules implementations, one per activity type

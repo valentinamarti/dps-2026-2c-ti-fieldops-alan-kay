@@ -175,36 +175,63 @@ Cambios respecto del plan y cosas que las otras fases tienen que saber:
 
 Convierte el itinerario plano en un árbol con Composite: una actividad agendada es la hoja y un bloque es el compuesto. Validación, estimación e informes recorren el árbol sin preguntar de qué tipo es cada nodo.
 
+**Estado (rama `assignment-2-phase-2`, apilada sobre la 1b):** dominio hecho, con sus tests y sus entradas de `DESIGN.md`. `mvn -B clean verify` pasa con 412 tests (397 domain, 11 app, 4 web); antes eran 361 y los 346 de `domain` siguen pasando sin tocarlos. Falta la parte de API (el endpoint y su test), que espera el esqueleto de la Fase 5.
+
+Qué hay y dónde (módulo `domain`):
+
+- **Nodo del itinerario:** `ItineraryNode` (`business.interfaces.itinerary`) con período agendado, duración estimada, riesgo, consumibles requeridos, si terminó, sus hojas, `runsInParallel` y `planKeepingStructure`. `ItineraryItem` es la hoja; `SequentialBlock` y `ParallelBlock` (sobre la base abstracta `ItineraryBlock`) son los compuestos.
+- **Declarar un bloque:** `PlannedNode.sequential(...)`, `parallel(...)` y `activity(actividad, horario)`. Se agenda con `Expedition.schedule(PlannedNode)`, con `ExpeditionBuilder.addNode` o con el caso de uso `ScheduleBlock` (`ScheduleBlockCommand`).
+- **Itinerario:** `getNodes()` devuelve las raíces y `getItems()` las hojas, las dos ordenadas por inicio. `runInParallel(a, b)` dice si dos actividades están en ramas distintas de un mismo paralelo.
+- **Estimación:** `ExpeditionEstimator` agrega sobre las raíces.
+- **Validación:** `ResourceOverlapValidation` reporta también el recurso compartido entre ramas paralelas.
+- **Replanificación:** `ExpeditionReplanner` conserva los bloques con `Itinerary.planKeepingStructure`.
+- **Tests:** `ItineraryBlocksTest` e `ItineraryWithoutBlocksRegressionTest` (nuevos), y casos nuevos en `ExpeditionEstimatorTest` (con el parametrizado de duración), `ResourceOverlapValidationTest`, `ApprovalPolicyTest`, `ExpeditionReplannerTest`, `ExpeditionReporterTest`, `ExpeditionBuilderTest` e `ItineraryUseCasesTest`.
+
+Cambios respecto del plan y cosas que las otras fases tienen que saber:
+
+- **El conflicto en paralelo no es una regla nueva:** se amplió `ResourceOverlapValidation` (D41). `ApprovalPolicy.MANDATORY_RULES` no cambió, así que la Fase 3 agrega su línea sin conflicto.
+- **Dos ramas paralelas no comparten un recurso reutilizable aunque sus horarios no se pisen.** Tampoco puede haber una dependencia entre actividades de ramas paralelas: se rechaza al agendar. Esto último no estaba en el plan (D40).
+- **En un secuencial se admiten huecos** y el orden es el declarado: no se reordena por horario (D40).
+- **`PlannedNode` no estaba en el plan.** Hace falta porque un `ItineraryItem` no puede existir fuera de una expedición (D3), así que un bloque se declara y la expedición lo arma.
+- **Caso de uso `ScheduleBlock`:** tampoco estaba en el plan. Recibe el `PlannedNode` con las actividades ya armadas, igual que `ScheduleActivityCommand` (D38). `FieldOpsConfig` lo expone como bean, que es el único cambio de esta fase en `web`.
+- **`ExpeditionBuilder` agenda en el orden en que se le agregan las cosas.** Antes agendaba primero los terminados. `addFinishedItem` sigue existiendo como atajo; `Expedition.addFinishedCopyOf` e `Itinerary.addFinishedCopyOf` se eliminaron (notas en D3 y D33).
+- **`Itinerary.getItems()` devuelve una copia no modificable**, no una vista viva de la lista interna (nota en D6).
+- **No se agregaron campos a `ExpeditionReport`**, aunque la tabla de archivos compartidos lo preveía. El informe refleja los bloques a través del estimador (D24); la Fase 4 puede agregar los suyos al final sin conflicto.
+- **Para la Fase 4:** `ExpeditionReplanner.planAlternative` no cambió de firma y ya conserva los bloques. La alternativa se agenda en el orden en que se agendó la original, no por horario. Cancelar la única actividad de un bloque elimina el bloque. Un `Delay` que deja a la actividad pisando al hermano siguiente de su secuencial falla con `InvalidScheduleException`: no corre a los hermanos. Está anotado como deuda técnica de F2 y la reprogramación de F3 lo va a necesitar.
+- **Para la Fase 5:** `ItineraryNode` no expone los hijos ni el tipo de nodo. Cómo se muestra el árbol en la respuesta del itinerario se define con el endpoint. El "paralelo dentro de un secuencial" del seed se arma con `PlannedNode`.
+- En el README solo cambió la línea de `interfaces`, que ahora nombra `ItineraryNode`.
+
 ### Diseño
 
-- [ ] Interfaz común del nodo (por ejemplo `ItineraryNode`): período agendado, duración estimada, riesgo, consumo, si terminó y sus hojas.
-- [ ] `ItineraryItem` la implementa como hoja y delega en su `Activity`, como hoy.
-- [ ] Dos compuestos, `SequentialBlock` y `ParallelBlock`, en vez de un bloque con un `enum` de modo y un `if`. Duración: suma en secuencial, máximo en paralelo. Riesgo: el más alto. Consumo: suma.
-- [ ] Un bloque admite actividades y otros bloques como hijos.
-- [ ] `Itinerary` guarda los nodos raíz. `getItems()` sigue devolviendo las hojas ordenadas por inicio, así las validaciones, las reservas y el informe actuales no cambian.
-- [ ] Agendar un bloque entra por `Expedition`, igual que una actividad (D19). `ExpeditionBuilder` suma la forma de declarar un bloque.
-- [ ] Invariantes al armar el bloque, con el criterio de D21: en un secuencial cada hijo empieza cuando terminó el anterior; el período del bloque envuelve a sus hijos y queda dentro del período de la expedición.
-- [ ] `ExpeditionEstimator` pasa a sumar la duración de los nodos raíz. Hoy suma todas las actividades y contaría de más un bloque paralelo.
-- [ ] Conflicto en paralelo: dos ramas de un `ParallelBlock` no comparten un recurso reutilizable.
-- [ ] Dejar en el itinerario la forma de copiar la estructura de bloques a otra expedición. `ExpeditionReplanner` reconstruye la alternativa actividad por actividad y hoy la perdería.
+- [x] Interfaz común del nodo (por ejemplo `ItineraryNode`): período agendado, duración estimada, riesgo, consumo, si terminó y sus hojas.
+- [x] `ItineraryItem` la implementa como hoja y delega en su `Activity`, como hoy.
+- [x] Dos compuestos, `SequentialBlock` y `ParallelBlock`, en vez de un bloque con un `enum` de modo y un `if`. Duración: suma en secuencial, máximo en paralelo. Riesgo: el más alto. Consumo: suma.
+- [x] Un bloque admite actividades y otros bloques como hijos.
+- [x] `Itinerary` guarda los nodos raíz. `getItems()` sigue devolviendo las hojas ordenadas por inicio, así las validaciones, las reservas y el informe actuales no cambian.
+- [x] Agendar un bloque entra por `Expedition`, igual que una actividad (D19). `ExpeditionBuilder` suma la forma de declarar un bloque.
+- [x] Invariantes al armar el bloque, con el criterio de D21: en un secuencial cada hijo empieza cuando terminó el anterior; el período del bloque envuelve a sus hijos y queda dentro del período de la expedición. El período se calcula a partir de los hijos, así que los envuelve por construcción.
+- [x] `ExpeditionEstimator` pasa a sumar la duración de los nodos raíz. Hoy suma todas las actividades y contaría de más un bloque paralelo.
+- [x] Conflicto en paralelo: dos ramas de un `ParallelBlock` no comparten un recurso reutilizable.
+- [x] Dejar en el itinerario la forma de copiar la estructura de bloques a otra expedición. `ExpeditionReplanner` reconstruye la alternativa actividad por actividad y hoy la perdería.
 
 Dos puntos a decidir y documentar:
 
-- Dónde vive el conflicto en paralelo: ampliar `ResourceOverlapValidation` o una regla nueva en `ApprovalPolicy`. En los dos casos el mismo conflicto se reporta una sola vez (D32 identifica un resultado por regla y sujeto).
-- Si dos ramas de un paralelo con horarios que no se pisan pueden compartir un recurso. Recomendación: no, porque el bloque declara que pueden correr a la vez.
+- Dónde vive el conflicto en paralelo: ampliar `ResourceOverlapValidation` o una regla nueva en `ApprovalPolicy`. En los dos casos el mismo conflicto se reporta una sola vez (D32 identifica un resultado por regla y sujeto). **Resuelto:** se amplió `ResourceOverlapValidation` (D41).
+- Si dos ramas de un paralelo con horarios que no se pisan pueden compartir un recurso. Recomendación: no, porque el bloque declara que pueden correr a la vez. **Resuelto:** no pueden (D41).
 
 ### API
 
-- [ ] Endpoint para agendar un bloque con su árbol de hijos, sobre el esqueleto de la Fase 5.
-- [ ] La respuesta del itinerario muestra el árbol.
+- [ ] Endpoint para agendar un bloque con su árbol de hijos, sobre el esqueleto de la Fase 5. **Pendiente:** el caso de uso `ScheduleBlock` ya existe y está expuesto como bean; faltan el controller y los DTOs.
+- [ ] La respuesta del itinerario muestra el árbol. **Pendiente.**
 
 ### Tests
 
-- [ ] Parametrizado de duración: secuencial, paralelo, paralelo dentro de secuencial y secuencial dentro de paralelo.
-- [ ] Un test por criterio de aceptación: itinerario con un paralelo dentro de un secuencial; suma y máximo; conflicto de recursos entre actividades paralelas del mismo bloque.
-- [ ] Regresión: un itinerario sin bloques valida, estima e informa igual que antes.
-- [ ] Invariantes: bloque vacío, hijo fuera del período, secuencial con hijos solapados.
-- [ ] Test de API del endpoint de bloques.
+- [x] Parametrizado de duración: secuencial, paralelo, paralelo dentro de secuencial y secuencial dentro de paralelo.
+- [x] Un test por criterio de aceptación: itinerario con un paralelo dentro de un secuencial; suma y máximo; conflicto de recursos entre actividades paralelas del mismo bloque.
+- [x] Regresión: un itinerario sin bloques valida, estima e informa igual que antes.
+- [x] Invariantes: bloque vacío, hijo fuera del período, secuencial con hijos solapados.
+- [x] La alternativa de una replanificación conserva los bloques, y el informe de una expedición con bloques usa la duración de cada bloque.
+- [ ] Test de API del endpoint de bloques. **Pendiente**, con el endpoint.
 
 ### `DESIGN.md`
 
@@ -214,7 +241,9 @@ Dos puntos a decidir y documentar:
 - Marcar como revisadas D4 (la duración ya no es una suma plana) y D6 (el itinerario pasa de colección ordenada a árbol).
 - Subsección F2: clases agregadas, clases modificadas (`Itinerary`, `ItineraryItem`, `Expedition`, `ExpeditionBuilder`, `ExpeditionEstimator`, la validación de superposición), refactorizaciones y deuda técnica. Candidatas a deuda: dependencias entre bloques, mover una actividad de un bloque a otro.
 
-**Terminado cuando:** los tres criterios de aceptación tienen test con su nombre, no hay `instanceof` ni `switch` sobre el tipo de nodo, y la Fase 4 puede replanificar sin perder bloques.
+Todo escrito: D39, D40 y D41; notas "Revisado en D39" en D3, D4, D6 y D33, y "Revisado en D40" en D21; las filas del `enum` de modo y de Visitor en patrones no aplicados; la sección "Funcionalidades nuevas de la Entrega 2" con la subsección de F2, y cinco supuestos nuevos. La deuda técnica suma el retraso dentro de un secuencial, que no corre a los hermanos siguientes.
+
+**Terminado cuando:** los tres criterios de aceptación tienen test con su nombre, no hay `instanceof` ni `switch` sobre el tipo de nodo, y la Fase 4 puede replanificar sin perder bloques. Hoy se cumple todo en el dominio; queda el endpoint.
 
 ## Fase 3: F1, actividad nocturna y tipos de actividad
 
@@ -464,7 +493,7 @@ La fecha de entrega es el pendiente que más condiciona el plan: el calendario d
 | ~~Separar o no la interfaz de los casos de uso de su implementación~~ | Resuelto en la Fase 1: no se separa (D35). Reabrir si algún adaptador necesita sustituir un caso de uso | PR 1a |
 | Los cuatro tipos de actividad | Fase 3 con Fase 5 | Seed de la demo |
 | Nivel de riesgo por encima de `HIGH` | Fase 3 | F1 |
-| Dónde vive el conflicto en paralelo | Fase 2 | F2 |
+| ~~Dónde vive el conflicto en paralelo~~ | Resuelto en la Fase 2: en `ResourceOverlapValidation`, sin regla nueva (D41) | F2 |
 | Incidente sobre una actividad en curso o pendiente | Fase 4 con el grupo | F3 |
 | Formato del guion (`demo.http` o `demo.sh`) | Fase 5 | Demo |
 | Persistencia real y frontend | El grupo | Tests de repositorio y entregable de frontend |

@@ -19,6 +19,7 @@ import ar.edu.itba.dps.fieldops.business.usecases.QueryExpeditions;
 import ar.edu.itba.dps.fieldops.business.usecases.ReplanExpedition;
 import ar.edu.itba.dps.fieldops.business.usecases.ReportExpedition;
 import ar.edu.itba.dps.fieldops.business.usecases.ScheduleActivity;
+import ar.edu.itba.dps.fieldops.business.usecases.ScheduleBlock;
 import ar.edu.itba.dps.fieldops.business.usecases.TrackActivity;
 import ar.edu.itba.dps.fieldops.business.usecases.TransitionExpedition;
 import ar.edu.itba.dps.fieldops.business.usecases.ValidateExpedition;
@@ -74,6 +75,11 @@ public class FieldOpsConfig {
     @Bean
     ScheduleActivity scheduleActivity(ExpeditionRepository repository) {
         return new ScheduleActivity(repository);
+    }
+
+    @Bean
+    ScheduleBlock scheduleBlock(ExpeditionRepository repository) {
+        return new ScheduleBlock(repository);
     }
 
     @Bean

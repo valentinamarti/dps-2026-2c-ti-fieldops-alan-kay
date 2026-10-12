@@ -47,6 +47,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - Builder + Director — más estructura de la que hace falta para este caso.
   - Validar todas las reglas de negocio dentro de `build()` — mezclaría "está bien formado" con "es válido para operar", que tienen ciclos de vida distintos.
   - Que el builder reciba `ItineraryItem` ya armados para planificar — obligaría a que existan ítems fuera de una expedición y a repetir en el builder los chequeos de zona, período y dependencias. Por eso las actividades nuevas entran como actividad y horario (`addActivity`) y se agendan con `Expedition.schedule`. La única excepción es `addFinishedItem` (D33): recibe ítems ya terminados de otra expedición, porque lo que ya ocurrió no se puede volver a agendar; `build` los copia (`addFinishedCopyOf`) y no los vuelve a validar como plan.
+- **Revisado en D39:** el builder ya no guarda actividades y terminados en dos listas: todo lo que se le agrega es un `PlannedNode` (una actividad con su horario, un bloque o un ítem terminado) y `build` los agenda con `Expedition.schedule(PlannedNode)` en el orden en que se agregaron, en vez de los terminados primero. `Expedition.addFinishedCopyOf` e `Itinerary.addFinishedCopyOf` ya no existen: `addFinishedItem` queda como atajo de `addNode(PlannedNode.finished(item))`. La decisión no cambia: lo terminado se copia y no se vuelve a validar como plan.
 
 
 ### D4 — Estimación como agregación, Informe como caso de uso que reutiliza
@@ -55,6 +56,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 - **Dónde:** `ExpeditionEstimator` (en `business.estimations`) y su resultado `ExpeditionEstimate` (en `business.models.estimation`); el informe (`ExpeditionReporter` + `ExpeditionReport`) reutiliza este servicio.
 - **Por qué:** la estimación no calcula nada propio: recorre el itinerario y le pregunta a cada actividad, que a su vez delega en su `ActivityRules` (D1), así que agregar un tipo de actividad no toca al estimador. Las tres agregaciones tienen reglas distintas: la duración se suma, el riesgo global es el más alto de sus actividades (`RiskLevel.isAbove`) y el consumo se acumula por categoría sumando `Quantity`, que es la aritmética que ya existe (D8). Estimar no cambia nada ni exige un estado, así que se puede estimar un borrador, que es cuando más sirve para decidir. El equipamiento no se agrega: sumar "1 bote" de tres actividades daría 3 botes cuando puede ser el mismo reutilizado, y lo que hace falta por actividad ya lo verifica `MissingResourcesValidation` (D2).
 - **Alternativas descartadas:** calcular el resumen de riesgos del informe con lógica propia, independiente de `ExpeditionEstimator` — duplicaría reglas de cálculo. Builder para `ExpeditionEstimate` — no tiene invariantes que proteger, es una proyección de datos. Que la duración total sea el lapso entre el primer inicio y el último fin del itinerario — eso mide cuánto dura el plan en el calendario y no cuánto trabajo hay, porque los huecos entre actividades no son esfuerzo estimado.
+- **Revisado en D39:** la duración ya no es una suma plana de todas las actividades. El estimador agrega sobre los nodos raíz del itinerario, y cada bloque combina a sus hijos: suma en secuencial y máximo en paralelo. Un itinerario sin bloques da el mismo resultado que antes. El riesgo y el consumo se siguen combinando igual (el más alto y la suma).
 
 
 ### D5 — Actividad vs. su programación dentro de la expedición
@@ -80,6 +82,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 - **Alternativas descartadas:**
   - Que `Expedition` tenga una lista de actividades sin un itinerario que las agrupe — perdería el lugar natural para el orden, las dependencias entre actividades programadas y los datos propios de cada ítem.
   - Orden manual por posición (mover arriba o abajo) — permitiría un orden que contradice los horarios.
+- **Revisado en D39:** el itinerario pasó de colección ordenada de ítems a árbol: guarda nodos raíz (`ItineraryNode`), que son actividades agendadas o bloques. `getItems()` sigue devolviendo las hojas ordenadas por hora de inicio, pero ya no es una vista de la lista interna sino una copia no modificable calculada en cada llamada: las raíces se guardan en el orden en que se agendaron y se ordenan al leer. `getNodes()` devuelve las raíces.
 
 
 ### D7 — Dos contratos de recurso: por tiempo y por stock
@@ -273,6 +276,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 - **Alternativas descartadas:**
   - Convertir todo en reglas de validación — permitiría armar itinerarios imposibles (una actividad antes de su dependencia) que recién se detectarían al pedir la aprobación.
   - Rechazar al agendar también la falta de recursos — impediría armar el itinerario antes de asignar.
+- **Revisado en D40:** las mismas reglas valen para cada actividad de un bloque, y se suman las propias del bloque (vacío, orden de un secuencial, dependencia entre ramas paralelas). Un bloque entra entero, así que una dependencia puede estar agendada en el mismo bloque y no solo antes.
 
 
 ### D22 — La aprobación corre la validación y registra las advertencias aceptadas
@@ -462,6 +466,7 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - Un `enum` de motivos con un `switch` en el replanificador — cada motivo nuevo obligaría a modificarlo (Open/Closed).
   - Dos métodos separados en `ReplanReason` (el horario y qué recursos conserva) — una cancelación tendría que implementar uno que nunca se usa, porque la actividad no vuelve (Interface Segregation). Con una sola pregunta, cada motivo responde exactamente lo que necesita.
   - Elegir automáticamente el reemplazo del recurso indisponible — haría falta un criterio de selección que el enunciado no define; el catálogo ya ofrece candidatos (D18).
+- **Revisado en D39:** la alternativa conserva los bloques de la original. El replanificador ya no pasa los terminados con `ExpeditionBuilder.addFinishedItem` y el resto con `addActivity` ordenados por inicio: le pide al itinerario un plan con su misma estructura (`Itinerary.planKeepingStructure`) y decide por actividad (la terminada va como `PlannedNode.finished`, la afectada como diga el motivo, el resto con su horario). La alternativa se agenda en el orden en que se agendó la original. `addFinishedItem` sigue existiendo como atajo; `addFinishedCopyOf` ya no.
 
 ### D34 — Las categorías y las certificaciones se normalizan al construirse (corrección de la Entrega 1)
 
@@ -553,6 +558,121 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
   - `ValidateExpedition` y `ApproveExpedition` reciben cada uno su lista de reglas adicionales; hoy ambas están vacías en `FieldOpsConfig`.
   - Los tests del repositorio se podrán reutilizar contra el adaptador JPA cuando exista.
 
+### D39 — El itinerario es un árbol de actividades y bloques (Composite) (Entrega 2, F2)
+
+- **Origen:** F2 pide que el itinerario admita bloques: agrupaciones de actividades o de otros bloques que se ejecutan en secuencia o en paralelo, y que un bloque participe de la validación, la estimación y los informes como cualquier actividad. El itinerario era una lista plana de ítems (D6) y la estimación sumaba todas las duraciones (D4), así que un bloque paralelo se habría contado de más.
+- **Patrón / principio:** Composite + Open/Closed. La declaración de lo que se quiere agendar es un objeto aparte del nodo agendado (mismo criterio que D3).
+- **Dónde:** interfaz `ItineraryNode` (en `business.interfaces.itinerary`). En `business.models.expeditions`: `ItineraryItem` es la hoja; `SequentialBlock` y `ParallelBlock` son los compuestos, sobre la clase abstracta `ItineraryBlock`; `PlannedNode` declara lo que se agenda. `Itinerary.getNodes()`, `getItems()` y `planKeepingStructure`; `Expedition.schedule(PlannedNode)`; `ExpeditionBuilder.addNode`; `ExpeditionEstimator`; `ExpeditionReplanner`; caso de uso `ScheduleBlock` con `ScheduleBlockCommand` (en `business.usecases`).
+- **Por qué:**
+  - `ItineraryNode` responde lo mismo para una actividad agendada y para un bloque: período agendado, duración estimada, riesgo, consumibles que requiere, si terminó y cuáles son sus hojas. La hoja delega en su `Activity`, como antes (D1). El bloque combina a sus hijos: la duración es la suma en `SequentialBlock` y el máximo en `ParallelBlock`, el riesgo es el más alto, el consumo se suma y está terminado cuando lo están todos. Quien recorre el itinerario no pregunta de qué tipo es cada nodo: no hay `instanceof` ni `switch`, ni en el dominio ni en los tests.
+  - Son dos clases y no una con un modo porque entre secuencial y paralelo cambia comportamiento: cómo se combina la duración, qué se le exige a los hijos (D40) y si las ramas se consideran simultáneas (D41). Lo que comparten (guardar los hijos, período, riesgo, consumo, hojas) está en `ItineraryBlock`, con el mismo esquema que `ScheduledResource` (D9): la interfaz es el contrato y la clase abstracta, la implementación compartida.
+  - El período de un bloque no se guarda: se calcula desde el inicio más temprano hasta el fin más tardío de sus hijos. Así no puede quedar desactualizado respecto de ellos.
+  - `Itinerary` guarda los nodos raíz. `getItems()` sigue devolviendo las hojas ordenadas por inicio, así que las validaciones, las reservas, el seguimiento y el informe no cambiaron: un itinerario sin bloques es un árbol donde cada actividad es su propia raíz, y valida, estima e informa igual que antes.
+  - `ExpeditionEstimator` agrega sobre las raíces en vez de sobre las actividades (D4). El informe no cambió: toma la estimación del estimador (D24), así que refleja la duración de cada bloque sin calcular nada propio.
+  - `PlannedNode` existe por D3: un `ItineraryItem` no puede existir fuera de una expedición, porque es la expedición la que verifica zona, período, ventana y dependencias (D19, D21). Para declarar un árbol antes de agendarlo hace falta una descripción que todavía no sea un ítem: `PlannedNode.activity(actividad, horario)`, `sequential(...)` y `parallel(...)`. `Expedition.schedule(PlannedNode)` la convierte en nodos aplicando a cada actividad las mismas reglas que a una suelta, y los mutadores siguen siendo package-private (D19). Cada fábrica guarda el constructor de su compuesto (`SequentialBlock::new`, `ParallelBlock::new`), así que tampoco ahí hay un modo que consultar.
+  - `PlannedNode.finished(ítem)` extiende a los bloques la excepción de D3 para lo ya ocurrido: un terminado tiene que poder quedar dentro de su bloque. Por eso el builder dejó de tener una lista aparte de terminados y agenda todo en el orden en que se le agrega.
+  - Para replanificar, `Itinerary.planKeepingStructure` devuelve un `PlannedNode` por raíz con la misma forma: la hoja pregunta por su plan a la función que recibe, y el bloque arma el de sus hijos y se vuelve a envolver en su mismo tipo. `ExpeditionReplanner` solo decide qué pasa con cada actividad (D33); un bloque que se queda sin hijos desaparece. Los planes salen en el orden en que se agendaron las raíces y no por horario, porque una actividad dentro de un bloque puede depender de una actividad suelta que empieza después que el bloque: ordenar por inicio la agendaría antes que su dependencia.
+  - `ScheduleBlock` es el caso de uso por id (D38): busca la expedición y le pasa el `PlannedNode` del comando, que ya trae las actividades armadas igual que `ScheduleActivityCommand`.
+- **Alternativas descartadas:**
+  - Un único bloque con un `enum` de modo y condicionales — ver la tabla de patrones no aplicados.
+  - El bloque como subtipo de `Activity` — una actividad tiene ventana, zona, dependencias y reglas de tipo (D1, D5); un bloque no tiene nada de eso propio, así que heredaría campos sin sentido y las validaciones por actividad lo tratarían como una actividad sin recursos.
+  - Lista plana con un id de grupo en cada ítem — no expresa anidamiento sin agregar un padre a cada grupo, y cada cliente (estimación, validación, replanificación) tendría que reconstruir el árbol para calcular.
+  - Construir los bloques fuera de la expedición y pasárselos ya armados — existirían ítems y bloques que ninguna expedición verificó, y habría que repetir afuera los chequeos de zona, período y dependencias. Es lo mismo que D3 descartó para el builder.
+  - Guardar el período del bloque — habría que mantenerlo consistente con los hijos y validar que los envuelva.
+  - Visitor para recorrer el árbol — ver la tabla de patrones no aplicados.
+- **Consecuencia:**
+  - Agregar otra forma de combinar es agregar una clase que extienda `ItineraryBlock` y una fábrica en `PlannedNode`.
+  - `ItineraryNode` tiene dos métodos que una hoja responde de forma trivial (`runsInParallel` y `planKeepingStructure`). Es el costo conocido de un Composite uniforme, y se acepta a cambio de no preguntar por el tipo.
+  - `getItems()` se calcula en cada llamada y devuelve una copia (D6).
+  - La interfaz no expone los hijos de un nodo: ningún cliente del dominio los necesita. Cómo se muestra el árbol hacia afuera queda para el endpoint.
+
+### D40 — Qué se rechaza al armar un bloque y qué detecta la validación (Entrega 2, F2, extiende D21)
+
+- **Origen:** D21 separó lo que se rechaza al agendar (un plan mal formado) de lo que detecta la validación (lo que depende de asignaciones y del catálogo). Con bloques hay que decidir de qué lado cae cada regla nueva.
+- **Patrón / principio:** fail fast para planes mal formados, con cada invariante en el objeto que lo puede garantizar (mismo criterio que D21).
+- **Dónde:** constructores de `ItineraryBlock` y `SequentialBlock`; `Expedition.schedule(PlannedNode)`; `Itinerary.add`. Todos lanzan `InvalidScheduleException`.
+- **Por qué:**
+  - Se rechaza al agendar, sin importar qué recursos haya: un bloque vacío; un secuencial donde un hijo empieza antes de que termine el anterior; una actividad del bloque fuera de las zonas o del período de la expedición, o fuera de su ventana; una actividad que ya está agendada o que aparece dos veces en el bloque; una dependencia sin agendar o que termina después; y una dependencia entre ramas paralelas.
+  - En un secuencial, "cada hijo empieza cuando terminó el anterior" significa que no empieza antes, con huecos permitidos. Es la misma comparación que usan las dependencias (D21), con el borde compartido válido (D8): un plan real tiene traslados y esperas entre una actividad y la siguiente.
+  - El orden de un secuencial es el declarado y no se reordena por horario: si se declara `[A, B]` y B está agendada antes que A, el bloque se rechaza. Un hijo que es un bloque ocupa su lugar con su período completo.
+  - Un paralelo no exige nada a los horarios de sus ramas: pueden pisarse o no.
+  - El período del bloque queda dentro del de la expedición porque cada hoja se verifica contra ese período y el del bloque se calcula a partir de las hojas (D39). No hace falta un chequeo propio.
+  - Las dependencias siguen siendo entre actividades. Como el bloque entra entero, una dependencia puede estar agendada antes o dentro del mismo bloque, y se le aplica la misma regla de D21.
+  - Una actividad no puede depender de otra que está en otra rama del mismo paralelo, aunque los horarios den: el bloque declara que las ramas pueden correr a la vez y la dependencia exige que una termine antes. Es el mismo criterio que D41 aplica a los recursos.
+  - Un bloque se agenda todo o nada: el árbol se arma y se verifica antes de tocar el itinerario, así que un bloque rechazado no deja nada a medias.
+  - Un bloque con un solo hijo es válido. Es un caso degenerado (suma y máximo coinciden), pero es lo que queda cuando una replanificación cancela la otra rama.
+  - Agendar un bloque exige la expedición en borrador, igual que una actividad (D19).
+  - Queda para la validación lo que depende de las asignaciones: el conflicto de recursos entre ramas paralelas (D41).
+  - El seguimiento no exige el orden del bloque: registra lo que pasó en el campo, igual que con el horario agendado (D23).
+- **Alternativas descartadas:**
+  - Exigir que cada hijo de un secuencial empiece exactamente cuando termina el anterior — no dejaría lugar a traslados ni esperas, y sería más estricto que la regla de dependencias.
+  - Ordenar los hijos de un secuencial por horario — aceptaría una secuencia distinta de la declarada sin avisar.
+  - Dependencias implícitas entre los hijos de un secuencial — cancelar un hijo obligaría a cancelar los siguientes, y el orden ya lo garantiza el invariante.
+  - Exigir al menos dos hijos — cancelar una rama de un bloque de dos obligaría a desarmarlo.
+  - Reportar estos problemas como reglas de validación — permitiría armar bloques imposibles que recién se detectarían al pedir la aprobación (mismo argumento que D21).
+- **Consecuencia:** al replanificar, un retraso que deja a la actividad afectada pisando al hermano siguiente de su secuencial no se puede armar y falla con `InvalidScheduleException`, igual que un retraso que la saca de su ventana (D33). Queda como deuda técnica de F2.
+
+### D41 — El conflicto de recursos entre ramas paralelas vive en la regla de superposición (Entrega 2, F2)
+
+- **Origen:** criterio de aceptación de F2: la validación detecta conflictos de recursos entre actividades paralelas del mismo bloque. `ResourceOverlapValidation` ya detectaba un recurso reutilizable asignado a dos actividades cuyos horarios se pisan (D2).
+- **Patrón / principio:** Information Expert (el bloque paralelo sabe qué ramas declaró simultáneas) + una regla por concepto, con un resultado por hallazgo (D2, D32).
+- **Dónde:** `ItineraryNode.runsInParallel`, que `ParallelBlock` responde por sus ramas; `Itinerary.runInParallel`; `ResourceOverlapValidation`.
+- **Por qué:**
+  - Dos actividades corren en paralelo cuando están en ramas distintas de un mismo `ParallelBlock`, es decir, cuando el bloque común más cercano es un paralelo. Dos actividades de una misma rama secuencial no lo están, aunque esa rama sea parte de un paralelo.
+  - Dos ramas paralelas no pueden compartir un recurso reutilizable aunque sus horarios no se pisen. El bloque declara que pueden ejecutarse a la vez; si solo contara el horario, un bloque paralelo no cambiaría nada para la validación, y un retraso en una rama las haría chocar en el campo. Si dos actividades tienen que compartir el recurso, van en secuencia.
+  - La regla es la misma de siempre, "un recurso no puede estar en dos lugares a la vez", con una definición más amplia de "a la vez": los horarios se pisan o el itinerario las declara paralelas. Por eso se amplió `ResourceOverlapValidation` en lugar de sumar una regla. No hubo que tocar `ApprovalPolicy`.
+  - Cada conflicto se reporta una sola vez: la regla recorre cada par de actividades pendientes una vez y emite un resultado por recurso compartido, con el mismo sujeto de antes (actividad y recurso, D32). Si los horarios se pisan, el mensaje es el de siempre; si solo las une el bloque, dice que corren en paralelo.
+  - Es crítico, como cualquier superposición de recursos (D2).
+  - Los consumibles no entran: no se reservan por horario, y lo que piden las ramas se suma (D30).
+  - `ResourceReservations` no cambió: reserva por franja horaria, y un plan con este conflicto no llega a reservarse porque la validación impide aprobarlo (D22, D28).
+- **Alternativas descartadas:**
+  - Una regla nueva en `ApprovalPolicy` — las actividades paralelas normalmente se pisan en horario, y ese caso ya lo reporta la regla de superposición: habría dos resultados con dos `RuleId` para el mismo par y recurso, o una de las dos reglas tendría que saber qué reporta la otra para callarse.
+  - Permitir que dos ramas compartan un recurso si sus horarios no se pisan — deja al bloque paralelo sin efecto en la validación.
+  - Rechazarlo al asignar el recurso — las asignaciones cambian mientras se planifica y un borrador puede estar incompleto a propósito (D21, D22).
+  - Detectarlo al reservar — la reserva corta en el primer problema con una excepción en vez de reportarlo junto con los demás (D22).
+- **Consecuencia:** saber si dos actividades corren en paralelo recorre el árbol por cada par. Con el tamaño de un itinerario no pesa; si pesara, el itinerario podría calcular una vez los pares paralelos.
+
+## Funcionalidades nuevas de la Entrega 2
+
+### F2 — Bloques de actividades secuenciales y paralelos
+
+- **Decisiones:** D39, D40, D41.
+- **Clases agregadas:**
+  - `business.interfaces.itinerary.ItineraryNode` — contrato común de una actividad agendada y un bloque.
+  - `business.models.expeditions.ItineraryBlock` — clase abstracta con lo que comparten los bloques: hijos, período calculado, riesgo, consumo y hojas.
+  - `business.models.expeditions.SequentialBlock` — bloque cuyos hijos corren uno después del otro; su duración es la suma.
+  - `business.models.expeditions.ParallelBlock` — bloque cuyas ramas pueden correr a la vez; su duración es el máximo.
+  - `business.models.expeditions.PlannedNode` — declaración de lo que se agenda: actividad con horario, bloque o ítem terminado.
+  - `business.usecases.ScheduleBlock` y `ScheduleBlockCommand` — agendar un bloque por id de expedición.
+- **Clases modificadas:**
+  - `ItineraryItem` — implementa `ItineraryNode` como hoja y delega en su `Activity`.
+  - `Itinerary` — guarda nodos raíz; suma `getNodes()`, `runInParallel` y `planKeepingStructure`; el alta recibe un nodo entero y verifica las dependencias de todas sus hojas; `addFinishedCopyOf` se eliminó.
+  - `Expedition` — suma `schedule(PlannedNode)`; `addFinishedCopyOf` se eliminó.
+  - `ExpeditionBuilder` — suma `addNode(PlannedNode)`; `addActivity` y `addFinishedItem` pasan a ser atajos.
+  - `ExpeditionEstimator` — agrega sobre los nodos raíz en vez de sobre las actividades.
+  - `ResourceOverlapValidation` — además del horario, considera las ramas paralelas.
+  - `ExpeditionReplanner` — arma la alternativa a partir del plan que conserva la estructura.
+  - `FieldOpsConfig` (módulo `web`) — expone `ScheduleBlock` como bean, igual que los demás casos de uso (D37).
+- **Refactorizaciones realizadas:**
+  - `Itinerary` pasó de una lista de ítems ordenada en cada alta a una lista de nodos raíz en orden de alta, con `getItems()` calculado. Hizo falta para tener el árbol sin cambiar lo que ven los clientes de las hojas.
+  - El chequeo de dependencias de `Itinerary` pasó de mirar un ítem contra el itinerario a mirar todas las hojas de un nodo contra el itinerario y contra el propio nodo, para que un bloque entre entero.
+  - `ExpeditionBuilder` reemplazó su `record` privado `PlannedActivity` y su lista de terminados por una sola lista de `PlannedNode`, y los dos caminos de alta (`schedule` y `addFinishedCopyOf`) quedaron en uno.
+  - `ExpeditionReplanner` dejó de recorrer los ítems dos veces (terminados y pendientes) y de ordenarlos por inicio: le pide el plan al itinerario y solo decide qué pasa con cada actividad.
+- **Deuda técnica que se decidió no resolver:**
+  - **Un retraso dentro de un secuencial no corre a los hermanos siguientes.** Si la actividad retrasada pasa a pisar a la siguiente, la alternativa falla con `InvalidScheduleException` en vez de reprogramar el resto del bloque. Se aceptó porque correr a los hermanos es una política de reprogramación que el replanificador todavía no tiene (D33 descartó reagendar automáticamente). La Fase 4 lo va a necesitar para ofrecer la reprogramación de F3: ahí hay que definir cuánto se corre cada hermano y qué pasa con las ventanas.
+  - **Dependencias entre bloques.** Las dependencias son entre actividades; no se puede declarar que un bloque va después de otro. Se aceptó porque el enunciado no lo pide y se puede expresar con las dependencias de sus actividades o metiendo ambos en un secuencial. Habría que resolverlo si aparecen bloques reutilizables o dependencias que hoy obligan a repetirse en cada actividad.
+  - **Editar un bloque ya agendado.** No se puede agregar un hijo, sacar una actividad ni moverla de un bloque a otro: un bloque se agenda entero y no tiene identificador propio. Se aceptó porque en borrador se puede rearmar el itinerario y, una vez aprobado, el cambio es una replanificación. Habría que resolverlo si la API necesita editar bloques, y ahí el bloque necesita un id.
+  - **El árbol no se expone hacia afuera.** `ItineraryNode` no publica los hijos ni el tipo de nodo, y el informe no muestra la estructura. Queda para el endpoint de bloques, que todavía no existe.
+  - **`runInParallel` recorre el árbol por cada par de actividades.** Se aceptó por el tamaño de un itinerario; habría que precalcular los pares si la validación se vuelve lenta.
+- **Criterios de aceptación:**
+  - Puede construirse un itinerario con un bloque paralelo dentro de un bloque secuencial — `ItineraryBlocksTest.anItineraryCanHaveAParallelBlockInsideASequentialBlock`.
+  - La duración estimada de un bloque secuencial es la suma de sus partes y la de un bloque paralelo, el máximo — `ExpeditionEstimatorTest.theDurationOfASequentialBlockIsTheSumOfItsPartsAndTheOneOfAParallelBlockIsTheMaximum`, y el parametrizado `theDurationOfABlockDependsOnWhetherItsPartsRunInSequenceOrInParallel` (secuencial, paralelo, paralelo dentro de secuencial y secuencial dentro de paralelo).
+  - La validación detecta conflictos de recursos entre actividades paralelas del mismo bloque — `ResourceOverlapValidationTest.detectsAResourceConflictBetweenParallelActivitiesOfTheSameBlock`; que se reporta una sola vez e impide aprobar, `ApprovalPolicyTest.aResourceConflictInAParallelBlockIsReportedOnceAndPreventsTheApproval`.
+  - Un bloque participa de los informes como cualquier actividad — `ExpeditionReporterTest.theReportOfAnExpeditionWithBlocksUsesTheDurationEachBlockEstimates`.
+  - Un itinerario sin bloques valida, estima e informa igual que antes — `ItineraryWithoutBlocksRegressionTest`.
+  - Los invariantes de D40 — `ItineraryBlocksTest` (`rejectsAnEmptyBlock`, `rejectsABlockWithAChildOutsideTheExpeditionPeriod`, `rejectsASequentialBlockWhoseChildrenOverlap`, `rejectsADependencyBetweenParallelBranchesEvenIfTheirPeriodsDoNotOverlap` y los demás).
+  - La alternativa de una replanificación conserva los bloques — `ExpeditionReplannerTest.theAlternativeKeepsTheBlocksOfTheOriginal`.
+
 ## Patrones que decidimos no aplicar
 
 | Patrón | Por qué no                                                                                                                                                                                              | Consecuencias |
@@ -563,6 +683,8 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 | Servicio dedicado de asignación (`AsignacionService`) | El enunciado pide "proponer o realizar asignaciones", y ya está cubierto sin una clase intermedia: `ResourceCatalog` (D18) responde quién puede cubrir un requisito (Information Expert sobre el catálogo) y `Expedition.assignStaff`/`assignEquipment`/`assignSupply` (D19) realiza la asignación verificando el estado. Un servicio aparte solo delegaría en las dos sin agregar comportamiento propio. | Si aparece una regla propia de asignación (ej. elegir entre varios candidatos con un criterio de optimización, no solo listarlos), ahí se justifica introducir un servicio que la encapsule. |
 | Clean Architecture | La separación que necesitamos es adentro / afuera del dominio, y la hexagonal (D35) la da con menos piezas. Los anillos adicionales (entidades por un lado, casos de uso por otro, con modelos de entrada y salida propios) duplicarían clases sin que haya una regla que lo justifique en este dominio. | Si los casos de uso necesitaran protegerse de cambios de las entidades (por ejemplo, modelos de entrada y salida propios por caso de uso), habría que reconsiderarlo. |
 | DDD táctico completo | El dominio es un solo contexto con un agregado claro (`Expedition`) y los bloques que sirven ya están aplicados: entidades, value objects (D8), servicios de dominio y repositorio (D28). Bounded contexts, eventos de dominio y fábricas por agregado sumarían ceremonia sin un segundo contexto que las justifique. | Si aparece un segundo contexto con lenguaje propio (por ejemplo logística de flota separada de planificación), habría que separar módulos por contexto. |
+| Modo del bloque como `enum` (un solo bloque con `SEQUENTIAL` / `PARALLEL`) | Entre un bloque secuencial y uno paralelo cambia comportamiento: cómo se combina la duración, qué se exige a los hijos y si las ramas cuentan como simultáneas. Con un `enum`, cada una de esas preguntas sería un `if` sobre el modo repetido en el bloque, en la validación y en la replanificación. Son dos clases, `SequentialBlock` y `ParallelBlock`, sobre una base común (D39). | Hay una clase por forma de combinar. A cambio, sumar una forma nueva es sumar una clase y no revisar cada condicional. |
+| Visitor para recorrer el árbol del itinerario | Lo que se le pregunta a un nodo son pocas operaciones estables (duración, riesgo, consumo, hojas, si dos actividades corren en paralelo, el plan que conserva su forma), y cada una tiene una respuesta natural por tipo de nodo, así que van como métodos de `ItineraryNode` (D39). Un Visitor separaría cada operación en una clase aparte y obligaría a tocar todos los visitors al sumar un tipo de bloque, que es justo el cambio que F2 hace esperable. | Cada operación nueva sobre el árbol agrega un método a `ItineraryNode` y a sus implementaciones. Si las operaciones empiezan a crecer mucho más rápido que los tipos de nodo (por ejemplo varias exportaciones o vistas del árbol), convendría reconsiderarlo. |
 
 ## Supuestos
 
@@ -582,3 +704,8 @@ Cada ítem del itinerario (`ItineraryItem`) referencia una `Activity` (con sus r
 - Las validaciones de personal evalúan cada requisito por separado: una misma persona asignada puede contar para dos requisitos distintos de la misma actividad. Con dos requisitos de un buzo cada uno y un solo buzo asignado, los dos se dan por cubiertos. Resolverlo con exactitud es un problema de asignación uno a uno (matching) que el enunciado no justifica; si hiciera falta, la regla viviría en `StaffRequirement` y no en la validación.
 - La validación de superposición también compara contra las reservas de otras expediciones ya aprobadas, así que tiene sentido correrla antes de aprobar: una vez aprobada, la expedición tiene sus propias reservas.
 - El enunciado nombra seis estados de una expedición. Agregamos un séptimo, reemplazada (`REPLACED`), para la expedición original cuando se aprueba la alternativa de una replanificación (D33): no es una cancelación ni una finalización, y necesitaba su propio estado terminal.
+- En un bloque secuencial se admiten huecos entre un hijo y el siguiente: el enunciado dice que se ejecutan en secuencia, no que sean contiguos (D40).
+- Un bloque paralelo declara que sus ramas pueden ejecutarse a la vez. Por eso dos ramas no comparten un recurso reutilizable ni tienen dependencias entre sí, aunque sus horarios agendados no se pisen (D40, D41).
+- La duración estimada de un bloque sale de la duración estimada de sus actividades (D4), no de su período agendado: el período dice cuándo ocurre y la estimación, cuánto trabajo hay.
+- El consumo estimado de un bloque paralelo es la suma del de sus ramas y no el máximo: los consumibles se gastan aunque las actividades corran a la vez.
+- Un bloque con un solo hijo es válido, y un bloque no tiene nombre ni identificador propio: el enunciado no pide referirse a un bloque, solo agruparlo y ejecutarlo (D39, D40).
