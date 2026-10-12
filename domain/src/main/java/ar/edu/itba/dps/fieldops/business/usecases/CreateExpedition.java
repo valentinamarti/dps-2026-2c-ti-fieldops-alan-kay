@@ -1,6 +1,5 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
-import ar.edu.itba.dps.fieldops.business.exceptions.NotFoundException;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionBuilder;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
@@ -27,7 +26,7 @@ public class CreateExpedition {
                 .withPeriod(command.period())
                 .withRestrictions(command.restrictions());
         command.objectives().forEach(draft::addObjective);
-        command.zoneIds().forEach(id -> draft.addZone(zones.findById(id).orElseThrow(() -> new NotFoundException("zone", id))));
+        command.zoneIds().forEach(id -> draft.addZone(Lookups.zone(zones, id)));
         command.responsibleIds().forEach(id -> draft.addResponsible(Lookups.staff(catalog, id)));
         command.grantedPermits().forEach(draft::addPermit);
         return create(draft);
