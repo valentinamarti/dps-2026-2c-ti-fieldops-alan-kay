@@ -126,19 +126,40 @@ Cambios respecto del plan:
 
 ### PR 1b: casos de uso y puertos que faltan
 
-- [ ] Casos de uso para lo que hoy se llama directo sobre `Expedition`: agendar actividad, asignar personal, equipo y consumible, enviar a revisión, devolver a borrador, iniciar, suspender, reanudar, iniciar y finalizar actividad, registrar observación.
-- [ ] Consultas: obtener y listar expediciones, validar sin aprobar (con `ApprovalPolicy`), estimar, informe y candidatos de asignación del catálogo.
-- [ ] Entrada por comandos con ids (`record`), para que el adaptador REST no construya objetos de dominio. Hoy `CreateExpedition` recibe un `ExpeditionBuilder` ya armado.
-- [ ] `ExpeditionRepository.findAll()`.
-- [ ] Búsqueda por id en el catálogo (`ResourceCatalog` hoy solo consulta por requisito) y una única instancia compartida.
-- [ ] Puerto de salida para zonas, con su adaptador en memoria.
-- [ ] Búsqueda de un ítem del itinerario por `ActivityId`.
+**Estado (rama `assignment-2-phase-1b`, apilada sobre la 1a):** todo hecho. `mvn -B clean verify` pasa con 361 tests (346 domain, 11 app, 4 web). Falta abrir el PR; depende de que se mergee la 1a.
+
+Qué hay y dónde (módulo `domain` salvo que se indique):
+
+- **Casos de uso nuevos** (`business.usecases`): `ScheduleActivity`, `AssignResources` (personal, equipo y consumible), `TransitionExpedition` (enviar a revisión, devolver a borrador, iniciar, suspender, reanudar), `TrackActivity` (iniciar, finalizar actividad, observar), `QueryExpeditions`, `ValidateExpedition`, `EstimateExpedition`, `ReportExpedition` y `FindAssignmentCandidates`.
+- **Comandos** (`record`): `CreateExpeditionCommand`, `ScheduleActivityCommand`, `WarningAcceptance`.
+- **Variantes por id** de los casos de uso existentes: `ApproveExpedition.approve(id, aceptaciones)`, `FinishExpedition.finish(id)`, `ReplanExpedition.replan(id, actividad, motivo)` y `CreateExpedition.create(comando)`. Las variantes que reciben el objeto siguen existiendo.
+- **Puertos y búsquedas:** `ExpeditionRepository.findAll()`, `ZoneRepository` (adaptador `InMemoryZoneRepository` en `app`), `ResourceCatalog.findStaff/findEquipment/findSupply` y listados, `Itinerary.itemFor(ActivityId)` y `NotFoundException`.
+- **`web`:** `FieldOpsConfig` expone todos los beans nuevos y un único `ResourceCatalog`.
+- **Tests:** `ExpeditionRepositoryContract` y `ZoneRepositoryContract` (clases abstractas en el `test-jar` de `domain`) con sus subclases en `app`; unitarios con Mockito en `TransitionExpeditionTest` (parametrizado), `CreateExpeditionCommandTest`, `ItineraryUseCasesTest` y `ExpeditionByIdTest`.
+
+Cambios respecto del plan y cosas que las otras fases tienen que saber:
+
+- **Cambian los constructores:** `CreateExpedition(repository, zones, catalog)`, `ApproveExpedition(reglas, reservas, repository, catalog)` y `FinishExpedition(reservas, repository)`. Quien los use al rebasear tiene que adaptar la llamada. En los tests de `domain` hay un helper, `ExpeditionFixtures.createExpeditionOn(repository)`.
+- **`ScheduleActivityCommand` recibe la `Activity` ya armada.** Armarla por tipo y parámetros es del registro de tipos de la Fase 3; hasta entonces lo hace quien llama.
+- **Aceptar una advertencia que la expedición no levanta falla** con `NotFoundException`, en vez de ignorarse.
+- **No se hizo:** `reportIncident` como caso de uso (es de la Fase 4) ni un `save` en el repositorio (hará falta con persistencia real).
+- **Reglas adicionales:** `ApproveExpedition` y `ValidateExpedition` reciben cada uno su lista; ambas son `List.of()` en `FieldOpsConfig`.
+- **Para la Fase 5:** los errores de "no existe" son `NotFoundException` (404 en el mapeo de errores). El resto de las excepciones de dominio no cambió.
+- D38 escrita en `DESIGN.md`, con una nota en D28. El README menciona los puertos y casos de uso nuevos.
+
+- [x] Casos de uso para lo que hoy se llama directo sobre `Expedition`: agendar actividad, asignar personal, equipo y consumible, enviar a revisión, devolver a borrador, iniciar, suspender, reanudar, iniciar y finalizar actividad, registrar observación.
+- [x] Consultas: obtener y listar expediciones, validar sin aprobar (con `ApprovalPolicy`), estimar, informe y candidatos de asignación del catálogo.
+- [x] Entrada por comandos con ids (`record`), para que el adaptador REST no construya objetos de dominio. Hoy `CreateExpedition` recibe un `ExpeditionBuilder` ya armado.
+- [x] `ExpeditionRepository.findAll()`.
+- [x] Búsqueda por id en el catálogo (`ResourceCatalog` hoy solo consulta por requisito) y una única instancia compartida.
+- [x] Puerto de salida para zonas, con su adaptador en memoria.
+- [x] Búsqueda de un ítem del itinerario por `ActivityId`.
 
 ### Tests
 
-- [ ] Unitarios de cada caso de uso nuevo, con Mockito para los puertos de salida.
-- [ ] Contrato de repositorio: una clase abstracta de test por puerto, que hoy corre contra el adaptador en memoria y después contra JPA.
-- [ ] Parametrizado de las transiciones de estado expuestas por los casos de uso.
+- [x] Unitarios de cada caso de uso nuevo, con Mockito para los puertos de salida.
+- [x] Contrato de repositorio: una clase abstracta de test por puerto, que hoy corre contra el adaptador en memoria y después contra JPA.
+- [x] Parametrizado de las transiciones de estado expuestas por los casos de uso.
 
 ### `../../../../Downloads/DESIGN.md`
 
@@ -148,7 +169,7 @@ Cambios respecto del plan:
 - D38: casos de uso con comandos por id. Amplía D28.
 - El README documenta el workflow y la regla de protección de rama, que no queda en el código.
 
-**Terminado cuando:** `mvn verify` pasa desde la raíz, un PR con un test roto no se puede mergear y `web` arranca.
+**Terminado cuando:** `mvn verify` pasa desde la raíz, un PR con un test roto no se puede mergear y `web` arranca. Hoy se cumple todo salvo el segundo punto, que espera la regla de protección de `main`.
 
 ## Fase 2: F2, bloques secuenciales y paralelos
 
