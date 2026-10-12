@@ -7,6 +7,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -51,5 +52,34 @@ class ZoneTest {
     void permitNeedsANonBlankName() {
         assertThrows(IllegalArgumentException.class, () -> new Permit(" "));
         assertThrows(IllegalArgumentException.class, () -> new Permit(null));
+    }
+
+    @Test
+    void namesTheSpecialPermitOfAnOperationAfterTheOperationAndItsOwnId() {
+        assertEquals(new Permit("night operations in zone z-1"), protectedCoast.specialPermitFor("night operations"));
+    }
+
+    @Test
+    void theSpecialPermitIsTheSameHoweverTheOperationIsSpelled() {
+        assertEquals(protectedCoast.specialPermitFor("night operations"), protectedCoast.specialPermitFor("  Night Operations "));
+    }
+
+    @Test
+    void theSpecialPermitOfAZoneIsNotTheOneOfAnotherZoneNorOfAnotherOperation() {
+        final var namesake = new Zone("z-2", "Protected coast", Set.of());
+
+        assertNotEquals(protectedCoast.specialPermitFor("night operations"), namesake.specialPermitFor("night operations"));
+        assertNotEquals(protectedCoast.specialPermitFor("night operations"), protectedCoast.specialPermitFor("drone flights"));
+    }
+
+    @Test
+    void theSpecialPermitOfAnOperationIsNotNeededJustToAccessTheZone() {
+        assertFalse(protectedCoast.missingPermits(List.of()).contains(protectedCoast.specialPermitFor("night operations")));
+    }
+
+    @Test
+    void rejectsABlankOrMissingOperation() {
+        assertThrows(IllegalArgumentException.class, () -> protectedCoast.specialPermitFor(" "));
+        assertThrows(IllegalArgumentException.class, () -> protectedCoast.specialPermitFor(null));
     }
 }

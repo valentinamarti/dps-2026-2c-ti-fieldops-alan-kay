@@ -16,9 +16,11 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Optional;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.NIGHT_OPERATIONS;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.instrument;
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.nightSampling;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.sampling;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.supply;
@@ -151,5 +153,21 @@ class ItineraryUseCasesTest {
     @Test
     void offeringCandidatesForAnUnknownActivityFails() {
         assertThrows(NotFoundException.class, () -> candidates.candidatesFor(expedition.getId(), new ActivityId("a-404")));
+    }
+
+    @Test
+    void offersOnlyTheStaffHoldingTheCertificationsTheActivityRequiresOfEveryoneAndTheEquipmentItAdds() {
+        final var dayWorker = person("p-2");
+        final var nightWorker = person("p-3", NIGHT_OPERATIONS);
+        final var lamp = instrument("i-1", "Lighting");
+        catalog.addStaff(dayWorker);
+        catalog.addStaff(nightWorker);
+        catalog.addEquipment(lamp);
+        scheduleActivity.schedule(new ScheduleActivityCommand(expedition.getId(), nightSampling("a-2", coast, hours(0, 24)), hours(20, 22)));
+
+        final var offer = candidates.candidatesFor(expedition.getId(), new ActivityId("a-2"));
+
+        assertEquals(List.of(List.of(nightWorker)), offer.staff().stream().map(entry -> entry.candidates()).toList());
+        assertTrue(offer.equipment().stream().flatMap(entry -> entry.candidates().stream()).anyMatch(lamp::equals));
     }
 }

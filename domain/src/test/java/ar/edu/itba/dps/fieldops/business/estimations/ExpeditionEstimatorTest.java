@@ -20,6 +20,7 @@ import java.util.stream.Stream;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.diving;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.nightDiving;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.sampling;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
@@ -156,5 +157,34 @@ class ExpeditionEstimatorTest {
         assertEquals(RiskLevel.HIGH, estimate.overallRisk());
         assertEquals(Map.of(SAMPLE_CONTAINER, Quantity.of("6", UNITS), FUEL, Quantity.of("20", LITERS)),
                 estimate.estimatedConsumption());
+    }
+
+    @Test
+    void theRiskEstimateReflectsTheNightFactor() {
+        expedition.schedule(diving("a-1", coast, hours(0, 24), 10), hours(8, 10));
+        final var byDay = estimator.estimate(expedition).overallRisk();
+
+        expedition.schedule(nightDiving("a-2", coast, hours(0, 24), 10), hours(20, 22));
+
+        assertEquals(RiskLevel.MEDIUM, byDay);
+        assertEquals(RiskLevel.HIGH, estimator.estimate(expedition).overallRisk());
+    }
+
+    @Test
+    void anActivityThatIsAlreadyHighRiskByDayIsExtremeAtNight() {
+        expedition.schedule(nightDiving("a-1", coast, hours(0, 24), 40), hours(20, 23));
+
+        assertEquals(RiskLevel.EXTREME, estimator.estimate(expedition).overallRisk());
+    }
+
+    @Test
+    void aNightActivityTakesAsLongAndConsumesAsMuchAsByDay() {
+        expedition.schedule(diving("a-1", coast, hours(0, 24), 10), hours(8, 10));
+        expedition.schedule(nightDiving("a-2", coast, hours(0, 24), 10), hours(20, 22));
+
+        final var estimate = estimator.estimate(expedition);
+
+        assertEquals(Duration.ofMinutes(65 + 65), estimate.totalDuration());
+        assertEquals(Map.of(FUEL, Quantity.of("40", LITERS)), estimate.estimatedConsumption());
     }
 }

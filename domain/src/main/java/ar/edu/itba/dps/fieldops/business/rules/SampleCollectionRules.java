@@ -1,6 +1,7 @@
 package ar.edu.itba.dps.fieldops.business.rules;
 
 import ar.edu.itba.dps.fieldops.business.interfaces.activities.ActivityRules;
+import ar.edu.itba.dps.fieldops.business.interfaces.activities.ActivityType;
 import ar.edu.itba.dps.fieldops.business.models.activities.DepletableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.ReusableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
@@ -16,6 +17,8 @@ import java.util.Set;
 import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.UNITS;
 
 public class SampleCollectionRules implements ActivityRules {
+
+    public static final ActivityType TYPE = new SingleParameterActivityType("Sample collection", "sampleCount", SampleCollectionRules::new);
 
     private static final Duration SETUP_TIME = Duration.ofHours(1);
     private static final Duration TIME_PER_SAMPLE = Duration.ofMinutes(20);

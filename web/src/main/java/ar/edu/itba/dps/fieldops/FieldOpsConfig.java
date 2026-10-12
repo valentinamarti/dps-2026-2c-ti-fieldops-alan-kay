@@ -8,6 +8,7 @@ import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
 import ar.edu.itba.dps.fieldops.business.replanning.ExpeditionReplanner;
 import ar.edu.itba.dps.fieldops.business.reports.ExpeditionReporter;
+import ar.edu.itba.dps.fieldops.business.rules.ActivityTypeRegistry;
 import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
 import ar.edu.itba.dps.fieldops.business.usecases.ApproveExpedition;
 import ar.edu.itba.dps.fieldops.business.usecases.AssignResources;
@@ -15,6 +16,7 @@ import ar.edu.itba.dps.fieldops.business.usecases.CreateExpedition;
 import ar.edu.itba.dps.fieldops.business.usecases.EstimateExpedition;
 import ar.edu.itba.dps.fieldops.business.usecases.FindAssignmentCandidates;
 import ar.edu.itba.dps.fieldops.business.usecases.FinishExpedition;
+import ar.edu.itba.dps.fieldops.business.usecases.QueryActivityTypes;
 import ar.edu.itba.dps.fieldops.business.usecases.QueryExpeditions;
 import ar.edu.itba.dps.fieldops.business.usecases.ReplanExpedition;
 import ar.edu.itba.dps.fieldops.business.usecases.ReportExpedition;
@@ -120,6 +122,16 @@ public class FieldOpsConfig {
     @Bean
     FindAssignmentCandidates findAssignmentCandidates(ExpeditionRepository repository, ResourceCatalog catalog) {
         return new FindAssignmentCandidates(repository, catalog);
+    }
+
+    @Bean
+    ActivityTypeRegistry activityTypeRegistry() {
+        return ActivityTypeRegistry.withStandardTypes();
+    }
+
+    @Bean
+    QueryActivityTypes queryActivityTypes(ActivityTypeRegistry registry) {
+        return new QueryActivityTypes(registry);
     }
 
     @Bean

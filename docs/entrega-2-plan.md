@@ -249,38 +249,72 @@ Todo escrito: D39, D40 y D41; notas "Revisado en D39" en D3, D4, D6 y D33, y "Re
 
 Agrega la variante nocturna como un Decorator de `ActivityRules` que envuelve las reglas de cualquier tipo, y completa los seis tipos base que pide la demostración. Ningún validador, estimador ni informe pregunta si una actividad es nocturna.
 
+**Estado (rama `assignment-2-phase-3`, sobre `main` con las fases 1 y 2 mergeadas):** dominio y casos de uso hechos, con sus tests y sus entradas de `DESIGN.md`. `mvn -B clean verify` pasa con 524 tests (509 domain, 11 app, 4 web); antes eran 412 y los 397 de `domain` siguen pasando sin tocarlos. Falta la parte de API (el alta de actividad por tipo, el endpoint que lista los tipos y su test), que espera el esqueleto de la Fase 5.
+
+Qué hay y dónde (módulo `domain`):
+
+- **Decorador:** `ActivityRulesDecorator` (base abstracta que delega todos los métodos) y `NightOperationRules`, en `business.rules`. Suma un equipo de categoría `Lighting`, la certificación `Night operations` para todo el personal y el permiso de la zona, y sube un nivel el riesgo.
+- **`ActivityRules` ampliada:** `requiredCertificationsForAllStaff()` y `requiredPermitsIn(Zone)`, vacíos por defecto. `Activity` los expone (`requiredCertificationsForAllStaff`, `requiredPermits`) y responde `admits(persona)` y `missingPermits(concedidos)`.
+- **Riesgo:** `RiskLevel.EXTREME` y `RiskLevel.next()`, que se queda en el máximo.
+- **Permiso especial:** `Zone.specialPermitFor(operación)`. El de operación nocturna de la zona `z-1` se llama `night operations in zone z-1`.
+- **Validación:** `MissingCertificationsValidation` reporta además a cada persona asignada sin la certificación (sujeto actividad + persona). `MissingPermitsValidation` reporta además los permisos de cada actividad pendiente (sujeto actividad).
+- **Tipos nuevos:** `DroneSurveyRules(areaHectares)`, `WildlifeObservationRules(observationPoints)`, `WaterQualityMeasurementRules(stationCount)` y `TransferRules(distanceKilometers)`.
+- **Registro:** `ActivityTypeRegistry.rulesFor(nombre, parámetros, nocturna)`, con `ActivityType`, `ActivityTypeName`, `ActivityParameters`, `UnknownActivityTypeException` e `InvalidActivityParametersException`. Cada regla publica su tipo en una constante `TYPE`.
+- **Casos de uso:** `QueryActivityTypes` lista los tipos con sus parámetros. `FindAssignmentCandidates` ofrece solo personal que la actividad admite.
+- **`web`:** `FieldOpsConfig` expone `ActivityTypeRegistry` y `QueryActivityTypes` como beans. Es el único cambio de esta fase fuera de `domain`.
+- **Tests:** `NightOperationRulesTest`, `RiskLevelTest`, `ActivityTypeNameTest`, `ActivityTypeRegistryTest`, `QueryActivityTypesTest` y uno por tipo nuevo (`DroneSurveyRulesTest`, `WildlifeObservationRulesTest`, `WaterQualityMeasurementRulesTest`, `TransferRulesTest`). Casos nuevos, sin tocar los existentes, en `MissingCertificationsValidationTest`, `MissingPermitsValidationTest`, `MissingResourcesValidationTest`, `ApprovalPolicyTest`, `ExpeditionEstimatorTest`, `ExpeditionReporterTest`, `ItineraryBlocksTest`, `CreateExpeditionTest`, `ItineraryUseCasesTest`, `ActivityTest` y `ZoneTest`. `ExpeditionFixtures` suma `NIGHT_OPERATIONS`, `nightSampling`, `nightDiving`, `nightPermit` y `assignLighting`.
+
+Cambios respecto del plan y cosas que las otras fases tienen que saber:
+
+- **La certificación nocturna no se suma a cada `StaffRequirement`**, como decía el plan. Se exige a cada persona asignada con una pregunta nueva de `ActivityRules`, y la validación reporta una crítica por persona (D43). Con las dos cosas a la vez, la misma falta habría salido reportada dos veces.
+- **`ApprovalPolicy.MANDATORY_RULES` no cambió**, aunque la tabla de archivos compartidos preveía una línea de esta fase. Se ampliaron `MissingCertificationsValidation` y `MissingPermitsValidation`; las reglas obligatorias siguen siendo siete.
+- **`ScheduleActivityCommand` sigue recibiendo la `Activity` ya armada.** El registro existe, pero que el comando reciba tipo, parámetros e indicador de nocturna queda **pendiente para la API**: además de las reglas hay que resolver por id la zona y las dependencias, y eso se define con el endpoint (nota en D38 y consecuencia de D44).
+- **`FindAssignmentCandidates` cambió y no estaba en el plan:** filtra el personal con `Activity.admits`, para no proponer en una actividad nocturna gente que la validación después rechaza.
+- **Los parámetros del registro son enteros** (`Map<String, Integer>`) y sus nombres se comparan tal cual (`maxDepthMeters`). El nombre del tipo sí se normaliza como en D34.
+- **Tampoco estaban en el plan:** `ActivityTypeName`, `ActivityParameters`, `SingleParameterActivityType` y las dos excepciones del registro (D44).
+- **Para la Fase 5 (seed, API y demo):**
+  - Los nombres de los tipos y de sus parámetros están en la tabla de D44 y los devuelve `QueryActivityTypes`.
+  - Una actividad nocturna necesita en el catálogo un equipo de categoría `Lighting` y personas con la certificación `Night operations`, y en la expedición el permiso `night operations in zone <id>` (se puede obtener con `zone.specialPermitFor("night operations")`).
+  - Excepciones nuevas para el mapeo de errores: `UnknownActivityTypeException` e `InvalidActivityParametersException`. Las dos son un pedido mal formado (400).
+  - `RiskLevel` tiene un valor más para serializar: `EXTREME`.
+  - Los candidatos de la demo siguen valiendo: el crítico es el permiso nocturno faltante, y la advertencia, el riesgo. Un buceo nocturno de hasta 30 metros es `HIGH` y supera una tolerancia `MEDIUM`.
+  - El dominio no dice si una actividad es nocturna ni de qué tipo es. Si la respuesta de la API lo tiene que mostrar, el dato viaja aparte.
+- **Para la Fase 4:** la alternativa de una replanificación conserva la variante nocturna y su permiso sin hacer nada, porque el replanificador reutiliza la misma `Activity` y copia los permisos concedidos.
+- D42, D43 y D44 escritas en `DESIGN.md`, con notas en D1, D10, D11, D13 y D38, la subsección de F1 y seis supuestos nuevos. En el README cambiaron las líneas de `interfaces`, `rules` y `usecases`.
+
 ### Diseño del decorador
 
-- [ ] `NightOperationRules` implementa `ActivityRules` y envuelve otra `ActivityRules`. Una clase base que delega todo evita olvidar un método.
-- [ ] Personal: suma la certificación de operación nocturna a cada `StaffRequirement` de la regla base.
-- [ ] Equipamiento: suma un `ReusableRequirement` de iluminación.
-- [ ] Riesgo: sube un nivel el de la regla base. Duración y consumibles se delegan sin cambios.
+- [x] `NightOperationRules` implementa `ActivityRules` y envuelve otra `ActivityRules`. Una clase base que delega todo evita olvidar un método.
+- [x] Personal: la certificación de operación nocturna se exige a cada persona asignada. **Cambiado respecto del plan:** no se suma a cada `StaffRequirement` de la regla base (D43).
+- [x] Equipamiento: suma un `ReusableRequirement` de iluminación.
+- [x] Riesgo: sube un nivel el de la regla base. Duración y consumibles se delegan sin cambios.
 
 Tres huecos del modelo actual que esta fase tiene que cerrar:
 
-- **Permiso por zona.** `ActivityRules` no conoce permisos: hoy solo los exige `Zone`, y `MissingPermitsValidation` mira las zonas de la expedición. Propuesta: que la regla declare los permisos que exige en la zona de su actividad (vacío por defecto, el permiso nocturno de esa zona en el decorador) y que la validación los sume.
-- **Todo el personal asignado.** `MissingCertificationsValidation` cuenta calificados contra el `headcount`, así que una persona extra sin la certificación pasaría. Hace falta que la regla pueda declarar certificaciones exigidas a cada asignado.
-- **Riesgo ya en el máximo.** `RiskLevel` termina en `HIGH`. Un buceo profundo nocturno no reflejaría el factor salvo que se agregue un nivel por encima.
+- **Permiso por zona.** `ActivityRules` no conoce permisos: hoy solo los exige `Zone`, y `MissingPermitsValidation` mira las zonas de la expedición. Propuesta: que la regla declare los permisos que exige en la zona de su actividad (vacío por defecto, el permiso nocturno de esa zona en el decorador) y que la validación los sume. **Resuelto** así; el permiso lo nombra la zona con `specialPermitFor` (D43).
+- **Todo el personal asignado.** `MissingCertificationsValidation` cuenta calificados contra el `headcount`, así que una persona extra sin la certificación pasaría. Hace falta que la regla pueda declarar certificaciones exigidas a cada asignado. **Resuelto** con `requiredCertificationsForAllStaff()` y `Activity.admits` (D43).
+- **Riesgo ya en el máximo.** `RiskLevel` termina en `HIGH`. Un buceo profundo nocturno no reflejaría el factor salvo que se agregue un nivel por encima. **Resuelto:** se agregó `EXTREME` (D42).
 
 ### Tipos de actividad y registro
 
-- [ ] Cuatro implementaciones nuevas de `ActivityRules`, cada una con su parámetro propio como `DivingRules` con la profundidad. Sugerencia a confirmar: relevamiento con dron, observación de fauna, medición de calidad de agua y traslado.
-- [ ] Registro de tipos en el dominio: nombre del tipo y sus parámetros a una `ActivityRules`, sin `switch`. Lo usan la API y el cargador del seed. La variante nocturna se pide con un indicador y el registro envuelve la regla base.
-- [ ] Certificación y categoría nuevas (operación nocturna, iluminación), normalizadas como define D34.
+- [x] Cuatro implementaciones nuevas de `ActivityRules`, cada una con su parámetro propio como `DivingRules` con la profundidad. **Confirmados:** relevamiento con dron, observación de fauna, medición de calidad de agua y traslado.
+- [x] Registro de tipos en el dominio: nombre del tipo y sus parámetros a una `ActivityRules`, sin `switch`. Lo usan la API y el cargador del seed. La variante nocturna se pide con un indicador y el registro envuelve la regla base.
+- [x] Certificación y categoría nuevas (operación nocturna, iluminación), normalizadas como define D34.
 
 ### API
 
-- [ ] El alta de actividad recibe tipo, parámetros e indicador de nocturna.
-- [ ] Endpoint que lista los tipos disponibles y sus parámetros.
+- [ ] El alta de actividad recibe tipo, parámetros e indicador de nocturna. **Pendiente:** el registro ya existe; falta que `ScheduleActivityCommand` reciba tipo y parámetros en vez de la `Activity` armada, y el controller con sus DTOs.
+- [ ] Endpoint que lista los tipos disponibles y sus parámetros. **Pendiente:** el caso de uso `QueryActivityTypes` ya existe y está expuesto como bean.
 
 ### Tests
 
-- [ ] Parametrizado: el decorador sobre cada uno de los seis tipos base suma certificación, iluminación y permiso.
-- [ ] Parametrizado: riesgo resultante por cada nivel base.
-- [ ] Tests propios de cada tipo nuevo, con el estilo de `DivingRulesTest`.
-- [ ] Un test por criterio de aceptación: expedición con una actividad nocturna; crítico sin certificación; crítico sin permiso; la estimación refleja el factor.
-- [ ] El informe de una expedición con actividad nocturna sale de `ExpeditionReporter` sin modificarlo.
-- [ ] Test de API del alta de una actividad nocturna.
+- [x] Parametrizado: el decorador sobre cada uno de los seis tipos base suma certificación, iluminación y permiso.
+- [x] Parametrizado: riesgo resultante por cada nivel base.
+- [x] Tests propios de cada tipo nuevo, con el estilo de `DivingRulesTest`.
+- [x] Un test por criterio de aceptación: expedición con una actividad nocturna; crítico sin certificación; crítico sin permiso; la estimación refleja el factor.
+- [x] El informe de una expedición con actividad nocturna sale de `ExpeditionReporter` sin modificarlo.
+- [x] Registro: cada tipo por nombre, la variante nocturna, tipo desconocido y parámetro faltante o inválido. Una actividad nocturna dentro de un bloque se valida y se estima igual que suelta.
+- [ ] Test de API del alta de una actividad nocturna. **Pendiente**, con el endpoint.
 
 ### `DESIGN.md`
 
@@ -291,7 +325,9 @@ Tres huecos del modelo actual que esta fase tiene que cerrar:
 - Supuestos: los valores de los tipos nuevos son ilustrativos. La actividad se declara nocturna; no se infiere de su horario.
 - Subsección F1: clases agregadas, clases modificadas (`ActivityRules`, `Activity`, `RiskLevel`, las dos validaciones), refactorizaciones y deuda técnica. Candidata a deuda: nada impide envolver dos veces la misma regla.
 
-**Terminado cuando:** los cuatro criterios de aceptación tienen test, y agregar la nocturna no sumó ningún condicional por tipo en validaciones, estimación ni informes.
+Todo escrito: D42, D43 y D44; notas "Revisado en D44" en D1 y "Revisado en D43" en D10, D11 y D13; la nota de pendiente en la consecuencia de D38; la fila de Decorator actualizada en patrones no aplicados; la subsección de F1 antes de la de F2, y seis supuestos nuevos. La deuda técnica suma que `ScheduleActivityCommand` no usa el registro, que una actividad no dice que es nocturna, que el permiso especial es una convención de nombre, que los parámetros son enteros y que el horario de una actividad nocturna no se verifica.
+
+**Terminado cuando:** los cuatro criterios de aceptación tienen test, y agregar la nocturna no sumó ningún condicional por tipo en validaciones, estimación ni informes. Hoy se cumple todo en el dominio; queda la API.
 
 ## Fase 4: F3, replanificación automática
 
@@ -491,8 +527,8 @@ La fecha de entrega es el pendiente que más condiciona el plan: el calendario d
 | --- | --- | --- |
 | Fecha de entrega | El grupo con el docente | Todo el plan |
 | ~~Separar o no la interfaz de los casos de uso de su implementación~~ | Resuelto en la Fase 1: no se separa (D35). Reabrir si algún adaptador necesita sustituir un caso de uso | PR 1a |
-| Los cuatro tipos de actividad | Fase 3 con Fase 5 | Seed de la demo |
-| Nivel de riesgo por encima de `HIGH` | Fase 3 | F1 |
+| ~~Los cuatro tipos de actividad~~ | Resuelto en la Fase 3: relevamiento con dron, observación de fauna, medición de calidad de agua y traslado (D44) | Seed de la demo |
+| ~~Nivel de riesgo por encima de `HIGH`~~ | Resuelto en la Fase 3: se agregó `EXTREME` (D42) | F1 |
 | ~~Dónde vive el conflicto en paralelo~~ | Resuelto en la Fase 2: en `ResourceOverlapValidation`, sin regla nueva (D41) | F2 |
 | Incidente sobre una actividad en curso o pendiente | Fase 4 con el grupo | F3 |
 | Formato del guion (`demo.http` o `demo.sh`) | Fase 5 | Demo |

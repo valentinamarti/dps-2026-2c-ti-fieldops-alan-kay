@@ -13,10 +13,16 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.NIGHT_OPERATIONS;
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.assignContainers;
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.assignCooler;
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.assignLighting;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.completeAssignments;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.diving;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.nightPermit;
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.nightSampling;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.sampling;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
@@ -91,5 +97,36 @@ class ApprovalPolicyTest {
         final var expected = ValidationResult.critical(ResourceOverlapValidation.ID, ValidationSubject.of(new ActivityId("a-1"), new ResourceId("p-2")), "p-2 is assigned to Sampling a-1 and Sampling a-2 at the same time");
         assertEquals(List.of(expected), result.results());
         assertFalse(result.canBeApproved());
+    }
+
+    @Test
+    void aNightActivityWithoutItsCertificationAndItsPermitPreventsTheApproval() {
+        final var night = expedition.schedule(nightSampling("a-1", coast, hours(0, 24)), hours(20, 22));
+        expedition.assignStaff(night, person("p-2"));
+        assignCooler(expedition, night);
+        assignLighting(expedition, night);
+        assignContainers(expedition, night);
+
+        final var result = policyAdding().validate(expedition);
+
+        final var certification = ValidationResult.critical(MissingCertificationsValidation.ID, ValidationSubject.of(new ActivityId("a-1"), new ResourceId("p-2")), "Night sampling a-1 requires everyone assigned to be certified in night operations, but p-2 is not");
+        final var permit = ValidationResult.critical(MissingPermitsValidation.ID, ValidationSubject.of(new ActivityId("a-1")), "Night sampling a-1 requires the permit night operations in zone z-1, which was not granted");
+        assertEquals(List.of(certification, permit), result.results());
+        assertFalse(result.canBeApproved());
+    }
+
+    @Test
+    void aNightActivityWithItsCertificationItsPermitAndLightingPassesTheMandatoryRules() {
+        final var permitted = expeditionIn(coast, person("p-1")).addPermit(nightPermit(coast)).build(repository);
+        final var night = permitted.schedule(nightSampling("a-1", coast, hours(0, 24)), hours(20, 22));
+        permitted.assignStaff(night, person("p-2", NIGHT_OPERATIONS));
+        assignCooler(permitted, night);
+        assignLighting(permitted, night);
+        assignContainers(permitted, night);
+
+        final var result = policyAdding().validate(permitted);
+
+        assertTrue(result.results().isEmpty());
+        assertTrue(result.canBeApproved());
     }
 }

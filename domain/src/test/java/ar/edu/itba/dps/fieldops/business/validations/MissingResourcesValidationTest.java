@@ -14,6 +14,7 @@ import java.util.List;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.instrument;
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.nightSampling;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.sampling;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
@@ -51,5 +52,20 @@ class MissingResourcesValidationTest {
 
         final var expected = ValidationResult.critical(MissingResourcesValidation.ID, ValidationSubject.of(new ActivityId("a-1")), "Sampling a-1 has 0 of the 1 cooler it needs");
         assertEquals(List.of(expected), validation.validate(expedition));
+    }
+
+    @Test
+    void aNightActivityIsMissingEquipmentUntilItGetsLighting() {
+        final var night = expeditionIn(coast, person("p-1")).build(repository);
+        final var nightItem = night.schedule(nightSampling("a-2", coast, hours(0, 24)), hours(20, 22));
+        night.assignStaff(nightItem, person("p-2"));
+        night.assignEquipment(nightItem, instrument("i-1", "Cooler"));
+
+        final var expected = ValidationResult.critical(MissingResourcesValidation.ID, ValidationSubject.of(new ActivityId("a-2")), "Night sampling a-2 has 0 of the 1 lighting it needs");
+        assertEquals(List.of(expected), validation.validate(night));
+
+        night.assignEquipment(nightItem, instrument("i-2", "Lighting"));
+
+        assertTrue(validation.validate(night).isEmpty());
     }
 }
