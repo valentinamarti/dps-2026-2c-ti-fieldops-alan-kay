@@ -14,6 +14,7 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.resources.Certification;
 import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
+import ar.edu.itba.dps.fieldops.business.usecases.PlannedActivityCommand;
 import ar.edu.itba.dps.fieldops.business.usecases.ScheduleActivityCommand;
 
 import java.util.List;
@@ -34,8 +35,15 @@ public final class ActivityMapper {
     }
 
     public static ScheduleActivityCommand toCommand(String expeditionId, ScheduleActivityRequest request) {
-        return new ScheduleActivityCommand(
-                new ExpeditionId(expeditionId),
+        return new ScheduleActivityCommand(new ExpeditionId(expeditionId), toPlannedActivity(request));
+    }
+
+    /**
+     * The description of one activity, which is the same whether it is scheduled on its own or as a leaf of a
+     * block, so the mapper of the itinerary reuses this one (D54).
+     */
+    static PlannedActivityCommand toPlannedActivity(ScheduleActivityRequest request) {
+        return new PlannedActivityCommand(
                 new ActivityId(request.id()),
                 request.name(),
                 Mappings.toPeriod(request.timeWindow()),

@@ -91,8 +91,8 @@ public class FieldOpsConfig {
     }
 
     @Bean
-    ScheduleBlock scheduleBlock(ExpeditionRepository repository) {
-        return new ScheduleBlock(repository);
+    ScheduleBlock scheduleBlock(ExpeditionRepository repository, ZoneRepository zones, ActivityTypeRegistry types) {
+        return new ScheduleBlock(repository, zones, types);
     }
 
     @Bean

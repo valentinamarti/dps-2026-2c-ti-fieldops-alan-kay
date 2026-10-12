@@ -61,6 +61,21 @@ class OpenApiDocumentationTest {
     }
 
     @Test
+    void publishesTheBlocksTheItineraryAndTheValidationAndEstimationOfAnExpedition() throws Exception {
+        api.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/expeditions/{expeditionId}/blocks'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/expeditions/{expeditionId}/itinerary'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/expeditions/{expeditionId}/validation'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/expeditions/{expeditionId}/estimate'].get").exists())
+                .andExpect(jsonPath("$.components.schemas.ScheduleBlockRequest").exists())
+                .andExpect(jsonPath("$.components.schemas.ItineraryNodeResponse").exists())
+                .andExpect(jsonPath("$.components.schemas.ItineraryResponse").exists())
+                .andExpect(jsonPath("$.components.schemas.ValidationResponse").exists())
+                .andExpect(jsonPath("$.components.schemas.EstimateResponse").exists());
+    }
+
+    @Test
     void servesSwaggerUi() throws Exception {
         api.perform(get("/swagger-ui/index.html")).andExpect(status().isOk());
     }
