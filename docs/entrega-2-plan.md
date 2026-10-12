@@ -12,9 +12,9 @@ La Entrega 2 se reparte en cinco fases, una por integrante: una base que se merg
 | 2. F2 Bloques | Bloques secuenciales y paralelos con Composite | D39 a D41 | Sin asignar |
 | 3. F1 Nocturna | Actividad nocturna con Decorator, los cuatro tipos de actividad que faltan y el registro de tipos | D42 a D44 | Sin asignar |
 | 4. F3 Replanificación | Evento de dominio, propuestas con varias opciones, decisión y auditoría | D45 a D48 | Sin asignar |
-| 5. API y demo | API REST, Swagger, seed, guion de demo, README e integración final | D49 a D51 | Sin asignar |
+| 5. API y demo | API REST, Swagger, seed, guion de demo, README e integración final | D49 a D52 | Sin asignar |
 
-Los dueños de F1, F2 y F3 escriben también los endpoints y los tests de API de su funcionalidad, sobre el esqueleto que publica la Fase 5. Así cada funcionalidad nueva queda "implementada, probada y documentada" por una sola persona, como pide la consigna.
+El plan original repartía los endpoints de F1, F2 y F3 entre sus dueños, sobre el esqueleto que publicaba la Fase 5, para que cada funcionalidad quedara "implementada, probada y documentada" por una sola persona. **No se cumplió:** las fases 2, 3 y 4 mergearon con su sección "API" pendiente. Esos endpoints los absorbe la Fase 5 (ver su alcance acordado).
 
 Supuestos del plan, tomados de las decisiones del 11/10:
 
@@ -418,43 +418,83 @@ El código actual choca con el criterio de aceptación en cuatro lugares. Hay qu
 
 ## Fase 5: API REST, demo y documentación
 
-Expone los casos de uso por REST, deja la demostración reproducible y cierra la entrega. Publica primero un esqueleto con las convenciones, para que las fases 2, 3 y 4 agreguen sus endpoints sin esperar.
+Expone los casos de uso por REST, deja la demostración reproducible y cierra la entrega.
 
-### PR 5a: esqueleto de la API (apenas mergea el PR 1a)
+**Estado (12/10/2026, antes de empezar):** nada escrito. `web` tiene solo `FieldOpsApplication`, `FieldOpsConfig` y `ReplanningConfig`: no hay paquete `adapters.driving.rest`, ni DTOs, ni `@RestControllerAdvice`, ni springdoc en el `pom`, ni carpeta `demo/`. `DESIGN.md` llega hasta D48 y el README dice que el proyecto todavía no expone endpoints. Las fases 1 a 4 están mergeadas en `main` (último commit `1baba60`).
+
+### Alcance acordado (12/10/2026)
+
+| Punto | Decisión |
+| --- | --- |
+| Endpoints pendientes de F1, F2 y F3 | **Los absorbe la Fase 5**, con sus tests de API y los cambios de dominio que habilitan. Son siete: agendar bloque, itinerario en árbol, alta de actividad por tipo, listar tipos, registrar incidente, consultar propuestas y decidir |
+| Alta del catálogo | **Casos de uso nuevos** en `business.usecases`. El controller no arma objetos de dominio, como fija D38 (D52) |
+| Guion de la demo | **`demo.http`**, el cliente HTTP de IntelliJ. La repetibilidad en la CI la cubre el test de API que recorre el mismo guion |
+| Frontend | **Fuera del alcance de la fase.** Queda anotado como pendiente del grupo en el README y en `DESIGN.md`; Swagger UI no lo reemplaza |
+| Persistencia | Sigue en memoria, como decidió el grupo el 11/10. D51 la registra como deuda técnica |
+
+Absorber los endpoints de las otras fases cambia el tamaño de la fase: pasa de "exponer lo que ya existe" a ser el último tramo de la entrega. Si hay que recortar, el orden es el del cierre de este documento: primero el camino que recorre la demo, después el resto del PR 5b.
+
+### Cambios de dominio que la API necesita
+
+El dominio quedó cerrado para tres cosas que un adaptador REST no puede resolver solo. Son trabajo de esta fase, en el módulo `domain`, y se documentan como revisión de las decisiones que tocan.
+
+1. **Alta de actividad por tipo.** `ScheduleActivityCommand(ExpeditionId, Activity, TimePeriod)` recibe la `Activity` ya construida, y `new Activity(...)` pide `Zone`, `List<Activity>` de dependencias y `ActivityRules`. Hace falta un comando con `zoneId`, ids de dependencias, nombre del tipo, parámetros e indicador de nocturna, y que el caso de uso resuelva la zona con `ZoneRepository`, las dependencias en el itinerario y las reglas con `ActivityTypeRegistry`. Es la deuda que anotó la Fase 3 (nota en D38).
+2. **Alta de bloque.** `ScheduleBlockCommand(ExpeditionId, PlannedNode)` tiene el mismo problema un nivel más arriba: `PlannedNode.activity(...)` también recibe `Activity` armadas. El DTO es un árbol y se traduce con el mismo resolver del punto 1. **No estaba anotado en ninguna fase**; salió al definir este alcance.
+3. **Itinerario en árbol.** `ItineraryNode` no expone los hijos ni el tipo de nodo, y la Fase 2 cerró con el criterio de que no haya `instanceof` ni `switch` sobre el tipo de nodo. Para serializar el árbol hay que elegir: sumar a la interfaz un accesor de hijos y un nombre de tipo, o un Visitor (que la Fase 2 descartó en la tabla de patrones no aplicados). **A decidir en el PR 5a y documentar en D49.**
+
+Y una decisión que queda abierta: **el dominio no dice de qué tipo es una actividad ni si es nocturna** (lo anotó la Fase 3). Si la respuesta del itinerario lo tiene que mostrar, el dato viaja aparte o se guarda. Se resuelve junto con el punto 3.
+
+### PR 5a: esqueleto de la API
 
 - [ ] Paquete `adapters.driving.rest` en `web`, con un controller por recurso.
 - [ ] DTOs de entrada y salida como `record`, separados del dominio, con sus mappers. Ninguna entidad se serializa directo.
 - [ ] Un `@RestControllerAdvice` que traduce las excepciones de dominio a HTTP con un formato de error único (`ProblemDetail`).
 - [ ] springdoc para generar OpenAPI y Swagger UI. Verificar la versión compatible con el Spring Boot del proyecto.
-- [ ] Un endpoint completo de punta a punta como ejemplo para las otras fases, con su test de API.
+- [ ] Un endpoint completo de punta a punta como ejemplo del resto, con su test de API.
+- [ ] Prefijo `/api`, y convención para las operaciones que no son CRUD: son sub-recursos en `POST` (`/approval`, `/suspension`), no verbos en la URL. Queda en D49.
 
-Mapeo de errores propuesto:
+Mapeo de errores, con las dieciocho excepciones que hay hoy en `business.exceptions`:
 
 | Excepción de dominio | HTTP |
 | --- | --- |
-| Argumento inválido, `InvalidScheduleException`, `InvalidTrackingException` | 400 |
-| Recurso, zona, expedición o propuesta inexistente | 404 |
-| `InvalidStatusTransitionException`, `ExpeditionNotEditableException`, `ActivitiesInProgressException`, `Duplicate*`, `ResourceUnavailableException` | 409 |
-| `ExpeditionNotApprovableException` (con la lista de críticos), `UnacceptedWarningException`, `InsufficientStockException` | 422 |
+| Argumento inválido (`IllegalArgumentException`, `NullPointerException` de los constructores), `InvalidScheduleException`, `InvalidTrackingException`, `UnknownActivityTypeException`, `InvalidActivityParametersException` | 400 |
+| `NotAResponsibleException` | 403, o 422 si se prefiere tratarlo como regla de negocio. **A definir en 5a** |
+| `NotFoundException` (recurso, zona, expedición, actividad agendada, propuesta u opción inexistente) | 404 |
+| `InvalidStatusTransitionException`, `ExpeditionNotEditableException`, `ActivitiesInProgressException`, `ResourceUnavailableException`, `DuplicateExpeditionException`, `DuplicateResourceException`, `DuplicateZoneException`, `DuplicateReplanProposalException`, `ProposalAlreadyDecidedException` | 409 |
+| `ExpeditionNotApprovableException` (con la lista de críticos en el cuerpo), `UnacceptedWarningException`, `InsufficientStockException` | 422 |
 
 ### PR 5b: endpoints de los requisitos funcionales
 
-| Capacidad | Endpoints |
-| --- | --- |
-| Catálogo | Alta y consulta de personas, vehículos, instrumentos y consumibles; registrar indisponibilidad; alta y consulta de zonas |
-| Expediciones | Crear, listar, obtener |
-| Itinerario | Agendar actividad, asignar personal, equipo y consumible, candidatos de asignación |
-| Validación y estimación | Validar sin aprobar, estimar |
-| Aprobación y estados | Enviar a revisión, devolver a borrador, aprobar con advertencias aceptadas, iniciar, suspender, reanudar, finalizar |
-| Seguimiento | Iniciar y finalizar actividad, registrar observación |
-| Informes | Informe de la expedición |
+Inventario completo, con el caso de uso que hay detrás de cada uno. Los marcados **(nuevo)** son casos de uso que hay que escribir; los marcados **(dominio)** dependen de los cambios de la sección anterior; los marcados **(F1/F2/F3)** son los que absorbemos de las otras fases.
 
-Los endpoints de bloques, de actividad nocturna y de incidentes y propuestas los escriben las fases 2, 3 y 4.
+| Capacidad | Endpoint | Caso de uso |
+| --- | --- | --- |
+| Catálogo | `POST` y `GET /api/staff`, `/api/equipment`, `/api/supplies` | `RegisterStaff`, `RegisterEquipment`, `RegisterSupply`, `QueryCatalog` **(nuevos)** |
+| Catálogo | `POST /api/{recurso}/{id}/unavailabilities` | `MarkResourceUnavailable` **(nuevo)** |
+| Zonas | `POST /api/zones`, `GET /api/zones`, `GET /api/zones/{id}` | `RegisterZone`, `QueryZones` **(nuevos)** |
+| Expediciones | `POST /api/expeditions`, `GET /api/expeditions`, `GET /api/expeditions/{id}` | `CreateExpedition.create(command)`, `QueryExpeditions` |
+| Itinerario | `POST /api/expeditions/{id}/activities` | `ScheduleActivity` **(dominio, F1)** |
+| Itinerario | `POST /api/expeditions/{id}/blocks` | `ScheduleBlock` **(dominio, F2)** |
+| Itinerario | `GET /api/expeditions/{id}/itinerary` | `QueryExpeditions.get` + mapeo del árbol **(dominio, F2)** |
+| Itinerario | `GET /api/activity-types` | `QueryActivityTypes` **(F1)** |
+| Asignación | `POST /api/expeditions/{id}/activities/{activityId}/staff`, `/equipment`, `/supplies` | `AssignResources` |
+| Asignación | `GET /api/expeditions/{id}/activities/{activityId}/candidates` | `FindAssignmentCandidates` |
+| Validación y estimación | `GET /api/expeditions/{id}/validation`, `/estimate` | `ValidateExpedition`, `EstimateExpedition` |
+| Informes | `GET /api/expeditions/{id}/report` | `ReportExpedition` |
+| Estados | `POST /api/expeditions/{id}/review`, `/draft`, `/execution`, `/suspension`, `/resumption` | `TransitionExpedition` |
+| Aprobación | `POST /api/expeditions/{id}/approval` (cuerpo: advertencias aceptadas) | `ApproveExpedition.approve(id, acceptances)` |
+| Cierre | `POST /api/expeditions/{id}/completion` | `FinishExpedition.finish(id)` |
+| Seguimiento | `POST /api/expeditions/{id}/activities/{activityId}/start`, `/completion`, `/observations` | `TrackActivity` |
+| Incidentes | `POST /api/expeditions/{id}/incidents` (devuelve la propuesta) | `RegisterIncident` **(F3)** |
+| Propuestas | `GET /api/expeditions/{id}/replan-proposals`, `GET /api/replan-proposals/{id}` | `QueryReplanProposals` **(F3)** |
+| Propuestas | `POST /api/replan-proposals/{id}/acceptance` (número de opción + responsable, justificación y fecha), `/rejection` | `DecideReplanProposal` **(F3)** |
+
+Son unos treinta endpoints sobre diecisiete casos de uso existentes y seis nuevos. `ReplanExpedition` (la replanificación manual, sin incidente) **no se expone**: la consigna pide la replanificación por incidente y el caso de uso manual ya tiene cobertura unitaria. Queda anotado en D49.
 
 ### PR 5c: demo
 
 - [ ] Seed como datos: `demo/catalog.json` y `demo/expedition.json`, más un único cargador genérico que corre con el perfil `demo`. Usa los builders y el registro de tipos de la Fase 3. No hay clases Java propias de la demo.
-- [ ] Guion contra la API (`demo.http` o `demo.sh`, a definir): crear la expedición, intentar aprobar y ver el crítico, corregir, aceptar la advertencia, aprobar, ejecutar, registrar el incidente y elegir una opción.
+- [ ] Guion contra la API en `demo.http`: crear la expedición, intentar aprobar y ver el crítico, corregir, aceptar la advertencia, aprobar, ejecutar, registrar el incidente y elegir una opción.
 - [ ] El escenario cubre lo que sugiere la consigna: diez o más actividades, seis tipos y la nocturna, un paralelo dentro de un secuencial, un recurso compartido, un error crítico, una advertencia aceptable y la replanificación.
 - [ ] Candidatos naturales: el crítico es el permiso nocturno faltante, y la advertencia es el riesgo por encima de la tolerancia, que `RiskToleranceValidation` ya emite como advertencia.
 
@@ -462,23 +502,30 @@ Los endpoints de bloques, de actividad nocturna y de incidentes y propuestas los
 
 - [ ] Tests de API con el contexto completo y los adaptadores reales en memoria, sin mocks: un caso feliz por capacidad.
 - [ ] Parametrizado: cada excepción de dominio devuelve su código HTTP.
+- [ ] Unitarios de los casos de uso nuevos del catálogo, con Mockito, como el resto de la Fase 1.
+- [ ] Tests de API de lo que absorbemos: agendar un bloque con su árbol, alta de una actividad nocturna por tipo, listar tipos, y el flujo completo de F3 (incidente, propuesta, aceptar y rechazar).
 - [ ] Test del cargador del seed: los archivos de `demo/` cargan sin errores.
-- [ ] Un test de API que recorre el mismo guion de la demo, para que la CI avise si la demo se rompe.
+- [ ] Un test de API que recorre el mismo guion de `demo.http`, para que la CI avise si la demo se rompe.
 
 ### README y cierre
 
-- [ ] Reescribir el README: requisitos, cómo compilar, ejecutar y probar, estructura de módulos, cómo correr la demo, contratos de la API (tabla de endpoints y enlace a Swagger UI), CI y regla de protección de rama.
+- [ ] Reescribir el README: requisitos, cómo compilar, ejecutar y probar, estructura de módulos, cómo correr la demo, contratos de la API (tabla de endpoints y enlace a Swagger UI), CI y regla de protección de rama. Hoy dice que el proyecto no expone endpoints.
 - [ ] Revisión final de `DESIGN.md`: numeración, referencias cruzadas, párrafo de modelo de dominio, tabla de patrones no aplicados y supuestos.
+- [ ] Completar las subsecciones de F1, F2 y F3 con los endpoints que agregamos, porque cada funcionalidad las tiene abiertas por su parte de API.
 - [ ] Correr la demo completa desde un clon limpio.
 - [ ] Anotar la URL del repo y el hash del commit de entrega.
+- [ ] Recordarle al grupo los dos pendientes que no son de esta fase y están en el checklist: la regla de protección de `main` (falta permiso de admin) y el frontend mínimo.
 
 ### `DESIGN.md`
 
-- D49: la API como adaptador driving, con DTOs propios y el mapeo de errores fuera del dominio. Alternativas descartadas: serializar entidades, anotar excepciones de dominio con códigos HTTP.
+- D49: la API como adaptador driving, con DTOs propios y el mapeo de errores fuera del dominio. Alternativas descartadas: serializar entidades, anotar excepciones de dominio con códigos HTTP. Se escribe en el PR 5a y se le agrega después cómo se serializa el árbol del itinerario sin condicionales por tipo de nodo, y por qué no se expone la replanificación manual.
 - D50: seed como datos con un cargador genérico. Alternativas descartadas: clases Java de demo, `data.sql` antes de tener persistencia.
 - D51: persistencia en memoria detrás de los puertos y tests de repositorio como contrato. Se registra como deuda técnica de la entrega.
+- D52: casos de uso de alta del catálogo y de zonas. Extiende D38. Alternativa descartada: que el controller llame directo a `ResourceCatalog` y `ZoneRepository` y construya los objetos de dominio.
+- Revisión de D38: los comandos de agendar actividad y bloque pasan a recibir ids, tipo y parámetros, que es lo que la Fase 1 dejó anotado como pendiente y la Fase 3 como deuda.
+- Patrones no aplicados: JPA en esta entrega, y Visitor si el árbol del itinerario se resuelve de otra forma.
 
-**Terminado cuando:** un clon limpio compila, pasa los tests, arranca con el perfil `demo` y el guion corre de principio a fin.
+**Terminado cuando:** un clon limpio compila, pasa los tests, arranca con el perfil `demo` y el guion de `demo.http` corre de principio a fin.
 
 ## `DESIGN.md`: qué escribe cada fase
 
@@ -505,8 +552,9 @@ Cada fase escribe sus entradas en el mismo PR que el código, con numeración re
 | D49 | API REST como adaptador driving | 5 |
 | D50 | Seed como datos | 5 |
 | D51 | Persistencia en memoria y contrato de repositorios | 5 |
+| D52 | Casos de uso de alta del catálogo y de zonas | 5 |
 
-Si una fase necesita una entrada más, toma desde D52 y avisa al resto.
+Si una fase necesita una entrada más, toma desde D53 y avisa al resto.
 
 ### Formato de cada decisión
 
@@ -556,8 +604,12 @@ La fecha de entrega es el pendiente que más condiciona el plan: el calendario d
 | ~~Nivel de riesgo por encima de `HIGH`~~ | Resuelto en la Fase 3: se agregó `EXTREME` (D42) | F1 |
 | ~~Dónde vive el conflicto en paralelo~~ | Resuelto en la Fase 2: en `ResourceOverlapValidation`, sin regla nueva (D41) | F2 |
 | ~~Incidente sobre una actividad en curso o pendiente~~ | Resuelto en la Fase 4: las dos; una en curso se cierra antes de aceptar y la alternativa la rehace (D47) | F3 |
-| Formato del guion (`demo.http` o `demo.sh`) | Fase 5 | Demo |
-| Persistencia real y frontend | El grupo | Tests de repositorio y entregable de frontend |
+| ~~Formato del guion (`demo.http` o `demo.sh`)~~ | Resuelto en la Fase 5: `demo.http`, y un test de API que recorre el mismo guion | Demo |
+| ~~Quién escribe los endpoints de F1, F2 y F3~~ | Resuelto el 12/10: los absorbe la Fase 5, con sus tests y los cambios de dominio que habilitan | Fase 5 |
+| Cómo se serializa el árbol del itinerario | Fase 5, en el PR que escribe el endpoint del itinerario. Se agrega a D49 ahí; el 5a no lo necesita | Endpoint del itinerario |
+| Si `NotAResponsibleException` es 403 o 422 | Fase 5, en el PR 5a | Endpoints de decisión de F3 |
+| Persistencia real | El grupo | Tests de repositorio |
+| Frontend mínimo | El grupo. **Fuera del alcance de la Fase 5**, que entrega API, Swagger y guion | Entregable de frontend y checklist |
 
 ### Riesgos
 
@@ -566,6 +618,7 @@ La fecha de entrega es el pendiente que más condiciona el plan: el calendario d
 - **PR 1a demorado.** Mientras no mergee, nadie tiene módulos ni CI. Tiene que ser lo primero y no mezclar otros cambios.
 - **F3 depende de F2.** Si los bloques se demoran, la Fase 4 avanza sobre el itinerario plano y suma la copia de bloques al final.
 - **Calendario de clases.** Rest API se dicta el 20/10 y Spring Data el 27/10. Si la entrega es antes, la API se hace sin esa clase.
+- **La Fase 5 quedó cargada.** Al absorber los endpoints de F1, F2 y F3 (12/10), la fase pasó a ser unos treinta endpoints, seis casos de uso nuevos, tres cambios de dominio, el seed, el guion, los tests de API y el cierre de la documentación. Es la única fase que queda abierta y la más grande. Si la fecha de entrega es el 13/10 no entra: hay que recortar por el orden de abajo o pedir que alguien tome el PR 5b.
 
 Si la fecha es el 13/10, el orden de recorte recomendado es: primero el dominio de F1, F2 y F3 con sus tests y su `DESIGN.md`, después la API de los flujos que usa la demo, y al final el resto de los endpoints.
 
