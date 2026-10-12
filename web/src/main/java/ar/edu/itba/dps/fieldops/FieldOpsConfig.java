@@ -65,8 +65,13 @@ public class FieldOpsConfig {
     }
 
     @Bean
-    ReplanExpedition replanExpedition(ExpeditionRepository repository) {
-        return new ReplanExpedition(repository, new ExpeditionReplanner(repository));
+    ExpeditionReplanner expeditionReplanner(ExpeditionRepository repository) {
+        return new ExpeditionReplanner(repository);
+    }
+
+    @Bean
+    ReplanExpedition replanExpedition(ExpeditionRepository repository, ExpeditionReplanner replanner) {
+        return new ReplanExpedition(repository, replanner);
     }
 
     @Bean
