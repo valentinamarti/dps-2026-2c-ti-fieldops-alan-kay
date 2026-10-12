@@ -1,5 +1,6 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
+import ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
@@ -16,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 class CreateExpeditionTest {
 
     private final SequentialExpeditionRepository repository = new SequentialExpeditionRepository();
-    private final CreateExpedition createExpedition = new CreateExpedition(repository);
+    private final CreateExpedition createExpedition = ExpeditionFixtures.createExpeditionOn(repository);
     private final Zone coast = zone("z-1");
     private final Person leader = person("p-1");
 

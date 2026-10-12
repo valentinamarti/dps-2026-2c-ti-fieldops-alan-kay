@@ -1,6 +1,11 @@
 package ar.edu.itba.dps.fieldops.business.fixtures;
 
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
+import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
+import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
+import ar.edu.itba.dps.fieldops.business.usecases.CreateExpedition;
+import org.mockito.Mockito;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
@@ -87,6 +92,10 @@ public final class ExpeditionFixtures {
                 assignContainers(expedition, item);
             }
         });
+    }
+
+    public static CreateExpedition createExpeditionOn(ExpeditionRepository repository) {
+        return new CreateExpedition(repository, Mockito.mock(ZoneRepository.class), new ResourceCatalog());
     }
 
     public static ExpeditionBuilder expeditionIn(Zone zone, Person responsible) {

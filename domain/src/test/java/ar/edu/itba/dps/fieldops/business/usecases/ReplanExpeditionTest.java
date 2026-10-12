@@ -1,5 +1,6 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
+import ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.replanning.Cancellation;
@@ -28,7 +29,7 @@ class ReplanExpeditionTest {
 
     @Test
     void theAlternativeGetsANewIdFromTheSystemAndIsStored() {
-        final var original = new CreateExpedition(repository).create(expeditionIn(coast, person("p-1")));
+        final var original = ExpeditionFixtures.createExpeditionOn(repository).create(expeditionIn(coast, person("p-1")));
         original.schedule(sampling("a-1", coast, hours(8, 18)), hours(9, 11));
         final var affectedItem = original.schedule(sampling("a-2", coast, hours(8, 18)), hours(12, 14));
         completeAssignments(original);

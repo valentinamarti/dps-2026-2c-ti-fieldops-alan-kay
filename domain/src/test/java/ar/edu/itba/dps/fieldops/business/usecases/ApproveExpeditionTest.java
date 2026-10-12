@@ -1,5 +1,6 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
+import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotApprovableException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InsufficientStockException;
 import ar.edu.itba.dps.fieldops.business.exceptions.ResourceUnavailableException;
@@ -47,7 +48,7 @@ class ApproveExpeditionTest {
     private final ResourceReservations reservations = new ResourceReservations();
 
     private ApproveExpedition finding(ValidationResult... results) {
-        return new ApproveExpedition(List.of(_ -> List.of(results)), reservations, repository);
+        return new ApproveExpedition(List.of(_ -> List.of(results)), reservations, repository, new ResourceCatalog());
     }
 
     @Test
@@ -112,7 +113,7 @@ class ApproveExpeditionTest {
     void aDiveWithoutDiversIsNotApprovedEvenWithoutAdditionalRules() {
         expedition.schedule(diving("a-1", coast, hours(0, 24), 30), hours(9, 11));
         expedition.submitForReview();
-        final var approveExpedition = new ApproveExpedition(List.of(), reservations, repository);
+        final var approveExpedition = new ApproveExpedition(List.of(), reservations, repository, new ResourceCatalog());
 
         assertThrows(ExpeditionNotApprovableException.class, () -> approveExpedition.approve(expedition, List.of()));
         assertEquals(ExpeditionStatus.IN_REVIEW, expedition.getStatus());
@@ -137,7 +138,7 @@ class ApproveExpeditionTest {
     void aSecondExpeditionCannotBeApprovedWithStockAlreadyReserved() {
         final var jars = supply("d-1", "Sample container", Quantity.of("3", UNITS));
         final var policy = new ApprovalPolicy(List.of());
-        final var approveExpedition = new ApproveExpedition(List.of(), reservations, repository);
+        final var approveExpedition = new ApproveExpedition(List.of(), reservations, repository, new ResourceCatalog());
         final var first = expeditionIn(coast, leader).build(repository);
         final var firstItem = first.schedule(sampling("a-1", coast, hours(0, 24)), hours(9, 11));
         first.assignSupply(firstItem, jars);
