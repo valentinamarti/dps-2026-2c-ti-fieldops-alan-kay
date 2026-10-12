@@ -29,6 +29,7 @@ import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.comp
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.diving;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.nightDiving;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.sampling;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.supply;
@@ -164,5 +165,19 @@ class ExpeditionReporterTest {
         assertEquals(looseActivities.plus(longestOfTheParallelBlock).plus(sumOfTheSequentialBlock), report.estimate().totalDuration());
         assertEquals(6, report.scheduledActivities());
         assertEquals(RiskLevel.MEDIUM, report.estimate().overallRisk());
+    }
+
+    @Test
+    void theReportOfAnExpeditionWithANightActivityReflectsItsRisk() {
+        final var riskByDay = reporter.reportOf(expedition).estimate().overallRisk();
+
+        expedition.schedule(nightDiving("a-3", coast, hours(0, 24), 40), hours(20, 23));
+        final var report = reporter.reportOf(expedition);
+
+        assertEquals(RiskLevel.LOW, riskByDay);
+        assertEquals(3, report.scheduledActivities());
+        assertEquals(RiskLevel.EXTREME, report.estimate().overallRisk());
+        assertEquals(Duration.ofMinutes(120 + 120 + 125), report.estimate().totalDuration());
+        assertEquals(new ExpeditionEstimator().estimate(expedition), report.estimate());
     }
 }

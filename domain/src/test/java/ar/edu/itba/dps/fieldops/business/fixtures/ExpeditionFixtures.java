@@ -21,8 +21,10 @@ import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.resources.Vehicle;
+import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.rules.DivingRules;
+import ar.edu.itba.dps.fieldops.business.rules.NightOperationRules;
 import ar.edu.itba.dps.fieldops.business.rules.SampleCollectionRules;
 
 import java.time.LocalDateTime;
@@ -34,6 +36,7 @@ import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.UN
 public final class ExpeditionFixtures {
 
     public static final Certification DIVING = new Certification("Diving");
+    public static final Certification NIGHT_OPERATIONS = new Certification("Night operations");
 
     private static final LocalDateTime FIRST_DAY = LocalDateTime.of(2026, 10, 1, 0, 0);
 
@@ -72,8 +75,24 @@ public final class ExpeditionFixtures {
         return new Activity(new ActivityId(id), "Diving " + id, window, zone, List.of(), new DivingRules(maxDepthMeters));
     }
 
+    public static Activity nightSampling(String id, Zone zone, TimePeriod window) {
+        return new Activity(new ActivityId(id), "Night sampling " + id, window, zone, List.of(), new NightOperationRules(new SampleCollectionRules(3)));
+    }
+
+    public static Activity nightDiving(String id, Zone zone, TimePeriod window, int maxDepthMeters) {
+        return new Activity(new ActivityId(id), "Night diving " + id, window, zone, List.of(), new NightOperationRules(new DivingRules(maxDepthMeters)));
+    }
+
+    public static Permit nightPermit(Zone zone) {
+        return zone.specialPermitFor("Night operations");
+    }
+
     public static void assignCooler(Expedition expedition, ItineraryItem item) {
         expedition.assignEquipment(item, instrument("c-" + item.getActivity().getId(), "Cooler"));
+    }
+
+    public static void assignLighting(Expedition expedition, ItineraryItem item) {
+        expedition.assignEquipment(item, instrument("l-" + item.getActivity().getId(), "Lighting"));
     }
 
     public static void assignContainers(Expedition expedition, ItineraryItem item) {

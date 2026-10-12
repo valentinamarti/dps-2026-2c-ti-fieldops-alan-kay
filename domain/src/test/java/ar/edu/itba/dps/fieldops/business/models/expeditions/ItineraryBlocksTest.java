@@ -1,20 +1,31 @@
 package ar.edu.itba.dps.fieldops.business.models.expeditions;
 
+import ar.edu.itba.dps.fieldops.business.estimations.ExpeditionEstimator;
 import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotEditableException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
 import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
+import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
+import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
+import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
+import ar.edu.itba.dps.fieldops.business.validations.ApprovalPolicy;
+import ar.edu.itba.dps.fieldops.business.validations.MissingCertificationsValidation;
+import ar.edu.itba.dps.fieldops.business.validations.MissingPermitsValidation;
+import ar.edu.itba.dps.fieldops.business.validations.MissingResourcesValidation;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.completeAssignments;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.nightDiving;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.sampling;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
@@ -246,5 +257,35 @@ class ItineraryBlocksTest {
 
         assertThrows(ExpeditionNotEditableException.class,
                 () -> expedition.schedule(parallel(activity(dive, hours(9, 11)), activity(transect, hours(9, 11)))));
+    }
+
+    private static List<ValidationResult> findingsAbout(Expedition planned, Activity activity) {
+        return new ApprovalPolicy(List.of()).validate(planned).results().stream()
+                .filter(result -> result.subject().activity().equals(Optional.of(activity.getId())))
+                .toList();
+    }
+
+    @Test
+    void aNightActivityInsideABlockIsValidatedAndEstimatedLikeALooseOne() {
+        final var nightDive = nightDiving("a-5", coast, hours(0, 24), 40);
+        final var uncertified = person("p-2");
+        final var loose = expeditionIn(coast, leader).build(repository);
+        loose.assignStaff(loose.schedule(nightDive, hours(20, 23)), uncertified);
+
+        final var block = expedition.schedule(sequential(
+                activity(landing, hours(18, 20)),
+                parallel(
+                        activity(nightDive, hours(20, 23)),
+                        activity(transect, hours(20, 22)))));
+        expedition.assignStaff(itemOf(nightDive), uncertified);
+
+        final var findings = findingsAbout(expedition, nightDive);
+        assertEquals(findingsAbout(loose, nightDive), findings);
+        assertTrue(findings.contains(ValidationResult.critical(MissingCertificationsValidation.ID, ValidationSubject.of(nightDive.getId(), uncertified.getId()), "Night diving a-5 requires everyone assigned to be certified in night operations, but p-2 is not")));
+        assertTrue(findings.contains(ValidationResult.critical(MissingPermitsValidation.ID, ValidationSubject.of(nightDive.getId()), "Night diving a-5 requires the permit night operations in zone z-1, which was not granted")));
+        assertTrue(findings.contains(ValidationResult.critical(MissingResourcesValidation.ID, ValidationSubject.of(nightDive.getId()), "Night diving a-5 has 0 of the 1 lighting it needs")));
+        assertEquals(RiskLevel.EXTREME, block.estimatedRisk());
+        assertEquals(new ExpeditionEstimator().estimate(loose).overallRisk(), new ExpeditionEstimator().estimate(expedition).overallRisk());
+        assertEquals(Duration.ofMinutes(120 + 125), block.estimatedDuration());
     }
 }
