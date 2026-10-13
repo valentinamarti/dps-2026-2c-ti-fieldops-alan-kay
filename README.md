@@ -262,7 +262,7 @@ property brings them structured, with the same shape `GET /api/expeditions/{id}/
 
 ## Tests
 
-`mvn -B verify` runs 782 tests: 637 in `domain`, 20 in `app` and 125 in `web`.
+`mvn -B verify` runs 787 tests: 641 in `domain`, 20 in `app` and 126 in `web`.
 
 | Kind | Where |
 | --- | --- |
@@ -298,6 +298,6 @@ Work happens on one branch per phase with small pull requests.
 
 ## Design decisions
 
-See [DESIGN.md](DESIGN.md), in Spanish: D1 to D34 come from the first delivery and D35 to D58 from this one,
+See [DESIGN.md](DESIGN.md), in Spanish: D1 to D34 come from the first delivery and D35 to D59 from this one,
 plus one section per new functionality (F1, F2 and F3) with the classes added and modified, the refactorings
 and the technical debt that was left unresolved on purpose.
