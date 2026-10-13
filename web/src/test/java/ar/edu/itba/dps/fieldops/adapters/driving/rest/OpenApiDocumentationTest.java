@@ -107,6 +107,22 @@ class OpenApiDocumentationTest {
     }
 
     @Test
+    void publishesTheIncidentsAndTheReplanProposalsTheyGenerate() throws Exception {
+        api.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/expeditions/{expeditionId}/incidents'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/expeditions/{expeditionId}/replan-proposals'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/replan-proposals/{proposalId}'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/replan-proposals/{proposalId}/acceptance'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/replan-proposals/{proposalId}/rejection'].post").exists())
+                .andExpect(jsonPath("$.components.schemas.RegisterIncidentRequest").exists())
+                .andExpect(jsonPath("$.components.schemas.ReplanProposalResponse").exists())
+                .andExpect(jsonPath("$.components.schemas.ReplanOptionDto").exists())
+                .andExpect(jsonPath("$.components.schemas.AcceptReplanOptionRequest").exists())
+                .andExpect(jsonPath("$.components.schemas.ReplanDecisionRequest").exists());
+    }
+
+    @Test
     void servesSwaggerUi() throws Exception {
         api.perform(get("/swagger-ui/index.html")).andExpect(status().isOk());
     }
