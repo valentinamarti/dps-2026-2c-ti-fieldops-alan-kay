@@ -1,5 +1,6 @@
 package ar.edu.itba.dps.fieldops.adapters.driving.rest;
 
+import ar.edu.itba.dps.fieldops.adapters.driving.rest.mappers.ValidationMapper;
 import ar.edu.itba.dps.fieldops.business.exceptions.ActivitiesInProgressException;
 import ar.edu.itba.dps.fieldops.business.exceptions.DuplicateExpeditionException;
 import ar.edu.itba.dps.fieldops.business.exceptions.DuplicateReplanProposalException;
@@ -74,6 +75,22 @@ public class DomainExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(RuntimeException.class)
     public ProblemDetail handle(RuntimeException exception) {
+        return problemFor(exception);
+    }
+
+    /**
+     * The one error that carries more than a message: besides the {@code detail}, which already enumerates
+     * them, the criticals that blocked the approval travel as a {@code criticals} property, with the same
+     * shape {@code GET .../validation} gives them, so a client can iterate them instead of parsing text (D58).
+     */
+    @ExceptionHandler(ExpeditionNotApprovableException.class)
+    public ProblemDetail handle(ExpeditionNotApprovableException exception) {
+        final var problem = problemFor(exception);
+        problem.setProperty("criticals", exception.getCriticals().stream().map(ValidationMapper::toDto).toList());
+        return problem;
+    }
+
+    private ProblemDetail problemFor(RuntimeException exception) {
         return statusOf(exception.getClass())
                 .map(status -> problem(status, exception.getMessage()))
                 .orElseGet(() -> unexpected(exception));

@@ -35,7 +35,7 @@ public final class ValidationMapper {
         return findings.stream().map(ValidationMapper::toDto).toList();
     }
 
-    static ValidationFindingDto toDto(ValidationResult finding) {
+    public static ValidationFindingDto toDto(ValidationResult finding) {
         return new ValidationFindingDto(finding.rule().value(), toDto(finding.subject()), finding.message());
     }
 

@@ -134,8 +134,10 @@ class ExpeditionLifecycleApiTest {
 
     /**
      * The other direction of the same rule (D22): a critical is not something a responsible can accept, so
-     * approving with one still open fails, and the body says which one (D57; it is the message of
-     * {@code ExpeditionNotApprovableException}, which already lists every critical it blocked on).
+     * approving with one still open fails, and the body says which ones. They come both ways (D58): enumerated
+     * in the {@code detail}, which is the message of {@code ExpeditionNotApprovableException}, and as a
+     * {@code criticals} array with the same shape {@code GET .../validation} gives them, so a client can
+     * iterate them without parsing text.
      */
     @Test
     void approvingWithACriticalStillOpenFailsAndTheBodyListsIt() throws Exception {
@@ -146,7 +148,14 @@ class ExpeditionLifecycleApiTest {
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.detail").value(Matchers.containsString("cannot be approved")))
                 .andExpect(jsonPath("$.detail").value(Matchers.containsString("has 0 of the 1 staff members it needs")))
-                .andExpect(jsonPath("$.detail").value(Matchers.containsString("has 0 of the 1 cooler it needs")));
+                .andExpect(jsonPath("$.detail").value(Matchers.containsString("has 0 of the 1 cooler it needs")))
+                .andExpect(jsonPath("$.criticals.length()").value(3))
+                .andExpect(jsonPath("$.criticals[*].rule").value(Matchers.contains(
+                        "missing-resources", "missing-resources", "insufficient-supplies")))
+                .andExpect(jsonPath("$.criticals[*].subject.activityId")
+                        .value(Matchers.everyItem(Matchers.is("a-1"))))
+                .andExpect(jsonPath("$.criticals[1].message")
+                        .value(Matchers.containsString("has 0 of the 1 cooler it needs")));
     }
 
     /**
