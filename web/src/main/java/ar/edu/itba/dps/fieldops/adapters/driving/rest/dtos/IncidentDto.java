@@ -3,8 +3,9 @@ package ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos;
 import java.time.LocalDateTime;
 
 /**
- * An incident registered against a scheduled activity, as the report shows it (D57). It is the first time an
- * incident travels over HTTP; F3 reuses this same DTO for its own endpoints.
+ * An incident registered against a scheduled activity, as the report shows it (D57) and as the proposal it
+ * motivated shows it back (D58): the same incident, with one translation, in
+ * {@code ReplanningMapper}.
  *
  * @param id                 the domain's {@code IncidentId}, which already reads as a path ("e-1/incidents/1")
  * @param resourceId         the resource the incident is about, or {@code null} when it is not about one

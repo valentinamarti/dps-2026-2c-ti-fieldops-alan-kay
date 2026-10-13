@@ -18,4 +18,20 @@ final class Locations {
     static URI itineraryOf(String expeditionId) {
         return URI.create("/api/expeditions/" + expeditionId + "/itinerary");
     }
+
+    /**
+     * Where an expedition can be read. Besides {@code ExpeditionController}, accepting a replan proposal
+     * creates one (the alternative, as a draft) and has to name it too (D58).
+     */
+    static URI expedition(String expeditionId) {
+        return URI.create("/api/expeditions/" + expeditionId);
+    }
+
+    /**
+     * Where a replan proposal can be read. Registering an incident creates one without being the owner of the
+     * resource, so the address is here and not inlined in two controllers (D58).
+     */
+    static URI replanProposal(String proposalId) {
+        return URI.create("/api/replan-proposals/" + proposalId);
+    }
 }

@@ -2,10 +2,7 @@ package ar.edu.itba.dps.fieldops.adapters.driving.rest.mappers;
 
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.AcceptedWarningDto;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.ExpeditionReportResponse;
-import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.IncidentDto;
-import ar.edu.itba.dps.fieldops.business.models.expeditions.Incident;
 import ar.edu.itba.dps.fieldops.business.models.report.ExpeditionReport;
-import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.validation.AcceptedWarning;
 
 /**
@@ -14,7 +11,8 @@ import ar.edu.itba.dps.fieldops.business.models.validation.AcceptedWarning;
  * translates, and {@code actualConsumption} is the same category-and-quantity shape, so the two are read the
  * same way even though one is a plan and the other is what happened. The warnings side reuses
  * {@link ValidationMapper}'s translation of a finding, closing the loop a {@code WarningAcceptanceRequest}
- * opened by copying one out of the validation.
+ * opened by copying one out of the validation. The incidents side reuses {@link ReplanningMapper}, which owns
+ * the concept (D48, D58): the log of the expedition and the incident of a proposal are the same incident.
  */
 public final class ReportMapper {
 
@@ -29,18 +27,8 @@ public final class ReportMapper {
                 report.finishedActivities(),
                 EstimateMapper.toResponse(report.estimate()),
                 EstimateMapper.toConsumptionDtos(report.actualConsumption()),
-                report.incidents().stream().map(ReportMapper::toDto).toList(),
+                report.incidents().stream().map(ReplanningMapper::toDto).toList(),
                 report.acceptedWarnings().stream().map(ReportMapper::toDto).toList());
-    }
-
-    private static IncidentDto toDto(Incident incident) {
-        return new IncidentDto(
-                incident.id().toString(),
-                incident.activity().value(),
-                incident.description(),
-                incident.occurredAt(),
-                incident.resource().map(ResourceId::value).orElse(null),
-                incident.expectedDelay().map(delay -> delay.toMinutes()).orElse(null));
     }
 
     private static AcceptedWarningDto toDto(AcceptedWarning warning) {

@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.net.URI;
 import java.util.List;
 import java.util.Objects;
 
@@ -45,7 +44,7 @@ public class ExpeditionController {
     @ApiResponse(responseCode = "404", description = "A zone or a responsible does not exist")
     public ResponseEntity<ExpeditionResponse> create(@RequestBody CreateExpeditionRequest request) {
         final var created = ExpeditionMapper.toResponse(createExpedition.create(ExpeditionMapper.toCommand(request)));
-        return ResponseEntity.created(URI.create("/api/expeditions/" + created.id())).body(created);
+        return ResponseEntity.created(Locations.expedition(created.id())).body(created);
     }
 
     @GetMapping
