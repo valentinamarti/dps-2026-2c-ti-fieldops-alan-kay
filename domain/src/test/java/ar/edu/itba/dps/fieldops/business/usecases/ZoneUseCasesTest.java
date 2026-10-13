@@ -21,13 +21,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * Registering and querying zones against a mocked repository, which is the output port they use (D38). That a
- * repeated id is rejected is part of the contract of every {@code ZoneRepository} and is verified by
- * {@code ZoneRepositoryContract}; here it is only checked that the use case does not swallow it.
- */
 class ZoneUseCasesTest {
-
     private static final Permit PROTECTED_AREA = new Permit("Protected area");
 
     private final ZoneRepository zones = mock(ZoneRepository.class);

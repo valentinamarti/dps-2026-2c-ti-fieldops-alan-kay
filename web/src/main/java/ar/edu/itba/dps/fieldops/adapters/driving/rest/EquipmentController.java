@@ -13,16 +13,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Objects;
 
-/**
- * The whole equipment of the catalog, read only: a vehicle is registered in {@code /api/vehicles} and an
- * instrument in {@code /api/instruments}, because they do not have the same shape, but whoever is looking for
- * equipment does not have to ask twice (D52).
- */
 @RestController
 @RequestMapping("/api/equipment")
 @Tag(name = "Equipment", description = "The vehicles and the instruments of the catalog, together")
 public class EquipmentController {
-
     private final QueryCatalog queryCatalog;
 
     public EquipmentController(QueryCatalog queryCatalog) {

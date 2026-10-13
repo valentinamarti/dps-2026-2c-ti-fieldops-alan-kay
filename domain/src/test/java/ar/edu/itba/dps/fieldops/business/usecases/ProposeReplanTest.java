@@ -21,11 +21,7 @@ import static ar.edu.itba.dps.fieldops.business.usecases.IncidentScenario.TEN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Which options a proposal offers depends on what the incident reports and on whether each alternative can be built.
- */
 class ProposeReplanTest {
-
     private static final String RESCHEDULE = "Run";
     private static final String REPLACE = "Replace";
     private static final String CANCEL = "Cancel";
@@ -50,10 +46,6 @@ class ProposeReplanTest {
                         true, List.of(RESCHEDULE, REPLACE, REPLACE, REPLACE, CANCEL)));
     }
 
-    /**
-     * The catalog of the scenario holds the leader and an outsider. With free staff it also has p-5, so there are
-     * more free candidates than the three a proposal offers; without it, everyone in the catalog is on leave.
-     */
     private static void prepareCatalog(IncidentScenario scenario, boolean freeStaffInCatalog) {
         if (freeStaffInCatalog) {
             scenario.catalog.addStaff(person("p-5"));

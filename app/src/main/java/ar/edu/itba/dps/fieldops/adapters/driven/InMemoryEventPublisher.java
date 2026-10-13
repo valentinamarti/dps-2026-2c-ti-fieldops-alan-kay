@@ -7,12 +7,7 @@ import ar.edu.itba.dps.fieldops.business.providers.EventPublisher;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * Hands each event to every subscriber of its type, in the order they were given, before returning (D45).
- * There are no retries: if a subscriber fails, the exception reaches whoever published.
- */
 public class InMemoryEventPublisher implements EventPublisher {
-
     private final List<EventSubscriber<?>> subscribers;
 
     public InMemoryEventPublisher(List<EventSubscriber<?>> subscribers) {

@@ -13,7 +13,6 @@ import java.util.Map;
 import java.util.Objects;
 
 public class ExpeditionReporter {
-
     private final ExpeditionEstimator estimator;
 
     public ExpeditionReporter(ExpeditionEstimator estimator) {
@@ -33,9 +32,6 @@ public class ExpeditionReporter {
                 expedition.getAcceptedWarnings());
     }
 
-    /**
-     * Only finished activities consumed anything, and only through the supply that covered each requirement.
-     */
     private Map<ResourceCategory, Quantity> actualConsumption(List<ItineraryItem> items) {
         final var consumed = new LinkedHashMap<ResourceCategory, Quantity>();
         items.stream()

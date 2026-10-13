@@ -26,15 +26,10 @@ import java.net.URI;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * The vehicles of the catalog: the equipment that has a license plate. The instruments are the other kind of
- * equipment and have their own resource; {@code GET /api/equipment} lists both (D52).
- */
 @RestController
 @RequestMapping("/api/vehicles")
 @Tag(name = "Vehicles", description = "The vehicles of the catalog and their unavailabilities")
 public class VehicleController {
-
     private final RegisterResources registerResources;
     private final QueryCatalog queryCatalog;
     private final MarkResourceUnavailable markResourceUnavailable;

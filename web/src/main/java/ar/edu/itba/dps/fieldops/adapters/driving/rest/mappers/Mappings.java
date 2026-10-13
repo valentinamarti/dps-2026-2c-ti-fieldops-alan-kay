@@ -15,16 +15,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-/**
- * The translations every mapper of this package shares: the value objects that travel as text and the lists
- * that come out sorted. It is here and not duplicated in each mapper because they are the same translation,
- * not a coincidence.
- *
- * <p>None of them validates. A value that is missing travels as {@code null} to the constructor of the value
- * object, which is what rejects it with its own message (D49).
- */
 final class Mappings {
-
     private Mappings() {
     }
 
@@ -58,10 +49,6 @@ final class Mappings {
                 .collect(Collectors.toUnmodifiableSet());
     }
 
-    /**
-     * The same translation as {@link #mapped} for the values whose order is part of what was sent, like the
-     * ids of the dependencies of an activity.
-     */
     static <T> List<T> mappedInOrder(List<String> values, Function<String, T> asValueObject) {
         return Objects.requireNonNullElse(values, List.<String>of()).stream().map(asValueObject).toList();
     }

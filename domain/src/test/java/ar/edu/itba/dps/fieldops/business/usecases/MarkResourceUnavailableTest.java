@@ -19,7 +19,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MarkResourceUnavailableTest {
-
     private final ResourceCatalog catalog = new ResourceCatalog();
     private final MarkResourceUnavailable markUnavailable = new MarkResourceUnavailable(catalog);
     private final Unavailability sickLeave = new Unavailability(hours(8, 12), "Sick leave");
@@ -61,10 +60,6 @@ class MarkResourceUnavailableTest {
                 () -> markUnavailable.markStaffUnavailable(new ResourceId("p-404"), sickLeave)).getMessage());
     }
 
-    /**
-     * The id has to be the one of the kind that is being marked: marking the instrument of a vehicle is not a
-     * different resource becoming unavailable, it is a request that does not refer to anything.
-     */
     @Test
     void failsWhenTheIdBelongsToAnotherKindOfResource() {
         catalog.addEquipment(vehicle("v-1", "Boat"));
@@ -73,10 +68,6 @@ class MarkResourceUnavailableTest {
                 () -> markUnavailable.markInstrumentUnavailable(new ResourceId("v-1"), sickLeave)).getMessage());
     }
 
-    /**
-     * A depletable supply has stock and not a calendar, so there is no way of marking one unavailable: its id
-     * is not the id of any reusable resource.
-     */
     @Test
     void doesNotReachTheSuppliesOfTheCatalog() {
         catalog.addSupply(supply("s-1", "Sample container", of("10", UNITS)));

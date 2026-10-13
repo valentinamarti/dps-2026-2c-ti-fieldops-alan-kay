@@ -6,11 +6,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * How the option generators put an option into words.
- */
 final class OptionSummaries {
-
     private OptionSummaries() {
     }
 

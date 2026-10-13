@@ -21,15 +21,10 @@ import java.net.URI;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * The depletable supplies of the catalog. There is no unavailabilities sub-resource here: a supply has stock,
- * not a calendar (D52).
- */
 @RestController
 @RequestMapping("/api/supplies")
 @Tag(name = "Supplies", description = "The depletable supplies of the catalog")
 public class SupplyController {
-
     private final RegisterResources registerResources;
     private final QueryCatalog queryCatalog;
 

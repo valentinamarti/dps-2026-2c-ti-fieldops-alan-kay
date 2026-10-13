@@ -17,16 +17,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Objects;
 
-/**
- * What the plan of an expedition is worth before it is approved: what the rules have to say about it and what
- * it is estimated to take. Both are reads, so they are {@code GET} of a sub-resource and not the sub-resource
- * in {@code POST} that an operation gets (D49).
- */
 @RestController
 @RequestMapping("/api/expeditions/{expeditionId}")
 @Tag(name = "Validation and estimation", description = "Validating and estimating an expedition without approving it")
 public class ExpeditionPlanController {
-
     private final ValidateExpedition validateExpedition;
     private final EstimateExpedition estimateExpedition;
 

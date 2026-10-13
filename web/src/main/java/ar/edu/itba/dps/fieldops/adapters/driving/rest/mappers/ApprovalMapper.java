@@ -9,14 +9,7 @@ import ar.edu.itba.dps.fieldops.business.usecases.WarningAcceptance;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * Turns the body of the approval into what {@code ApproveExpedition.approve} expects (D49, D57). The rule and
- * the subject are built the same way {@link ValidationMapper} reads them off a finding, which is what makes a
- * {@link WarningAcceptanceRequest} buildable by copying a {@code ValidationFindingDto} out of
- * {@code GET .../validation} and adding who accepts it and why.
- */
 public final class ApprovalMapper {
-
     private ApprovalMapper() {
     }
 

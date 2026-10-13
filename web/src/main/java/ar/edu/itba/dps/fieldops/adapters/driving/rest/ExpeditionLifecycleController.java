@@ -23,24 +23,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Objects;
 
-/**
- * The life of an expedition, from draft to finished, and what it is worth once it ran (D33, D49, D57). Every
- * transition is a sub-resource in {@code POST}, not a verb in the URL (D49): submitting for review is
- * {@code POST .../review}, approving is {@code POST .../approval}, and so on. All of them answer 204, because
- * none creates something with an address of its own; the effect is read back through
- * {@code GET /api/expeditions/{id}} (the status) or, for approving and finishing, through this same
- * controller's {@code GET .../report}.
- *
- * <p>{@code POST .../approval} is the one with a body: the warnings a responsible accepts, each built by
- * copying a finding out of {@code GET .../validation} (D57). An illegal transition, including approving with
- * a critical still open, fails the same way every other state change in the domain does (D20, D33): 409 if the
- * status itself cannot move there, 422 if what blocks it is a rule of approval.
- */
 @RestController
 @RequestMapping("/api/expeditions/{expeditionId}")
 @Tag(name = "Lifecycle", description = "Moving an expedition through its states, approving it, closing it and reporting on it")
 public class ExpeditionLifecycleController {
-
     private final TransitionExpedition transitionExpedition;
     private final ApproveExpedition approveExpedition;
     private final FinishExpedition finishExpedition;

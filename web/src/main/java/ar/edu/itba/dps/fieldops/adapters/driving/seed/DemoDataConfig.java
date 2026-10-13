@@ -20,18 +20,9 @@ import tools.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.List;
 
-/**
- * Turns {@link DemoDataLoader} on with the {@code demo} profile: the only piece of the seed that knows about
- * Spring, so the loader itself stays framework-free and testable without a context (D37, D50).
- *
- * <p>The documents come in as classpath resources, so the same build serves {@code mvn spring-boot:run}, the
- * packaged jar and the tests, with no working directory to get right. Where they are is a property, so another
- * scenario is another pair of files and not another class.
- */
 @Configuration
 @Profile("demo")
 public class DemoDataConfig {
-
     private static final Logger LOG = LoggerFactory.getLogger(DemoDataConfig.class);
 
     @Bean
@@ -43,12 +34,6 @@ public class DemoDataConfig {
                 scheduleActivity, scheduleBlock, assignResources, json);
     }
 
-    /**
-     * The seed runs while the context is being built, before the web server starts taking requests, so the
-     * first request of the script already finds the scenario loaded. A document that cannot be read or that
-     * the domain rejects fails the startup, which is what should happen: a half-loaded demo is worse than one
-     * that does not start.
-     */
     @Bean
     DemoData demoData(DemoDataLoader loader,
                       @Value("${fieldops.demo.catalog:classpath:demo/catalog.json}") Resource catalog,
@@ -60,11 +45,6 @@ public class DemoDataConfig {
         return loaded;
     }
 
-    /**
-     * What the seed left loaded. It is a bean so that loading happens once, when the context is built, and so
-     * that whoever needs to address the demonstration expedition has where to read its id from; over HTTP it
-     * is {@code GET /api/expeditions}.
-     */
     public record DemoData(List<ExpeditionId> expeditionIds) {
     }
 }

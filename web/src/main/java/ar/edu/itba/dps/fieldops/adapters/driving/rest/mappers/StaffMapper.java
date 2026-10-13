@@ -6,11 +6,7 @@ import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.usecases.RegisterPersonCommand;
 
-/**
- * Translates between the staff DTOs and the domain, in both directions (D49).
- */
 public final class StaffMapper {
-
     private StaffMapper() {
     }
 

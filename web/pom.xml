@@ -43,7 +43,6 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
-        <!-- 3.x is the springdoc line built on Spring Boot 4; the 2.x one targets Boot 3 and does not work here -->
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
@@ -60,7 +59,6 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
-        <!-- MockMvc and @AutoConfigureMockMvc, which Spring Boot 4 moved out of spring-boot-test-autoconfigure -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-webmvc-test</artifactId>
@@ -73,12 +71,6 @@
             <resource>
                 <directory>src/main/resources</directory>
             </resource>
-            <!--
-                The demonstration data lives in demo/ at the root of the repository, where whoever reads the
-                demo looks for it, and is read off the classpath, so the demo profile works the same from
-                spring-boot:run, from the packaged jar and from the tests, with no working directory to get
-                right (D50).
-            -->
             <resource>
                 <directory>${project.basedir}/../demo</directory>
                 <targetPath>demo</targetPath>
@@ -88,10 +80,6 @@
             </resource>
         </resources>
         <plugins>
-            <!--
-                Spring resolves @PathVariable and @RequestParam by parameter name, which javac only keeps with
-                -parameters. It is what spring-boot-starter-parent sets; this build does not use it as a parent.
-            -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>

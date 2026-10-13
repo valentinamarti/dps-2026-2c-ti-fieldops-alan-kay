@@ -18,27 +18,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * F3 over HTTP: the three acceptance criteria of the automatic replanning, with the whole wiring of
- * {@code FieldOpsConfig} and {@code ReplanningConfig} and the in-memory adapters, no mocks (D37, D45, D58).
- *
- * <p>The scenario is the one the demo walks: a sample collection in execution, with the field worker that is
- * doing it taken out by an incident that also delays it, so the proposal has more than one option to choose
- * from (reschedule, two replacements and a cancellation, in the order of D46).
- */
 @SpringBootTest
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class ReplanningApiTest {
-
     @Autowired
     private MockMvc api;
 
-    /**
-     * The first criterion of F3: registering an incident on an expedition in execution generates the proposal.
-     * Delivery of the event is synchronous (D45), so the proposal is already in the body of the answer that
-     * registers the incident, with its options numbered and its {@code Location} pointing at itself.
-     */
     @Test
     void registeringAnIncidentAnswersWithTheProposalItGeneratedAndItsOptions() throws Exception {
         final var expedition = anExpeditionInExecutionWithTheSampleCollectionStarted();
@@ -67,13 +53,6 @@ class ReplanningApiTest {
         assertEquals("/api/replan-proposals/" + proposal, registered.getHeader("Location"));
     }
 
-    /**
-     * The second criterion, accepting, which is also the whole path of the demo: the activity that the incident
-     * hit is closed with what actually got done (D47 needs it closed to accept, D29 leaves the result to
-     * whoever ran it), a responsible takes the rescheduling, and the alternative comes back as a draft that
-     * already points at the original it is going to replace. The original stays suspended until the
-     * alternative is approved (D47).
-     */
     @Test
     void theResponsibleAcceptsAnOptionAndGetsTheAlternativeAsADraftThatPointsAtTheOriginal() throws Exception {
         final var original = anExpeditionInExecutionWithTheSampleCollectionStarted();
@@ -100,11 +79,6 @@ class ReplanningApiTest {
                 .andExpect(jsonPath("$.nodes[0].activity.assignedStaffIds").value(Matchers.contains("p-2")));
     }
 
-    /**
-     * The other half of the second criterion: rejecting is a decision too, so it needs a responsible and a
-     * justification and stays audited, but it changes nothing in the expedition, which keeps running with the
-     * plan it had (D47). Hence 204 and no body.
-     */
     @Test
     void theResponsibleRejectsTheProposalAndTheExpeditionKeepsRunningWithThePlanItHad() throws Exception {
         final var expedition = anExpeditionInExecutionWithTheSampleCollectionStarted();
@@ -127,12 +101,6 @@ class ReplanningApiTest {
                 .andExpect(jsonPath("$.decision.alternativeExpeditionId").value(Matchers.nullValue()));
     }
 
-    /**
-     * The third criterion: once decided, the original plan, the incident and the decision can all be walked
-     * over HTTP (D48). Nothing new is needed for it — the proposal carries the incident and the decision, the
-     * two expeditions reference each other, and the report of each one lists the log, which the alternative
-     * inherits.
-     */
     @Test
     void afterTheDecisionTheOriginalPlanTheIncidentAndTheDecisionAreAllQueryable() throws Exception {
         final var original = anExpeditionInExecutionWithTheSampleCollectionStarted();
@@ -183,10 +151,6 @@ class ReplanningApiTest {
         }
     }
 
-    /**
-     * Only a responsible of the expedition decides (D47), and that is a 422 and not a 403 because whoever
-     * decides travels in the body and not in a credential (D49).
-     */
     @Test
     void decidingAsSomeoneWhoIsNotAResponsibleOfTheExpeditionAnswersUnprocessableEntity() throws Exception {
         final var expedition = anExpeditionInExecutionWithTheSampleCollectionStarted();
@@ -202,9 +166,6 @@ class ReplanningApiTest {
                 .andExpect(jsonPath("$.status").value("PENDING"));
     }
 
-    /**
-     * A proposal is decided once (D47): what the second decision gets is a 409, with the status it ended in.
-     */
     @Test
     void decidingAProposalThatWasAlreadyDecidedAnswersConflict() throws Exception {
         final var expedition = anExpeditionInExecutionWithTheSampleCollectionStarted();
@@ -220,10 +181,6 @@ class ReplanningApiTest {
                 .andExpect(status().isConflict());
     }
 
-    /**
-     * An option number the proposal does not offer is a 404, the same as any other id that does not resolve
-     * (D49): the options are numbered from 1 and the proposal says how many there are.
-     */
     @Test
     void acceptingAnOptionTheProposalDoesNotOfferAnswersNotFound() throws Exception {
         final var expedition = anExpeditionInExecutionWithTheSampleCollectionStarted();
@@ -251,10 +208,6 @@ class ReplanningApiTest {
                 .andExpect(jsonPath("$.detail").value("There is no expedition with id e-404"));
     }
 
-    /**
-     * An incident that the expedition will not take is a 400, like any other malformed tracking (D49): the
-     * resource it names has to be one assigned to the activity, and the activity cannot have finished already.
-     */
     @Test
     void registeringAnIncidentTheExpeditionDoesNotAcceptAnswersBadRequest() throws Exception {
         final var expedition = anExpeditionInExecutionWithTheSampleCollectionStarted();
@@ -313,10 +266,6 @@ class ReplanningApiTest {
                         """.formatted(responsibleId, justification)));
     }
 
-    /**
-     * Closing the activity the incident hit, with the result of what got done before it (D29, D47). Accepting
-     * an option with it still in progress would fail with 409.
-     */
     private void finishTheStartedActivity(String expeditionId) throws Exception {
         api.perform(post("/api/expeditions/{expeditionId}/activities/{activityId}/completion", expeditionId, "a-1")
                         .contentType(MediaType.APPLICATION_JSON).content("""
@@ -345,11 +294,6 @@ class ReplanningApiTest {
         return api.perform(post(path).contentType(MediaType.APPLICATION_JSON).content(body));
     }
 
-    /**
-     * A "Sample collection" running from 13 to 15 inside a window that goes from 8 to 18, so a two hour delay
-     * still fits and the rescheduling can be offered (D46). Lee (p-2) is doing it, Ada (p-1) is the
-     * responsible and Max (p-3) is free, so the two of them are the replacement candidates the catalog has.
-     */
     private String anExpeditionInExecutionWithTheSampleCollectionStarted() throws Exception {
         register("/api/zones", """
                 {"id": "z-1", "name": "Coastal reef", "requiredPermits": []}

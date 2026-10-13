@@ -16,28 +16,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Validating and estimating an expedition over HTTP. It covers the second acceptance criterion of F2 (the
- * duration of a sequential block is the sum of its parts and of a parallel one, the maximum) through
- * {@code GET /estimate}, and the third (the resource conflict between parallel activities of the same block)
- * through {@code GET /validation}, now that {@code AssignmentController} can assign the shared resource that
- * triggers it. The validation is asked both before approving and right after, which is where the defect D59
- * fixed showed up.
- *
- * <p>The whole wiring of {@code FieldOpsConfig} with the in-memory adapters and no mocks (D37).
- */
 @SpringBootTest
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class ExpeditionPlanApiTest {
-
     @Autowired
     private MockMvc api;
 
-    /**
-     * The acceptance criterion of F2 over HTTP: a sequential block with a parallel one inside sums the
-     * sequential parts and takes the maximum of the parallel branches (D39).
-     */
     @Test
     void theEstimateAddsASequentialBlockAndTakesTheMaximumOfAParallelOne() throws Exception {
         final var expedition = anExpeditionInTheCoastalReef();
@@ -63,7 +48,6 @@ class ExpeditionPlanApiTest {
                         activity("a-3", 10, 12, "Drone survey", "{\"areaHectares\": 20}"))))
                 .andExpect(status().isCreated());
 
-        // 120 (sampling) + max(50, 90) (transfer vs. drone survey) = 210.
         api.perform(get("/api/expeditions/{id}/estimate", expedition))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalDurationMinutes").value(210))
@@ -85,11 +69,6 @@ class ExpeditionPlanApiTest {
                 .andExpect(jsonPath("$.detail").value("There is no expedition with id e-404"));
     }
 
-    /**
-     * The validation reaches the same rules over HTTP, with criticals and warnings apart (D22, D32): an
-     * activity with nothing assigned is missing every resource it needs, which does not require an endpoint
-     * for assigning them.
-     */
     @Test
     void theValidationReportsWhatIsMissingAsACriticalAndSaysItCannotBeApproved() throws Exception {
         final var expedition = anExpeditionInTheCoastalReef();
@@ -104,11 +83,6 @@ class ExpeditionPlanApiTest {
                 .andExpect(jsonPath("$.warnings").isEmpty());
     }
 
-    /**
-     * The third acceptance criterion of F2 over HTTP: two activities of the same parallel block cannot share a
-     * reusable resource, not even when (as here) their periods overlap outright (D41). It needs a resource
-     * assigned to each activity, which {@code AssignmentController} now exposes.
-     */
     @Test
     void theValidationReportsAResourceConflictBetweenParallelActivitiesOfTheSameBlock() throws Exception {
         final var expedition = anExpeditionInTheCoastalReef();
@@ -143,11 +117,6 @@ class ExpeditionPlanApiTest {
                         .value(Matchers.everyItem(Matchers.is("p-2"))));
     }
 
-    /**
-     * The regression of D59 over HTTP: approving an expedition reserves the resources of its plan, and asking
-     * for its validation again does not turn those reservations against it. Before the fix every resource the
-     * expedition had assigned came back as a critical of {@code resource-overlap}.
-     */
     @Test
     void theValidationOfAnApprovedExpeditionIgnoresTheReservationsItsOwnApprovalMade() throws Exception {
         final var expedition = anExpeditionWithASampleCollectionFullyResourced();
@@ -190,10 +159,6 @@ class ExpeditionPlanApiTest {
                         """.formatted(resourceId)));
     }
 
-    /**
-     * A "Sample collection" with a field worker, a cooler and a sample container assigned: nothing missing
-     * and low risk, so it goes all the way to approved without accepting anything.
-     */
     private String anExpeditionWithASampleCollectionFullyResourced() throws Exception {
         final var expedition = anExpeditionInTheCoastalReef();
         api.perform(post("/api/staff").contentType(MediaType.APPLICATION_JSON).content("""

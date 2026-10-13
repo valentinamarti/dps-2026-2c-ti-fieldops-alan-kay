@@ -9,7 +9,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 public class Zone {
-
     private static final String SPECIAL_PERMIT_NAME = "%s in zone %s";
 
     @Getter
@@ -35,9 +34,6 @@ public class Zone {
         return missingPermits(grantedPermits).isEmpty();
     }
 
-    /**
-     * The permit this zone asks for a kind of operation. It carries the zone id, so the one of another zone is a different permit.
-     */
     public Permit specialPermitFor(String operation) {
         final var normalized = DomainArguments.requireText(operation, "operation").strip().toLowerCase(Locale.ROOT);
         return new Permit(SPECIAL_PERMIT_NAME.formatted(normalized, id));

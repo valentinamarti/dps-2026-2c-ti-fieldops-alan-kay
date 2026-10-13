@@ -41,13 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ItineraryBlocksTest {
-
-    /**
-     * What the tree looks like, written down by a visitor: a leaf answers the id of its activity and a block,
-     * the name of its kind with what its children answered inside.
-     */
     private static final ItineraryNodeVisitor<String> SHAPE = new ItineraryNodeVisitor<>() {
-
         @Override
         public String activity(ItineraryItem item) {
             return item.getActivity().getId().value();
@@ -102,11 +96,6 @@ class ItineraryBlocksTest {
         assertFalse(itinerary.runInParallel(itemOf(transect), itemOf(wrapUp)));
     }
 
-    /**
-     * The shape of the tree is read with a visitor, which is the only operation that tells the kinds of node
-     * apart (D54): each node calls the method of its kind, nobody asks what kind it is, and a block hands over
-     * what its children answered instead of publishing them.
-     */
     @Test
     void aVisitorReadsTheShapeOfTheTreeWithoutAnyoneAskingWhatKindEachNodeIs() {
         final var block = expedition.schedule(sequential(

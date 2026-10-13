@@ -11,17 +11,7 @@ import ar.edu.itba.dps.fieldops.business.models.resources.Vehicle;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * Reads the catalog: the whole list of each kind and one entry by id, which fails with
- * {@link NotFoundException} when there is nothing registered under that id (D38).
- *
- * <p>It answers with the model classes and not with the {@code Equipment} and {@code DepletableResource}
- * interfaces, because what the API shows of a resource (its category, its license plate, its stock) is not
- * what those interfaces ask of it (D52). Vehicles and instruments are both equipment, so telling them apart
- * is selecting the ones of a type; nothing here asks a resource its type to decide what to do with it.
- */
 public class QueryCatalog {
-
     private final ResourceCatalog catalog;
 
     public QueryCatalog(ResourceCatalog catalog) {

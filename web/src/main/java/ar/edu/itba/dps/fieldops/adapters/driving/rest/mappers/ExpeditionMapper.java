@@ -15,15 +15,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-/**
- * Translates between the expedition DTOs and the domain, in both directions. It is the only place in the
- * adapter that knows both vocabularies (D49).
- *
- * <p>It does not validate: a field that is missing travels as {@code null} or empty and the domain rejects it
- * with its own message, which the error handler turns into a 400.
- */
 public final class ExpeditionMapper {
-
     private ExpeditionMapper() {
     }
 

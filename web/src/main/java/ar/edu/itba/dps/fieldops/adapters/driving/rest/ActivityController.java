@@ -16,19 +16,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Objects;
 
-/**
- * The activities of the itinerary of an expedition. It only translates: the request becomes a command, the use
- * case resolves the zone, the dependencies and the rules of the type, and the scheduled activity becomes a DTO
- * (D49, D53).
- *
- * <p>What is created is a node of the itinerary, which has no address of its own, so the {@code Location} of
- * the answer points at the itinerary of the expedition (D53).
- */
 @RestController
 @RequestMapping("/api/expeditions/{expeditionId}/activities")
 @Tag(name = "Itinerary", description = "The activities scheduled in an expedition")
 public class ActivityController {
-
     private final ScheduleActivity scheduleActivity;
 
     public ActivityController(ScheduleActivity scheduleActivity) {

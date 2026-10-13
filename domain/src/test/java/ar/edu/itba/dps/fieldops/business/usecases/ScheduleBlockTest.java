@@ -39,14 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-/**
- * The block is scheduled from a tree of descriptions where every leaf is described like the command of a
- * single activity and is resolved by the same code (D53, D54). What a block accepts and rejects is the domain
- * of D39 and D40: these tests check that the command can ask for everything those rules allow and for nothing
- * they do not.
- */
 class ScheduleBlockTest {
-
     private static final ReusableRequirement LIGHTING = new ReusableRequirement(new ResourceCategory("Lighting"), 1);
     private static final Duration SAMPLING = Duration.ofMinutes(120);
     private static final Duration TRANSFER = Duration.ofMinutes(50);
@@ -69,10 +62,6 @@ class ScheduleBlockTest {
         when(zones.findById("z-404")).thenReturn(Optional.empty());
     }
 
-    /**
-     * The acceptance criterion of F2 asked for through the command: the tree arrives as descriptions and ends
-     * up as a block with a parallel one inside, whose duration each kind combines its own way (D39).
-     */
     @Test
     void buildsAParallelBlockInsideASequentialOneFromTheTreeOfTheCommand() {
         final var block = schedule(PlannedNodeCommand.sequential(
@@ -91,10 +80,6 @@ class ScheduleBlockTest {
         assertFalse(itinerary.runInParallel(item("a-1"), item("a-2")));
     }
 
-    /**
-     * A leaf asks for the night variant the way a single activity does, and gets the same thing: the lighting,
-     * the certification of everyone assigned, the permit of its zone and one more level of risk (D42, D43).
-     */
     @Test
     void aLeafOfABlockCanBeAskedForAsANightActivity() {
         schedule(PlannedNodeCommand.parallel(nightSampling("a-1", 20, 22), sampling("a-2", 20, 22)));
@@ -137,11 +122,6 @@ class ScheduleBlockTest {
                 sampling("a-1", 9, 11), samplingAfter("a-2", 11, 13, "a-1"))));
     }
 
-    /**
-     * A leaf can depend on one that comes earlier in the same tree, which is what D40 allows because the block
-     * goes in whole: while the tree is being built neither of the two is scheduled, so the dependency is
-     * resolved among the activities of this same request.
-     */
     @Test
     void aLeafCanDependOnAnEarlierLeafOfTheSameBlock() {
         schedule(PlannedNodeCommand.sequential(
@@ -154,10 +134,6 @@ class ScheduleBlockTest {
         assertEquals(List.of(item("a-2"), item("a-3")), expedition.getItinerary().dependentsOf(item("a-1")));
     }
 
-    /**
-     * The other way round does not exist yet: the order of the tree is the order the activities are built in,
-     * and a dependency has to end before the one that depends on it anyway (D21).
-     */
     @Test
     void aLeafCannotDependOnALaterLeafOfTheSameBlock() {
         final var block = PlannedNodeCommand.sequential(
@@ -230,10 +206,6 @@ class ScheduleBlockTest {
         assertThrows(NotFoundException.class, () -> scheduleBlock.schedule(command));
     }
 
-    /**
-     * A rejected block leaves nothing behind, because the expedition builds and checks the whole tree before
-     * touching its itinerary (D40).
-     */
     @Test
     void aRejectedBlockLeavesTheItineraryUntouched() {
         assertThrows(InvalidScheduleException.class, () -> schedule(PlannedNodeCommand.sequential(

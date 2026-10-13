@@ -8,11 +8,7 @@ import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanOption;
 
 import java.util.List;
 
-/**
- * Drops the affected activity and, with it, every activity that depends on it (D46).
- */
 public class CancellationOptions implements ReplanOptionGenerator {
-
     @Override
     public List<ReplanOption> optionsFor(Expedition expedition, ItineraryItem affected, Incident incident) {
         return List.of(new ReplanOption(new Cancellation(), OptionSummaries.withOthers(

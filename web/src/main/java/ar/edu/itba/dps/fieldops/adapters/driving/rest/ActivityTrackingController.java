@@ -20,23 +20,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Objects;
 
-/**
- * Tracking a scheduled activity while the expedition executes it: when it started, what was observed along
- * the way and when and how it finished (D49). It shares the base path of {@link AssignmentController} because
- * both operate on the same scheduled activity, but it is a separate controller because tracking is a
- * different concern from assigning resources to it (D49's one-controller-per-resource, applied to two
- * concerns of the same sub-resource, the same split {@code ActivityController} and {@code AssignmentController}
- * already have).
- *
- * <p>The three operations answer 204: {@code TrackActivity} returns {@code void}, and what they changed is
- * read back through {@code GET /api/expeditions/{id}/report} (finishing changes the actual consumption and
- * the finished count) rather than through an object of its own.
- */
 @RestController
 @RequestMapping("/api/expeditions/{expeditionId}/activities/{activityId}")
 @Tag(name = "Tracking", description = "Tracking a scheduled activity while the expedition is in execution")
 public class ActivityTrackingController {
-
     private final TrackActivity trackActivity;
 
     public ActivityTrackingController(TrackActivity trackActivity) {

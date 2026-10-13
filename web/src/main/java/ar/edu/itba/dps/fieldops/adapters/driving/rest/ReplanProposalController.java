@@ -26,23 +26,10 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * The replan proposals: reading one, reading the ones of an expedition, and deciding on one (D47, D48, D58).
- * A proposal has an id of its own and an address of its own, which is the one the incident that generated it
- * points at, so it is a top-level resource; listing them by expedition is the same resource under its parent,
- * which is why both paths live in this controller (D49's one controller per resource).
- *
- * <p>Deciding is a sub-resource in {@code POST}, like every other operation that is not CRUD (D49):
- * {@code POST .../acceptance} and {@code POST .../rejection}. The two are not symmetric in what they answer,
- * because they are not symmetric in what they do: accepting builds the alternative as a draft and returns it,
- * with its address in the {@code Location}; rejecting changes nothing in the expedition, so it answers 204
- * like the rest of the writes of the API (D52, D56, D57), and the decision is read back from the proposal.
- */
 @RestController
 @RequestMapping("/api")
 @Tag(name = "Replan proposals", description = "Reading the replanning proposed after an incident and deciding on it")
 public class ReplanProposalController {
-
     private final QueryReplanProposals queryReplanProposals;
     private final DecideReplanProposal decideReplanProposal;
 

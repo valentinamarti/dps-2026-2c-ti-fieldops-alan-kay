@@ -9,12 +9,7 @@ import ar.edu.itba.dps.fieldops.business.providers.ReplanProposalRepository;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * The audit of replanning: each proposal keeps the original expedition, the incident, the options and the
- * decision. The original plan is still the original expedition, which {@link QueryExpeditions} returns (D48).
- */
 public class QueryReplanProposals {
-
     private final ReplanProposalRepository proposals;
     private final ExpeditionRepository expeditions;
 

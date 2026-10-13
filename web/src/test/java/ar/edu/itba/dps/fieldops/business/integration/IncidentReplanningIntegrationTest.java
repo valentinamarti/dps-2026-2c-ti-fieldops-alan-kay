@@ -40,14 +40,9 @@ import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.UN
 import static ar.edu.itba.dps.fieldops.business.models.common.Quantity.of;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-/**
- * F3 with the real wiring: the in-memory publisher delivers the event to the proposal subscriber, so the proposal
- * exists when {@link RegisterIncident} returns.
- */
 @SpringBootTest
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class IncidentReplanningIntegrationTest {
-
     private static final LocalDateTime TEN = LocalDateTime.of(2026, 10, 1, 10, 0);
 
     @Autowired

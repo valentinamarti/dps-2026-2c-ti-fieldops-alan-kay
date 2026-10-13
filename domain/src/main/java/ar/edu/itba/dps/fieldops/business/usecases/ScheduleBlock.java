@@ -9,17 +9,7 @@ import ar.edu.itba.dps.fieldops.business.rules.ActivityTypeRegistry;
 
 import java.util.Objects;
 
-/**
- * Schedules a block in an expedition. The command brings a tree of descriptions, so this turns it into the
- * {@link PlannedNode} the expedition agrees to schedule: each leaf is resolved by {@link PlannedActivities},
- * the same resolution the schedule of a single activity uses (D53, D54), and the block goes in whole, so it is
- * the expedition that applies to it the rules of any plan (D39, D40).
- *
- * <p>The variant that receives the {@code PlannedNode} already built stays, for the same reason as the one of
- * {@link ScheduleActivity}.
- */
 public class ScheduleBlock {
-
     private final ExpeditionRepository repository;
     private final ZoneRepository zones;
     private final ActivityTypeRegistry types;

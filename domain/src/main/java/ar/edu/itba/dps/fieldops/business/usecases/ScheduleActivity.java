@@ -10,17 +10,7 @@ import ar.edu.itba.dps.fieldops.business.rules.ActivityTypeRegistry;
 
 import java.util.Objects;
 
-/**
- * Schedules an activity in an expedition. The command brings ids and text, so the {@link Activity} is
- * assembled by {@link PlannedActivities}, the same resolution the schedule of a block uses for each of its
- * leaves (D53, D54).
- *
- * <p>The variant that receives the {@code Activity} already built stays, like the ones of D38: a caller that
- * is not an adapter (the tests, the builder of an expedition) already has the object and does not need the
- * registry to get it.
- */
 public class ScheduleActivity {
-
     private final ExpeditionRepository repository;
     private final ZoneRepository zones;
     private final ActivityTypeRegistry types;

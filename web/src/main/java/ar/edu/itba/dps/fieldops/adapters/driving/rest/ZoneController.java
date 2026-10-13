@@ -20,15 +20,10 @@ import java.net.URI;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * The zones an expedition can reference. It only translates: the request becomes a command, the use case does
- * the work and the result becomes a DTO (D49).
- */
 @RestController
 @RequestMapping("/api/zones")
 @Tag(name = "Zones", description = "Registering and querying the zones")
 public class ZoneController {
-
     private final RegisterZone registerZone;
     private final QueryZones queryZones;
 

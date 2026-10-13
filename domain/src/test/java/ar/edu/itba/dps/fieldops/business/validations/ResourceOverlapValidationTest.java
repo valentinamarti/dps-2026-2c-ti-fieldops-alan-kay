@@ -31,7 +31,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ResourceOverlapValidationTest {
-
     private static final ExpeditionId ANOTHER_EXPEDITION = new ExpeditionId("e-2");
 
     private final SequentialExpeditionRepository repository = new SequentialExpeditionRepository();
@@ -80,11 +79,6 @@ class ResourceOverlapValidationTest {
         assertEquals(List.of(expected), validation.validate(expedition));
     }
 
-    /**
-     * The defect D59 fixed: the reservations an expedition's own approval made are its plan, not a competitor
-     * for it. Before the fix, validating it again after approving it reported every assigned resource as
-     * unavailable. The reservations are made the same way the approval makes them ({@code ApproveExpedition}).
-     */
     @Test
     void acceptsTheResourcesTheExpeditionItselfReserved() {
         scheduleWithWorker("a-1", hours(9, 11));
@@ -94,10 +88,6 @@ class ResourceOverlapValidationTest {
         assertTrue(validation.validate(expedition).isEmpty());
     }
 
-    /**
-     * The other side of D59: only its own reservations and the ones it takes over (D33) stop counting, so a
-     * resource another expedition booked is still a critical.
-     */
     @Test
     void flagsAResourceReservedByADifferentExpedition() {
         final var other = expeditionIn(coast, person("p-1")).build(repository);
@@ -109,10 +99,6 @@ class ResourceOverlapValidationTest {
         assertEquals(List.of(expected), validation.validate(expedition));
     }
 
-    /**
-     * An unavailability has no owner, so it is never one of the reservations D59 ignores: a resource that
-     * falls out after the expedition reserved it (a medical leave, maintenance) is still a critical (D27).
-     */
     @Test
     void flagsAResourceMarkedUnavailableOverItsOwnReservation() {
         scheduleWithWorker("a-1", hours(9, 11));

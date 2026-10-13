@@ -20,15 +20,10 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * The expedition resource. It only translates: the request becomes a command, the use case does the work and
- * the result becomes a DTO (D49). Nothing here knows the rules.
- */
 @RestController
 @RequestMapping("/api/expeditions")
 @Tag(name = "Expeditions", description = "Creating and querying expeditions")
 public class ExpeditionController {
-
     private final CreateExpedition createExpedition;
     private final QueryExpeditions queryExpeditions;
 

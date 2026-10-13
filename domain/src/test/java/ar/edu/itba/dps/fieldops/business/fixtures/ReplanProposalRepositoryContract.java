@@ -22,12 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * What every {@link ReplanProposalRepository} must do, whatever it stores the proposals in.
- * Each adapter extends this class and supplies a fresh repository.
- */
 public abstract class ReplanProposalRepositoryContract {
-
     private final ExpeditionId expedition = new ExpeditionId("e-1");
     private final ExpeditionId otherExpedition = new ExpeditionId("e-2");
     protected ReplanProposalRepository repository;

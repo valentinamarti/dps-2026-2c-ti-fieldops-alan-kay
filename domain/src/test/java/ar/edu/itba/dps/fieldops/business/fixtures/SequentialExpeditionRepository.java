@@ -10,11 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * Repository for tests whose ids are predictable: "e-1", "e-2", ... in the order they are requested.
- */
 public class SequentialExpeditionRepository implements ExpeditionRepository {
-
     private final Map<ExpeditionId, Expedition> expeditions = new LinkedHashMap<>();
     private int issued = 0;
 

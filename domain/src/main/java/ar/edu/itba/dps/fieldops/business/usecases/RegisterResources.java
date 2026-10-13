@@ -9,16 +9,7 @@ import ar.edu.itba.dps.fieldops.business.models.resources.Vehicle;
 
 import java.util.Objects;
 
-/**
- * The four ways of adding an entry to the catalog, grouped because all of them do the same: build the resource
- * from its command and hand it to the catalog (D52). The resource is built here and not by the adapter, like
- * every other use case that takes a command (D38).
- *
- * <p>Nothing checks for a repeated id: the catalog already rejects one with {@link DuplicateResourceException},
- * and it does it over a single id space, so a vehicle cannot take the id of a person.
- */
 public class RegisterResources {
-
     private final ResourceCatalog catalog;
 
     public RegisterResources(ResourceCatalog catalog) {

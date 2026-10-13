@@ -22,16 +22,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * The expedition resource over the whole stack: the real wiring of {@code FieldOpsConfig} with the in-memory
- * adapters, no mocks. The repositories and the catalog are shared beans, so each test starts with a new
- * context, like the other integration tests of this module (D37).
- */
 @SpringBootTest
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class ExpeditionApiTest {
-
     private static final String COASTAL_SURVEY = """
             {
               "name": "Coastal survey",
@@ -77,9 +71,6 @@ class ExpeditionApiTest {
                 .andExpect(status().isOk());
     }
 
-    /**
-     * The tree has its own endpoint and how it is serialized is still open, so it is not part of this response.
-     */
     @Test
     void leavesTheItineraryOutOfTheExpeditionResponse() throws Exception {
         api.perform(post("/api/expeditions").contentType(MediaType.APPLICATION_JSON).content(COASTAL_SURVEY))
@@ -117,9 +108,6 @@ class ExpeditionApiTest {
                 .andExpect(jsonPath("$.detail").value("There is no expedition with id e-404"));
     }
 
-    /**
-     * The adapter does not validate; what comes back is the message of the domain, as a 400.
-     */
     @Test
     void answersBadRequestWhenTheBodyDoesNotDescribeAnExpedition() throws Exception {
         api.perform(post("/api/expeditions").contentType(MediaType.APPLICATION_JSON).content("""

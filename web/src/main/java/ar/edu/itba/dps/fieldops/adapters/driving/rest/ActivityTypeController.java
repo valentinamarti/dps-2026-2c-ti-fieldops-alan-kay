@@ -13,16 +13,10 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * The types of activity the domain offers. It is the endpoint that tells a client what it can ask for when it
- * schedules an activity, so it is read only: the types are decided by the domain and not registered over HTTP
- * (D44).
- */
 @RestController
 @RequestMapping("/api/activity-types")
 @Tag(name = "Activity types", description = "The types of activity an activity can be scheduled as")
 public class ActivityTypeController {
-
     private final QueryActivityTypes queryActivityTypes;
 
     public ActivityTypeController(QueryActivityTypes queryActivityTypes) {

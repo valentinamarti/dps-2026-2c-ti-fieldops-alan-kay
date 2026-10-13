@@ -21,16 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * Translates between the activity DTOs and the domain, in both directions (D49). The request never becomes an
- * {@code Activity} here: it becomes a command with ids, a type name and its parameters, and the use case is
- * the one that resolves them (D53).
- *
- * <p>It does not validate: a field that is missing travels as {@code null} and the domain rejects it with its
- * own message, which the error handler turns into a 400.
- */
 public final class ActivityMapper {
-
     private ActivityMapper() {
     }
 
@@ -38,10 +29,6 @@ public final class ActivityMapper {
         return new ScheduleActivityCommand(new ExpeditionId(expeditionId), toPlannedActivity(request));
     }
 
-    /**
-     * The description of one activity, which is the same whether it is scheduled on its own or as a leaf of a
-     * block, so the mapper of the itinerary reuses this one (D54).
-     */
     static PlannedActivityCommand toPlannedActivity(ScheduleActivityRequest request) {
         return new PlannedActivityCommand(
                 new ActivityId(request.id()),
@@ -63,12 +50,12 @@ public final class ActivityMapper {
                 activity.getZone().getId(),
                 Mappings.toDto(activity.getTimeWindow()),
                 Mappings.toDto(item.getScheduledPeriod()),
-                // In the order the activity keeps them, which is the one they were sent in, and not sorted.
+
                 activity.getDependencies().stream().map(dependency -> dependency.getId().value()).toList(),
                 activity.estimatedDuration().toMinutes(),
                 activity.estimatedRisk(),
                 activity.requiredStaff().stream().map(ActivityMapper::toDto).toList(),
-                // In the order each was assigned, the same reasoning as the dependencies above.
+
                 item.getAssignedStaff().stream().map(person -> person.getId().value()).toList(),
                 activity.requiredEquipment().stream().map(ActivityMapper::toDto).toList(),
                 item.getAssignedEquipment().stream().map(equipment -> equipment.getId().value()).toList(),
@@ -78,10 +65,6 @@ public final class ActivityMapper {
                 Mappings.sorted(activity.requiredPermits().stream().map(Permit::name)));
     }
 
-    /**
-     * Package-private so {@link AssignmentCandidatesMapper} can pair the same requirement with its candidates
-     * (D56), instead of repeating the translation.
-     */
     static StaffRequirementDto toDto(StaffRequirement requirement) {
         return new StaffRequirementDto(
                 requirement.headcount(),

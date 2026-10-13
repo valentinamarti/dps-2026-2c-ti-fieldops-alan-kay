@@ -17,11 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-/**
- * The catalog is a model object without I/O, so these tests use the real one instead of a double.
- */
 class RegisterResourcesTest {
-
     private final ResourceCatalog catalog = new ResourceCatalog();
     private final RegisterResources register = new RegisterResources(catalog);
 
@@ -61,10 +57,6 @@ class RegisterResourcesTest {
         assertEquals(Quantity.of("10", UNITS), jars.getStock());
     }
 
-    /**
-     * The normalization of D34 happens when the value object is built, so what comes back is the normalized
-     * name and not the one that was sent.
-     */
     @Test
     void normalizesTheCategoryAndTheCertificationsOfWhatItRegisters() {
         final var cooler = register.registerInstrument(new RegisterInstrumentCommand(new ResourceId("i-1"), "Cooler",
@@ -82,9 +74,6 @@ class RegisterResourcesTest {
                 () -> register.registerPerson(new RegisterPersonCommand(new ResourceId("p-1"), "Grace", Set.of())));
     }
 
-    /**
-     * The catalog keeps a single id space, so the id of a person is taken for a vehicle as well.
-     */
     @Test
     void rejectsAResourceOfAnotherKindWithAnIdThatIsAlreadyTaken() {
         register.registerPerson(new RegisterPersonCommand(new ResourceId("p-1"), "Ada", Set.of()));
@@ -93,10 +82,6 @@ class RegisterResourcesTest {
                 new ResourceId("p-1"), "Zodiac", new ResourceCategory("Boat"), "AA 123 BB", Set.of())));
     }
 
-    /**
-     * The use case does not validate: what rejects an incomplete command is the constructor of the resource,
-     * which is the only place where the rules of a resource live (D16).
-     */
     @Test
     void leavesAnIncompleteCommandToTheResourceItBuilds() {
         final var withoutName = new RegisterPersonCommand(new ResourceId("p-1"), null, Set.of());

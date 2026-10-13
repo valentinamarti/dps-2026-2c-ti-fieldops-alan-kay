@@ -22,11 +22,7 @@ import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
 
 import java.util.Optional;
 
-/**
- * Turns the ids a use case receives into the objects it works with, or fails with {@link NotFoundException}.
- */
 final class Lookups {
-
     private Lookups() {
     }
 
@@ -71,10 +67,6 @@ final class Lookups {
         return ofKind(catalog.findSupply(id), Depletable.class, "supply", id);
     }
 
-    /**
-     * The catalog keeps every piece of equipment together, so an id that belongs to another kind is as good as
-     * an id that nobody registered: both answer that there is no vehicle (or no instrument) with that id.
-     */
     private static <T> T ofKind(Optional<?> found, Class<T> kind, String name, ResourceId id) {
         return found.filter(kind::isInstance).map(kind::cast).orElseThrow(() -> new NotFoundException(name, id));
     }

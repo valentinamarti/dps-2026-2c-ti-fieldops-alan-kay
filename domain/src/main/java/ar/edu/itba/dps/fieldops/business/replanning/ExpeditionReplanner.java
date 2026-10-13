@@ -22,7 +22,6 @@ import java.util.Optional;
 import java.util.function.Predicate;
 
 public class ExpeditionReplanner {
-
     private static final ExpeditionRepository PREVIEW_IDS = new PreviewIds();
 
     private final ExpeditionRepository repository;
@@ -37,10 +36,6 @@ public class ExpeditionReplanner {
         return draftOf(original, affectedItem, reason, repository);
     }
 
-    /**
-     * True when the alternative for this reason can be built from the itinerary as it is now. It does not look at
-     * the status of the original: a proposal is made while the expedition is still in execution (D46).
-     */
     public boolean canPlan(Expedition original, ItineraryItem affectedItem, ReplanReason reason) {
         requireArguments(original, affectedItem, reason);
         try {
@@ -74,10 +69,6 @@ public class ExpeditionReplanner {
         return builder;
     }
 
-    /**
-     * An item that comes back is planned again, even the affected one if it had already started (it is redone,
-     * D47). Anything else that already finished stays closed.
-     */
     private Optional<PlannedNode> planOf(ItineraryItem item, Map<ItineraryItem, CarriedItem> carried) {
         if (carried.containsKey(item)) {
             return Optional.of(PlannedNode.activity(item.getActivity(), carried.get(item).period()));
@@ -97,11 +88,6 @@ public class ExpeditionReplanner {
         return builder;
     }
 
-    /**
-     * What goes back to the alternative as a plan. What the reason does with the affected activity drags others
-     * along: a later start moves later whatever runs after it or depends on it, and a cancellation drops whatever
-     * depends on it (D46).
-     */
     private Map<ItineraryItem, CarriedItem> carriedItemsOf(Expedition original, ItineraryItem affectedItem, ReplanReason reason) {
         final var itinerary = original.getItinerary();
         final var carried = new LinkedHashMap<ItineraryItem, CarriedItem>();
@@ -143,7 +129,6 @@ public class ExpeditionReplanner {
 
     private record CarriedItem(ItineraryItem source, TimePeriod period, Predicate<Resource> keeps,
                                List<ResourceAssignment> additions) {
-
         static CarriedItem unchanged(ItineraryItem item) {
             return new CarriedItem(item, item.getScheduledPeriod(), _ -> true, List.of());
         }
@@ -157,11 +142,7 @@ public class ExpeditionReplanner {
         }
     }
 
-    /**
-     * Hands out a throwaway id to check whether an alternative can be built. Nothing built with it is stored.
-     */
     private static final class PreviewIds implements ExpeditionRepository {
-
         @Override
         public ExpeditionId nextId() {
             return new ExpeditionId("preview");

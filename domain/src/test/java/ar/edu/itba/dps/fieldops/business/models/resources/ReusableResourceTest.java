@@ -15,11 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Availability rules shared by every {@link ReusableResource} implementation.
- */
 class ReusableResourceTest {
-
     private static final ExpeditionId ANOTHER_EXPEDITION = new ExpeditionId("e-2");
     private static final TimePeriod MORNING = hours(8, 12);
     private static final ResourceCategory PICKUP = new ResourceCategory("Pickup");

@@ -15,20 +15,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Scheduling a night activity over HTTP, from an empty application: the zone, the person with the night
- * certification and the lighting go in through the catalog, the expedition grants the special permit of the
- * zone and the activity is asked for by the name of its type. It is the acceptance criterion of F1 that until
- * the catalog and the zones had endpoints could only be exercised from Java.
- *
- * <p>The whole wiring of {@code FieldOpsConfig} with the in-memory adapters and no mocks; the repositories are
- * shared beans, so each test starts with a new context (D37).
- */
 @SpringBootTest
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class ActivityApiTest {
-
     private static final String NIGHT_SAMPLING = """
             {
               "id": "a-1",
@@ -46,12 +36,6 @@ class ActivityApiTest {
     @Autowired
     private MockMvc api;
 
-    /**
-     * What the night variant adds travels in the answer as what the activity demands and not as a flag, because
-     * a wrapped rule does not say that it is nocturnal (D42): the lighting, the certification of everyone
-     * assigned, the permit of the zone with the name the expedition has to grant, and one more level of risk
-     * over the {@code LOW} of a sample collection.
-     */
     @Test
     void schedulesANightActivityAskedForByItsTypeAndAnswersWhatItDemands() throws Exception {
         final var expedition = anExpeditionInTheCoastalReef();
@@ -72,11 +56,6 @@ class ActivityApiTest {
                 .andExpect(jsonPath("$.requiredSupplies[0].quantity.amount").value("3"));
     }
 
-    /**
-     * That the night activity stayed in the itinerary is read through another activity that depends on it: the
-     * dependency is resolved among the ones already scheduled in the same expedition, so a second activity
-     * that declares it could not be scheduled if the first one were not there (D53).
-     */
     @Test
     void theNightActivityStaysInTheItineraryAndCanBeDependedOn() throws Exception {
         final var expedition = anExpeditionInTheCoastalReef();
@@ -160,10 +139,6 @@ class ActivityApiTest {
                 .andExpect(jsonPath("$.detail").value("There is no expedition with id e-404"));
     }
 
-    /**
-     * The schedule is still checked by the expedition: an activity outside its own time window is rejected
-     * when it is scheduled, like any malformed plan (D21, D40).
-     */
     @Test
     void answersBadRequestWhenTheScheduleDoesNotFitTheWindowOfTheActivity() throws Exception {
         final var expedition = anExpeditionInTheCoastalReef();
@@ -178,10 +153,6 @@ class ActivityApiTest {
                 .contentType(MediaType.APPLICATION_JSON).content(body));
     }
 
-    /**
-     * The scenario of F1 over HTTP: the zone, a person certified for night operations, a lamp of category
-     * {@code Lighting} and an expedition that works in that zone with its special permit granted.
-     */
     private String anExpeditionInTheCoastalReef() throws Exception {
         api.perform(post("/api/zones").contentType(MediaType.APPLICATION_JSON).content("""
                         {"id": "z-1", "name": "Coastal reef", "requiredPermits": []}

@@ -22,19 +22,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Objects;
 
-/**
- * Assigning staff, equipment and supplies to a scheduled activity, and what the catalog can offer for each of
- * its requirements. It only translates: the use case does the work (D49).
- *
- * <p>The three assignments answer 204 and not 201: {@code AssignResources} returns {@code void}, there is
- * nothing new of its own to read back, and what got assigned is read through
- * {@code GET /api/expeditions/{id}/itinerary} (D56), the same convention the unavailability of D52 uses.
- */
 @RestController
 @RequestMapping("/api/expeditions/{expeditionId}/activities/{activityId}")
 @Tag(name = "Assignment", description = "Assigning resources to a scheduled activity and its candidates")
 public class AssignmentController {
-
     private final AssignResources assignResources;
     private final FindAssignmentCandidates findAssignmentCandidates;
 

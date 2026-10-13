@@ -15,23 +15,11 @@ import ar.edu.itba.dps.fieldops.business.usecases.ScheduleBlockCommand;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * Translates between the itinerary DTOs and the domain, in both directions (D49, D54).
- *
- * <p>On the way out it is a visitor: every node of the tree calls the method of its own kind, so the mapper
- * never asks what kind of node it has in its hands and no node has to publish its children.
- *
- * <p>On the way in, the only thing it decides is whether a node of the body is a leaf, which is what bringing
- * an activity means. The names of the kinds of block come from the domain, and so does the rejection of a name
- * that is not one of them: the adapter does not validate (D49).
- */
 public final class ItineraryMapper {
-
     private static final String ACTIVITY = "activity";
 
     private static final ItineraryNodeVisitor<ItineraryNodeResponse> AS_RESPONSE =
             new ItineraryNodeVisitor<ItineraryNodeResponse>() {
-
                 @Override
                 public ItineraryNodeResponse activity(ItineraryItem item) {
                     return node(ACTIVITY, item, ActivityMapper.toResponse(item), null);

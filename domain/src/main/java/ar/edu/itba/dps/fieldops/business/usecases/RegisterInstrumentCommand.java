@@ -6,9 +6,6 @@ import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 
 import java.util.Set;
 
-/**
- * Everything needed to register an instrument in the catalog.
- */
 public record RegisterInstrumentCommand(ResourceId id, String name, ResourceCategory category,
                                         Set<Certification> certifications) {
 }

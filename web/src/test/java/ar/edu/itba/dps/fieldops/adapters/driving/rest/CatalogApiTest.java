@@ -16,15 +16,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * The catalog over the whole stack: the real wiring of {@code FieldOpsConfig} with the in-memory adapters, no
- * mocks. The catalog is a shared bean, so each test starts with a new context (D37).
- */
 @SpringBootTest
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class CatalogApiTest {
-
     private static final String DIVER = """
             {"id": "p-1", "name": "Ada", "certifications": ["Diving"]}
             """;
@@ -57,9 +52,6 @@ class CatalogApiTest {
                 .andExpect(jsonPath("$.name").value("Ada"));
     }
 
-    /**
-     * The certifications come back normalized, because that is how the domain keeps them (D34).
-     */
     @Test
     void normalizesTheCertificationsOfThePersonItRegisters() throws Exception {
         register("/api/staff", DIVER).andExpect(jsonPath("$.certifications[0]").value("diving"));
@@ -118,10 +110,6 @@ class CatalogApiTest {
         api.perform(get("/api/supplies")).andExpect(jsonPath("$.length()").value(1));
     }
 
-    /**
-     * Both kinds are equipment, so they are listed together; they keep their own shape because each has its
-     * own sub-resource (D52).
-     */
     @Test
     void listsTheVehiclesAndTheInstrumentsTogetherUnderEquipment() throws Exception {
         register("/api/vehicles", ZODIAC);
@@ -154,9 +142,6 @@ class CatalogApiTest {
                 .andExpect(jsonPath("$.detail").value("A resource with id p-1 is already registered"));
     }
 
-    /**
-     * The catalog keeps a single id space, so a vehicle cannot take the id of a person either.
-     */
     @Test
     void rejectsAResourceOfAnotherKindWithAnIdThatIsAlreadyTaken() throws Exception {
         register("/api/staff", DIVER);
@@ -177,9 +162,6 @@ class CatalogApiTest {
                 .andExpect(jsonPath("$.detail").value("There is no supply with id s-404"));
     }
 
-    /**
-     * The adapter does not validate; what comes back is the message of the domain, as a 400 (D49).
-     */
     @Test
     void answersBadRequestWhenTheBodyDoesNotDescribeAResource() throws Exception {
         api.perform(post("/api/staff").contentType(MediaType.APPLICATION_JSON).content("""
@@ -218,9 +200,6 @@ class CatalogApiTest {
                 .andExpect(jsonPath("$.detail").value("There is no person with id p-404"));
     }
 
-    /**
-     * A supply has stock and not a calendar, so there is no sub-resource to post an unavailability to.
-     */
     @Test
     void doesNotOfferUnavailabilitiesForASupply() throws Exception {
         register("/api/supplies", JARS);

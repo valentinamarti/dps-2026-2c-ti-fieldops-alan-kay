@@ -7,11 +7,7 @@ import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.resources.Vehicle;
 import ar.edu.itba.dps.fieldops.business.usecases.RegisterVehicleCommand;
 
-/**
- * Translates between the vehicle DTOs and the domain, in both directions (D49).
- */
 public final class VehicleMapper {
-
     private VehicleMapper() {
     }
 

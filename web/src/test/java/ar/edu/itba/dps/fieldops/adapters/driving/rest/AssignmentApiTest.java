@@ -16,27 +16,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Assigning resources to a scheduled activity and reading what the catalog can offer for it, over the whole
- * stack: the real wiring of {@code FieldOpsConfig}, no mocks. It covers the fourth tramo of the PR 5b
- * ({@code AssignResources} and {@code FindAssignmentCandidates}), which was already a finished use case with
- * no domain changes to make.
- *
- * <p>The repositories and the catalog are shared beans, so each test starts with a new context (D37).
- */
 @SpringBootTest
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class AssignmentApiTest {
-
     @Autowired
     private MockMvc api;
 
-    /**
-     * Assigning staff, equipment and a supply answers 204 (D56): {@code AssignResources} returns {@code void}
-     * and there is nothing of its own to read back. What got assigned is only observable by reading the
-     * itinerary back.
-     */
     @Test
     void assignsStaffEquipmentAndASupplyAndTheyShowInTheItineraryAfterwards() throws Exception {
         final var expedition = anExpeditionWithACandidateForEachRequirement();
@@ -53,12 +39,6 @@ class AssignmentApiTest {
                 .andExpect(jsonPath("$.nodes[0].activity.assignedSupplyIds").value(Matchers.contains("s-1")));
     }
 
-    /**
-     * The candidates mirror the shape of the requirements of the scheduled activity (D56): one entry per
-     * requirement, with what the catalog can offer for it. A "Sample collection" asks for one field worker, one
-     * cooler and as many sample containers as its parameter, and the catalog has exactly one of each that
-     * qualifies.
-     */
     @Test
     void candidatesReflectWhatTheCatalogCanOfferForEachRequirementOfTheActivity() throws Exception {
         final var expedition = anExpeditionWithACandidateForEachRequirement();
@@ -78,12 +58,6 @@ class AssignmentApiTest {
                 .andExpect(jsonPath("$.supplies[0].candidates[*].id").value(Matchers.hasItem("s-1")));
     }
 
-    /**
-     * The domain only checks who can cover a requirement when it validates, not when it assigns (D19):
-     * {@code Expedition.assignEquipment} adds whatever is handed to it. Assigning an instrument of a category
-     * the activity does not ask for still answers 204, and the mismatch shows up later as a missing-resources
-     * critical, because {@code accepted} in {@code MissingResourcesValidation} never counts it.
-     */
     @Test
     void assigningEquipmentOfTheWrongCategorySucceedsAndTheMismatchShowsUpOnlyAtValidation() throws Exception {
         final var expedition = anExpeditionWithACandidateForEachRequirement();
@@ -175,10 +149,6 @@ class AssignmentApiTest {
         return api.perform(post(path).contentType(MediaType.APPLICATION_JSON).content(body));
     }
 
-    /**
-     * A zone, a responsible and one candidate for each requirement a "Sample collection" asks for: a field
-     * worker (p-2), a cooler (i-1) and sample containers in stock (s-1).
-     */
     private String anExpeditionWithACandidateForEachRequirement() throws Exception {
         register("/api/zones", """
                 {"id": "z-1", "name": "Coastal reef", "requiredPermits": []}

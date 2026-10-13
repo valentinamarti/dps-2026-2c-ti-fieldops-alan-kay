@@ -54,12 +54,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * The error mapping of the plan of the Fase 5, exception by exception: a controller that only throws, the real
- * advice, and the status code and the body that come out the other end.
- */
 class DomainExceptionHandlerTest {
-
     private static final String EXCEPTIONS_PACKAGE = "ar.edu.itba.dps.fieldops.business.exceptions";
 
     @ParameterizedTest(name = "{0} -> {1}")
@@ -80,10 +75,6 @@ class DomainExceptionHandlerTest {
                 .andExpect(jsonPath("$.detail").value("The request could not be completed"));
     }
 
-    /**
-     * Guards the mapping against a domain exception that nobody classified: a new one in {@code
-     * business.exceptions} fails here instead of silently answering a 500.
-     */
     @Test
     void mapsEveryExceptionOfTheDomain() {
         final var scanner = new ClassPathScanningCandidateComponentProvider(false);
@@ -141,7 +132,6 @@ class DomainExceptionHandlerTest {
 
     @RestController
     private record AlwaysFailingController(RuntimeException failure) {
-
         @GetMapping("/boom")
         String boom() {
             throw failure;

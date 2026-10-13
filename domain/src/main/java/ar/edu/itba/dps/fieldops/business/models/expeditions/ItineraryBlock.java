@@ -15,7 +15,6 @@ import java.util.Optional;
 import java.util.function.Function;
 
 public abstract class ItineraryBlock implements ItineraryNode {
-
     private final List<ItineraryNode> children;
 
     ItineraryBlock(List<ItineraryNode> children) {
@@ -74,9 +73,6 @@ public abstract class ItineraryBlock implements ItineraryNode {
         return children;
     }
 
-    /**
-     * What the visitor answers for each child, so a block hands over the answers and not its children (D54).
-     */
     <T> List<T> acceptedChildren(ItineraryNodeVisitor<T> visitor) {
         return children.stream().map(child -> child.accept(visitor)).toList();
     }

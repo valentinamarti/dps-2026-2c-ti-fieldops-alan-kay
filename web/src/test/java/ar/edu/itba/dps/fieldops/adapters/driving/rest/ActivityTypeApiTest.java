@@ -11,15 +11,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * The endpoint that tells a client what it can ask for when it schedules an activity. It does not need a new
- * context per test, unlike the ones that register things: the registry of types is decided by the domain and
- * nothing over HTTP changes it (D44).
- */
 @SpringBootTest
 @AutoConfigureMockMvc
 class ActivityTypeApiTest {
-
     @Autowired
     private MockMvc api;
 
@@ -39,11 +33,6 @@ class ActivityTypeApiTest {
                 .andExpect(jsonPath("$[5].parameterNames").value("distanceKilometers"));
     }
 
-    /**
-     * The names come normalized, so a type asked for as {@code Sample collection} is published as the value
-     * the domain compares (D34), and the names of the parameters do not: they are identifiers and travel as
-     * they have to be sent.
-     */
     @Test
     void publishesTheNamesTheDomainComparesAndTheParametersAsTheyAreSent() throws Exception {
         api.perform(get("/api/activity-types"))

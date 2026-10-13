@@ -25,7 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class NightOperationRulesTest {
-
     private static final Certification NIGHT_OPERATIONS = new Certification("Night operations");
     private static final Certification FIRST_AID = new Certification("First aid");
     private static final ReusableRequirement LIGHTING = new ReusableRequirement(new ResourceCategory("Lighting"), 1);
@@ -88,11 +87,7 @@ class NightOperationRulesTest {
         assertThrows(NullPointerException.class, () -> new NightOperationRules(null));
     }
 
-    /**
-     * Stub with a fixed risk, so the risk of every level can be tested without depending on a concrete activity type.
-     */
     private static class FixedRules implements ActivityRules {
-
         private final RiskLevel risk;
 
         FixedRules(RiskLevel risk) {
@@ -126,7 +121,6 @@ class NightOperationRulesTest {
     }
 
     private static class DemandingRules extends FixedRules {
-
         DemandingRules() {
             super(RiskLevel.LOW);
         }

@@ -6,11 +6,7 @@ import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.usecases.RegisterZoneCommand;
 
-/**
- * Translates between the zone DTOs and the domain, in both directions (D49).
- */
 public final class ZoneMapper {
-
     private ZoneMapper() {
     }
 

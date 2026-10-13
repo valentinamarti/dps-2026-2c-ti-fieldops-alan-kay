@@ -32,22 +32,8 @@ import java.util.Set;
 
 import static java.util.Map.entry;
 
-/**
- * Turns the exceptions of the domain into HTTP, with {@link ProblemDetail} as the single error format (D49).
- * The table lives here and not in the exceptions: the domain does not know about HTTP.
- *
- * <p>It extends {@link ResponseEntityExceptionHandler} so the exceptions of Spring MVC itself (a body that
- * cannot be parsed, a method that is not supported, a path that does not exist) keep their standard answer
- * instead of falling into the catch-all below.
- */
 @RestControllerAdvice
 public class DomainExceptionHandler extends ResponseEntityExceptionHandler {
-
-    /**
-     * The mapping agreed in the plan of the Fase 5. A subclass of a mapped exception gets the status of its
-     * closest mapped ancestor, so the {@link IllegalArgumentException} entry also covers the ones the JDK and
-     * Spring throw while converting a value.
-     */
     static final Map<Class<? extends RuntimeException>, HttpStatus> STATUS_BY_EXCEPTION = Map.ofEntries(
             entry(IllegalArgumentException.class, HttpStatus.BAD_REQUEST),
             entry(NullPointerException.class, HttpStatus.BAD_REQUEST),
@@ -78,11 +64,6 @@ public class DomainExceptionHandler extends ResponseEntityExceptionHandler {
         return problemFor(exception);
     }
 
-    /**
-     * The one error that carries more than a message: besides the {@code detail}, which already enumerates
-     * them, the criticals that blocked the approval travel as a {@code criticals} property, with the same
-     * shape {@code GET .../validation} gives them, so a client can iterate them instead of parsing text (D58).
-     */
     @ExceptionHandler(ExpeditionNotApprovableException.class)
     public ProblemDetail handle(ExpeditionNotApprovableException exception) {
         final var problem = problemFor(exception);
@@ -117,10 +98,6 @@ public class DomainExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
-    /**
-     * Anything that is not in the table is a bug, not a decision of the business: it is logged with its stack
-     * trace and the answer does not say what broke.
-     */
     private ProblemDetail unexpected(RuntimeException exception) {
         logger.error("Unmapped exception while serving a request", exception);
         return problem(HttpStatus.INTERNAL_SERVER_ERROR, "The request could not be completed");

@@ -11,12 +11,7 @@ import ar.edu.itba.dps.fieldops.business.replanning.ExpeditionReplanner;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * Reacts to a registered incident by storing a proposal with every option the generators offer and the replanner
- * can actually build. A proposal with no options is still stored: it records that nothing could be proposed (D46).
- */
 public class ProposeReplan implements EventSubscriber<IncidentRegistered> {
-
     private final ExpeditionRepository expeditions;
     private final ReplanProposalRepository proposals;
     private final ExpeditionReplanner replanner;

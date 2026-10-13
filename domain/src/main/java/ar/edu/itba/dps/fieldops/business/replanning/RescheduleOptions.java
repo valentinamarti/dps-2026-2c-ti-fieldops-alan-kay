@@ -8,12 +8,7 @@ import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanOption;
 
 import java.util.List;
 
-/**
- * Runs the affected activity later by the delay the incident reports, moving along what runs after it or depends
- * on it. Without a reported delay there is nothing to offer (D46).
- */
 public class RescheduleOptions implements ReplanOptionGenerator {
-
     @Override
     public List<ReplanOption> optionsFor(Expedition expedition, ItineraryItem affected, Incident incident) {
         return incident.expectedDelay()

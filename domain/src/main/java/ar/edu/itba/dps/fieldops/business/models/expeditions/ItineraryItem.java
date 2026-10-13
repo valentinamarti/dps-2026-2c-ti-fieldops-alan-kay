@@ -25,7 +25,6 @@ import java.util.Set;
 import java.util.function.Function;
 
 public class ItineraryItem implements ItineraryNode {
-
     @Getter
     private final Activity activity;
     @Getter
@@ -118,9 +117,6 @@ public class ItineraryItem implements ItineraryNode {
         return Collections.unmodifiableSet(resources);
     }
 
-    /**
-     * The supply assigned to this item that covers a requirement: the first one of its category.
-     */
     public Optional<DepletableResource> supplyFor(DepletableRequirement requirement) {
         return assignedSupplies.stream().filter(requirement::accepts).findFirst();
     }
@@ -147,9 +143,6 @@ public class ItineraryItem implements ItineraryNode {
         return isStarted() && !isFinished();
     }
 
-    /**
-     * True when the activity did not run inside the period it was scheduled for.
-     */
     public boolean startedOutOfSchedule() {
         return isStarted() && !scheduledPeriod.includes(tracking.getStartedAt());
     }

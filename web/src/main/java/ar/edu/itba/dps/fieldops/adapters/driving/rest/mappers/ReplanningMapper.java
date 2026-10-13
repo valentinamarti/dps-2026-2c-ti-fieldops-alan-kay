@@ -24,19 +24,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.IntStream;
 
-/**
- * Translates between the DTOs of F3 and the domain, in both directions (D49, D58): what the field reports
- * about an activity, the proposal that comes back with it, and the decision a responsible takes on it.
- *
- * <p>The translation of an {@link Incident} lives here, where the concept belongs (D48), and
- * {@link ReportMapper} reuses it to show the log of the expedition: the same {@link IncidentDto} is the one
- * the report already published, so an incident reads the same wherever it shows up.
- *
- * <p>It does not validate: a field that is missing travels as {@code null} and the domain rejects it with its
- * own message, which the error handler turns into a 400 (D49).
- */
 public final class ReplanningMapper {
-
     private ReplanningMapper() {
     }
 
@@ -66,10 +54,6 @@ public final class ReplanningMapper {
                 proposal.getSupersededBy().map(ReplanProposalId::value).orElse(null));
     }
 
-    /**
-     * An incident as it comes out of the expedition that registered it. The delay travels in minutes, with the
-     * unit in the name of the field like every other duration of the API (D57).
-     */
     static IncidentDto toDto(Incident incident) {
         return new IncidentDto(
                 incident.id().toString(),
@@ -80,20 +64,12 @@ public final class ReplanningMapper {
                 incident.expectedDelay().map(Duration::toMinutes).orElse(null));
     }
 
-    /**
-     * The options keep the order they were offered in and are numbered from 1, which is the number an
-     * acceptance names (D46, D47).
-     */
     private static List<ReplanOptionDto> toDtos(List<ReplanOption> options) {
         return IntStream.rangeClosed(1, options.size())
                 .mapToObj(number -> new ReplanOptionDto(number, options.get(number - 1).summary()))
                 .toList();
     }
 
-    /**
-     * The chosen option and the alternative live on the proposal and not on the decision of the domain, but
-     * they are part of the same answer: what a responsible decided (D48).
-     */
     private static ReplanDecisionDto toDto(ReplanProposal proposal, ReplanDecision decision) {
         return new ReplanDecisionDto(
                 decision.responsible().getId().value(),

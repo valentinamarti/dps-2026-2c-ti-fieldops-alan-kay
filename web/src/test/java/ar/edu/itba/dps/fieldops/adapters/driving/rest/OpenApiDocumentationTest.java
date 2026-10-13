@@ -10,14 +10,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * springdoc publishes the contract of the controllers. It is tested because the compatible line with Spring
- * Boot 4 is springdoc 3.x, and a build that compiles does not prove that the document is generated.
- */
 @SpringBootTest
 @AutoConfigureMockMvc
 class OpenApiDocumentationTest {
-
     @Autowired
     private MockMvc api;
 

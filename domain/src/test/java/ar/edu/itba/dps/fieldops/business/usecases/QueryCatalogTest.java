@@ -19,7 +19,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class QueryCatalogTest {
-
     private final ResourceCatalog catalog = new ResourceCatalog();
     private final QueryCatalog query = new QueryCatalog(catalog);
 
@@ -41,10 +40,6 @@ class QueryCatalogTest {
         assertEquals(List.of(ada, grace), query.staff());
     }
 
-    /**
-     * Vehicles and instruments are both equipment and the catalog keeps them together, so each list has to
-     * leave the other kind out.
-     */
     @Test
     void keepsVehiclesAndInstrumentsApartEvenThoughBothAreEquipment() {
         final var zodiac = vehicle("v-1", "Boat");
@@ -87,10 +82,6 @@ class QueryCatalogTest {
                 assertThrows(NotFoundException.class, () -> query.supply(unknown)).getMessage());
     }
 
-    /**
-     * An id of another kind is as good as an id nobody registered: asking for the vehicle of an instrument is
-     * not a 500 nor a cast that blows up, it is a "there is no vehicle with that id".
-     */
     @Test
     void doesNotFindAVehicleWhenTheIdBelongsToAnInstrument() {
         catalog.addEquipment(instrument("i-1", "Cooler"));

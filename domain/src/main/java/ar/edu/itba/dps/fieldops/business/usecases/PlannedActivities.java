@@ -13,17 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * Builds the activities that one request describes, which is the resolution {@link ScheduleActivity} and
- * {@link ScheduleBlock} share (D53, D54): the zone comes from the repository of zones, the rules from the
- * registry of types, and each dependency from the activities of the expedition being planned.
- *
- * <p>One instance serves one request, and that is what lets a leaf of a block depend on an earlier leaf of the
- * same block: while the tree is being built neither of the two is scheduled, so the itinerary cannot answer for
- * them yet, but this does.
- */
 final class PlannedActivities {
-
     private final Expedition expedition;
     private final ZoneRepository zones;
     private final ActivityTypeRegistry types;
@@ -53,15 +43,6 @@ final class PlannedActivities {
                 .toList();
     }
 
-    /**
-     * A dependency is an activity of the same expedition: one this request already built, which is how an
-     * activity of a block depends on an earlier one of the same block (D40), or one that is already scheduled
-     * in its itinerary.
-     *
-     * <p>Anything else fails with {@link NotFoundException}, so an id of another expedition, one nobody
-     * scheduled and one of a leaf that comes later in the same tree all read the same way: from the expedition
-     * being planned, at the moment this activity is built, they do not exist.
-     */
     private Activity dependency(ActivityId id) {
         final var inTheSameRequest = built.get(id);
         return inTheSameRequest != null ? inTheSameRequest : Lookups.item(expedition, id).getActivity();

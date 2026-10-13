@@ -15,11 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * What every {@link ZoneRepository} must do, whatever it stores the zones in.
- */
 public abstract class ZoneRepositoryContract {
-
     protected ZoneRepository repository;
 
     protected abstract ZoneRepository createRepository();

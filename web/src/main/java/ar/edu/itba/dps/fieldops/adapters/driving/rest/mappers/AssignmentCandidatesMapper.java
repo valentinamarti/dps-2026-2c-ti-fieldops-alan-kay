@@ -15,13 +15,7 @@ import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.resources.Vehicle;
 import ar.edu.itba.dps.fieldops.business.usecases.AssignmentCandidates;
 
-/**
- * Translates {@link AssignmentCandidates} to its DTO (D56). It only reads: nothing here becomes a command,
- * because candidates are not assigned by naming them, only by {@code POST .../staff}, {@code .../equipment}
- * or {@code .../supplies} with a resource id.
- */
 public final class AssignmentCandidatesMapper {
-
     private AssignmentCandidatesMapper() {
     }
 
@@ -37,10 +31,6 @@ public final class AssignmentCandidatesMapper {
                 entry.candidates().stream().map(StaffMapper::toResponse).toList());
     }
 
-    /**
-     * A candidate that qualifies can be either kind of equipment, so it is split into the same two lists
-     * {@code GET /api/equipment} already uses (D52): a vehicle and an instrument do not have the same shape.
-     */
     private static EquipmentCandidatesDto toEquipmentCandidates(
             AssignmentCandidates.For<ReusableRequirement, Equipment> entry) {
         return new EquipmentCandidatesDto(ActivityMapper.toDto(entry.requirement()),

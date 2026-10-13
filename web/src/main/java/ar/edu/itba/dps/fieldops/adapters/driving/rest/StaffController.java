@@ -26,15 +26,10 @@ import java.net.URI;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * The staff of the catalog. It only translates: the request becomes a command, the use case does the work and
- * the result becomes a DTO (D49).
- */
 @RestController
 @RequestMapping("/api/staff")
 @Tag(name = "Staff", description = "The people of the catalog and their unavailabilities")
 public class StaffController {
-
     private final RegisterResources registerResources;
     private final QueryCatalog queryCatalog;
     private final MarkResourceUnavailable markResourceUnavailable;

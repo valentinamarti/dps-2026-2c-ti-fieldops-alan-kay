@@ -7,11 +7,7 @@ import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.usecases.RegisterSupplyCommand;
 
-/**
- * Translates between the supply DTOs and the domain, in both directions (D49).
- */
 public final class SupplyMapper {
-
     private SupplyMapper() {
     }
 

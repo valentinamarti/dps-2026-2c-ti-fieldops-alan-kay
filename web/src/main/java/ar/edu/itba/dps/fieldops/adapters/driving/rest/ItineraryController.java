@@ -20,18 +20,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Objects;
 
-/**
- * The itinerary of an expedition and the blocks that go into it. It only translates: the request becomes a
- * command, the use case does the work and the tree becomes a DTO (D49, D54).
- *
- * <p>A block is created whole and has no address of its own, because it has no id (D39): the {@code Location}
- * of the answer points at the itinerary, which is where what was scheduled can be read.
- */
 @RestController
 @RequestMapping("/api/expeditions/{expeditionId}")
 @Tag(name = "Itinerary", description = "The activities scheduled in an expedition")
 public class ItineraryController {
-
     private final ScheduleBlock scheduleBlock;
     private final QueryExpeditions queryExpeditions;
 

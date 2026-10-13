@@ -16,15 +16,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * The zone resource over the whole stack, with the in-memory repository of the real wiring and no mocks. The
- * repository is a shared bean, so each test starts with a new context (D37).
- */
 @SpringBootTest
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class ZoneApiTest {
-
     private static final String COASTAL_REEF = """
             {"id": "z-1", "name": "Coastal reef", "requiredPermits": ["Protected area"]}
             """;

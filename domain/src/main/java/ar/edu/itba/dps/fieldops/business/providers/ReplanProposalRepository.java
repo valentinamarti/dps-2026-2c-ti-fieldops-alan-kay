@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ReplanProposalRepository {
-
     ReplanProposalId nextId();
 
     void add(ReplanProposal proposal);
@@ -18,8 +17,5 @@ public interface ReplanProposalRepository {
 
     Optional<ReplanProposal> findByIncident(IncidentId incident);
 
-    /**
-     * The proposals made for this expedition as the original, in the order they were added.
-     */
     List<ReplanProposal> findByExpedition(ExpeditionId expedition);
 }

@@ -27,7 +27,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class InsufficientSuppliesValidationTest {
-
     private final SequentialExpeditionRepository repository = new SequentialExpeditionRepository();
     private final InsufficientSuppliesValidation validation = new InsufficientSuppliesValidation();
     private final Zone coast = zone("z-1");
@@ -46,10 +45,6 @@ class InsufficientSuppliesValidationTest {
         assertTrue(validation.validate(expedition).isEmpty());
     }
 
-    /**
-     * The same as D59 for the stock: once approved, an expedition has reserved the supplies of its own
-     * activities, and those reservations cannot be what makes it insufficient.
-     */
     @Test
     void acceptsTheStockTheExpeditionItselfReserved() {
         final var jars = supply("d-1", "Sample container", Quantity.of("6", UNITS));

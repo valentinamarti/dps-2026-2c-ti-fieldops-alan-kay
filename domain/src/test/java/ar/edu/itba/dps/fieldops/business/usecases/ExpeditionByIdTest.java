@@ -41,11 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-/**
- * The use cases that receive an id instead of the expedition: queries, tracking and the id versions of approve, finish and replan.
- */
 class ExpeditionByIdTest {
-
     private static final ValidationResult RISKY = ValidationResult.warning(
             new RuleId("risk-tolerance"), ValidationSubject.of(new ActivityId("a-1")), "Sampling a-1 has HIGH risk");
 

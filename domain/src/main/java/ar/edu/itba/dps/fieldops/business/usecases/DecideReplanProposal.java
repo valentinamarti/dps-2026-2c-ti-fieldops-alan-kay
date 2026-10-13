@@ -12,11 +12,7 @@ import ar.edu.itba.dps.fieldops.business.replanning.ExpeditionReplanner;
 
 import java.util.Objects;
 
-/**
- * A responsible of the expedition accepts one option of a proposal or rejects it (D47).
- */
 public class DecideReplanProposal {
-
     private final ReplanProposalRepository proposals;
     private final ExpeditionRepository expeditions;
     private final ExpeditionReplanner replanner;
@@ -32,12 +28,6 @@ public class DecideReplanProposal {
         this.catalog = Objects.requireNonNull(catalog, "catalog is required");
     }
 
-    /**
-     * Builds the alternative of the chosen option as a draft, which then goes through review and approval like any
-     * expedition (D33). An original in execution is suspended first. Everything is checked before anything
-     * changes: if the option can no longer be built, or an activity is still in progress, nothing is suspended or
-     * recorded. The other pending proposals of the same expedition are superseded by this one.
-     */
     public Expedition accept(ReplanProposalId proposalId, int optionNumber, ReplanDecisionCommand command) {
         final var proposal = Lookups.proposal(proposals, proposalId);
         proposal.requirePending();
@@ -57,9 +47,6 @@ public class DecideReplanProposal {
         return alternative;
     }
 
-    /**
-     * Rejecting changes nothing in the expedition: it keeps running with the plan it had.
-     */
     public void reject(ReplanProposalId proposalId, ReplanDecisionCommand command) {
         final var proposal = Lookups.proposal(proposals, proposalId);
         proposal.requirePending();

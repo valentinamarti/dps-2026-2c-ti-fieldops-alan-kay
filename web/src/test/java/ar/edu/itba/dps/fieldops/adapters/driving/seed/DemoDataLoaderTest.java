@@ -39,23 +39,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * The two documents of {@code demo/} load without errors and leave the scenario the demonstration needs: ten
- * activities of the six types, the parallel block inside the sequential one, resources shared between
- * activities that do not overlap, and a plan that is approvable as it stands (D50).
- *
- * <p>No Spring here: the loader takes no part of the framework, so the test wires the use cases over the same
- * in-memory adapters the application uses and reads the real files off the classpath. What the demonstration
- * adds on top over HTTP — the night activity, the critical it raises and the warning that gets accepted — is
- * in {@code DemoScriptApiTest}, which walks the same script as {@code demo.http}.
- */
 class DemoDataLoaderTest {
-
-    /**
-     * What identifies the type of each activity of the seed: the domain does not keep the name of a type
-     * (D42, D53), so what can be observed is what its rules estimate and demand. The six categories of
-     * equipment below are one per type, so finding the six of them is finding the six types.
-     */
     private static final List<Scheduled> THE_TEN_ACTIVITIES = List.of(
             new Scheduled("a-01", "Truck", 270, RiskLevel.MEDIUM),
             new Scheduled("a-02", "Multiparameter probe", 90, RiskLevel.LOW),
@@ -127,11 +111,6 @@ class DemoDataLoaderTest {
                 "Truck", "Multiparameter probe", "Boat", "Drone", "Cooler", "Binoculars");
     }
 
-    /**
-     * The composite block of F2, with the two branches that run at the same time inside the sequence. The
-     * duration of the sequential block is the sum of its three parts and the parallel one inside it counts as
-     * the longest of its branches (D39).
-     */
     @Test
     void schedulesAParallelBlockInsideASequentialOne() {
         final var expedition = theDemoExpedition();
@@ -146,11 +125,6 @@ class DemoDataLoaderTest {
         assertThat(block.estimatedDuration()).isEqualTo(Duration.ofMinutes(90 + 210 + 180));
     }
 
-    /**
-     * The shared resources of the scenario. They are shared on purpose and they are not a conflict, because
-     * the activities that share them neither overlap in time nor run in parallel in the same block, which is
-     * what the rule of overlaps looks at (D41). The validation below is what proves it.
-     */
     @Test
     void sharesResourcesBetweenActivitiesThatDoNotOverlap() {
         final var expedition = theDemoExpedition();
@@ -163,10 +137,6 @@ class DemoDataLoaderTest {
         assertThat(assignedTo(expedition, "a-11")).contains("p-nils", "v-truck-1");
     }
 
-    /**
-     * The plan the seed leaves is approvable as it stands: the critical and the warning of the demonstration
-     * come from the night activity the script adds, not from a seed left broken on purpose.
-     */
     @Test
     void leavesAPlanWithNoCriticalAndNoWarningOfItsOwn() {
         final var result = validate.validate(theDemoExpedition().getId());
@@ -176,12 +146,6 @@ class DemoDataLoaderTest {
         assertThat(result.canBeApproved()).isTrue();
     }
 
-    /**
-     * What the seed leaves ready so that the night activity of the script raises exactly one critical and one
-     * warning: the expedition already grants the special permit of the zone and the two divers are certified
-     * for night operations, so what is missing is the lighting, which nobody assigned yet, and the extra level
-     * of risk over a tolerance of {@code HIGH} (D42, D43).
-     */
     @Test
     void leavesTheNightActivityOfTheScriptOneCriticalAndOneWarningAway() {
         final var expedition = theDemoExpedition();

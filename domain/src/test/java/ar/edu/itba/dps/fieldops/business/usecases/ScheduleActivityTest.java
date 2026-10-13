@@ -37,13 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-/**
- * The activity is scheduled from ids, a type name and its parameters: that is what the use case has to resolve
- * so no adapter builds an {@code Activity} (D53). The night variant is checked by what the activity demands
- * and not by the class of its rules, because a wrapped rule does not say that it is nocturnal (D42).
- */
 class ScheduleActivityTest {
-
     private static final ReusableRequirement LIGHTING = new ReusableRequirement(new ResourceCategory("Lighting"), 1);
 
     private final ExpeditionRepository repository = mock(ExpeditionRepository.class);
@@ -99,10 +93,6 @@ class ScheduleActivityTest {
         assertEquals(List.of(second), expedition.getItinerary().dependentsOf(first));
     }
 
-    /**
-     * The night variant demands the certification of everyone assigned, the lighting and the special permit of
-     * its zone, and raises one level the risk of the type it is asked for (D42, D43).
-     */
     @Test
     void theNightIndicatorWrapsTheRulesOfTheTypeWithWhatANightOperationDemands() {
         final var night = scheduleActivity.schedule(sampleCollection("a-1", 3)
@@ -168,10 +158,6 @@ class ScheduleActivityTest {
         assertEquals("There is no scheduled activity with id a-404", failure.getMessage());
     }
 
-    /**
-     * A dependency is looked up in the itinerary of the expedition that is being scheduled, so one that is
-     * scheduled in another expedition reads the same as one that nobody scheduled.
-     */
     @Test
     void theDependencyHasToBeScheduledInTheSameExpedition() {
         final var other = expeditionIn(coast, person("p-1")).build(ids);
@@ -198,12 +184,7 @@ class ScheduleActivityTest {
         return new CommandBuilder(expedition.getId(), id);
     }
 
-    /**
-     * The description of an activity has nine components and each test varies one or two, so they are built
-     * here instead of repeating in every test the seven that never change.
-     */
     private static final class CommandBuilder {
-
         private final ActivityId activityId;
         private ExpeditionId expeditionId;
         private TimePeriod scheduledPeriod = hours(9, 11);

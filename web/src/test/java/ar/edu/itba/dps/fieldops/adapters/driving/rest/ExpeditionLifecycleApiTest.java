@@ -16,25 +16,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * The life of an expedition over HTTP, end to end: every transition of D33, approving with a warning accepted
- * the same way the demo script does (copying it out of {@code GET .../validation}), tracking an activity while
- * the expedition executes it, and the report that closes the story (D49, D57). The whole wiring of
- * {@code FieldOpsConfig} with the in-memory adapters, no mocks (D37).
- */
 @SpringBootTest
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class ExpeditionLifecycleApiTest {
-
     @Autowired
     private MockMvc api;
 
-    /**
-     * Draft -> in review -> approved -> in execution -> suspended -> in execution again -> finished, with the
-     * one scheduled activity started, observed and finished with a result in between. The report at the end
-     * reflects what actually happened: one of one activities finished, and the sample container it consumed.
-     */
     @Test
     void theFullLifecycleMovesThroughEveryStateWithTheActivityTrackedAlongTheWay() throws Exception {
         final var expedition = anExpeditionWithASampleCollectionFullyResourced();
@@ -87,11 +75,6 @@ class ExpeditionLifecycleApiTest {
                 .andExpect(jsonPath("$.acceptedWarnings").isEmpty());
     }
 
-    /**
-     * The symmetry the demo script relies on: the body of the approval is built by copying the rule and the
-     * subject straight out of a warning {@code GET .../validation} returned, adding only who accepts it and
-     * why. The report afterwards shows the same warning back, reusing {@code ValidationFindingDto} (D57).
-     */
     @Test
     void approvalAcceptsAWarningCopiedFromTheValidationResponseAndTheReportShowsItAccepted() throws Exception {
         final var expedition = anExpeditionWithARiskyDroneSurveyFullyResourced();
@@ -132,13 +115,6 @@ class ExpeditionLifecycleApiTest {
                         .value("The area has no obstacles close to the line of sight limit"));
     }
 
-    /**
-     * The other direction of the same rule (D22): a critical is not something a responsible can accept, so
-     * approving with one still open fails, and the body says which ones. They come both ways (D58): enumerated
-     * in the {@code detail}, which is the message of {@code ExpeditionNotApprovableException}, and as a
-     * {@code criticals} array with the same shape {@code GET .../validation} gives them, so a client can
-     * iterate them without parsing text.
-     */
     @Test
     void approvingWithACriticalStillOpenFailsAndTheBodyListsIt() throws Exception {
         final var expedition = anExpeditionWithASampleCollectionMissingItsResources();
@@ -158,11 +134,6 @@ class ExpeditionLifecycleApiTest {
                         .value(Matchers.containsString("has 0 of the 1 cooler it needs")));
     }
 
-    /**
-     * Accepting a warning for a rule and a subject the expedition does not currently raise is the same "not
-     * found" the Fase 1b left for every other lookup (D49): the pair identifies the finding (D32), and no
-     * finding with that identity exists right now.
-     */
     @Test
     void acceptingAWarningTheExpeditionDoesNotRaiseAnswersNotFound() throws Exception {
         final var expedition = anExpeditionWithASampleCollectionMissingItsResources();
@@ -184,10 +155,6 @@ class ExpeditionLifecycleApiTest {
                 .andExpect(jsonPath("$.detail").value(Matchers.containsString("There is no warning")));
     }
 
-    /**
-     * An illegal transition answers 409, with the domain's own explanation of which states it allows (D20,
-     * D33): a draft expedition has not been through review or approval yet.
-     */
     @Test
     void anIllegalTransitionAnswersConflict() throws Exception {
         final var expedition = anExpeditionWithASampleCollectionFullyResourced();
@@ -278,10 +245,6 @@ class ExpeditionLifecycleApiTest {
         return JsonPath.read(created, "$.id").toString();
     }
 
-    /**
-     * A "Sample collection" with a field worker, a cooler and a sample container assigned: nothing missing,
-     * low risk, so it can go all the way to approved without accepting anything.
-     */
     private String anExpeditionWithASampleCollectionFullyResourced() throws Exception {
         register("/api/zones", """
                 {"id": "z-1", "name": "Coastal reef", "requiredPermits": []}
@@ -322,10 +285,6 @@ class ExpeditionLifecycleApiTest {
         return expedition;
     }
 
-    /**
-     * The same "Sample collection" as above, scheduled but with nothing assigned: missing one field worker
-     * and one cooler, both criticals.
-     */
     private String anExpeditionWithASampleCollectionMissingItsResources() throws Exception {
         register("/api/zones", """
                 {"id": "z-1", "name": "Coastal reef", "requiredPermits": []}
@@ -352,11 +311,6 @@ class ExpeditionLifecycleApiTest {
         return expedition;
     }
 
-    /**
-     * A "Drone survey" past the line-of-sight limit (medium risk), with a certified pilot and a drone
-     * assigned: nothing missing, so the only thing standing between it and approval is the risk warning
-     * ({@code RiskToleranceValidation}), because the expedition's tolerance is low.
-     */
     private String anExpeditionWithARiskyDroneSurveyFullyResourced() throws Exception {
         register("/api/zones", """
                 {"id": "z-1", "name": "Coastal reef", "requiredPermits": []}
