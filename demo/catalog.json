@@ -1,0 +1,157 @@
+{
+  "zones": [
+    {
+      "id": "z-coast",
+      "name": "Coastal reef",
+      "requiredPermits": ["Marine research"]
+    },
+    {
+      "id": "z-wetland",
+      "name": "Wetland basin",
+      "requiredPermits": ["Wetland access"]
+    }
+  ],
+  "staff": [
+    {
+      "id": "p-lee",
+      "name": "Lee Carter",
+      "certifications": []
+    },
+    {
+      "id": "p-max",
+      "name": "Max Planck",
+      "certifications": []
+    },
+    {
+      "id": "p-emmy",
+      "name": "Emmy Noether",
+      "certifications": []
+    },
+    {
+      "id": "p-ada",
+      "name": "Ada Lovelace",
+      "certifications": ["Diving", "Night operations"]
+    },
+    {
+      "id": "p-grace",
+      "name": "Grace Hopper",
+      "certifications": ["Diving", "Night operations"]
+    },
+    {
+      "id": "p-alan",
+      "name": "Alan Turing",
+      "certifications": ["Drone pilot"]
+    },
+    {
+      "id": "p-rita",
+      "name": "Rita Levi",
+      "certifications": ["Water analysis"]
+    },
+    {
+      "id": "p-nils",
+      "name": "Nils Bohr",
+      "certifications": ["Off-road driving"]
+    }
+  ],
+  "vehicles": [
+    {
+      "id": "v-truck-1",
+      "name": "Field truck",
+      "category": "Truck",
+      "licensePlate": "AB 123 CD",
+      "certifications": []
+    },
+    {
+      "id": "v-boat-1",
+      "name": "Dive boat",
+      "category": "Boat",
+      "licensePlate": "BO 456 AT",
+      "certifications": []
+    }
+  ],
+  "instruments": [
+    {
+      "id": "i-tank-1",
+      "name": "Oxygen tank 1",
+      "category": "Oxygen tank",
+      "certifications": []
+    },
+    {
+      "id": "i-tank-2",
+      "name": "Oxygen tank 2",
+      "category": "Oxygen tank",
+      "certifications": []
+    },
+    {
+      "id": "i-probe-1",
+      "name": "Multiparameter probe",
+      "category": "Multiparameter probe",
+      "certifications": []
+    },
+    {
+      "id": "i-drone-1",
+      "name": "Survey drone",
+      "category": "Drone",
+      "certifications": []
+    },
+    {
+      "id": "i-drone-2",
+      "name": "Spare survey drone",
+      "category": "Drone",
+      "certifications": []
+    },
+    {
+      "id": "i-cooler-1",
+      "name": "Field cooler",
+      "category": "Cooler",
+      "certifications": []
+    },
+    {
+      "id": "i-binocular-1",
+      "name": "Binoculars 1",
+      "category": "Binoculars",
+      "certifications": []
+    },
+    {
+      "id": "i-binocular-2",
+      "name": "Binoculars 2",
+      "category": "Binoculars",
+      "certifications": []
+    },
+    {
+      "id": "i-lamp-1",
+      "name": "Dive floodlight",
+      "category": "Lighting",
+      "certifications": []
+    }
+  ],
+  "supplies": [
+    {
+      "id": "s-fuel",
+      "name": "Diesel fuel",
+      "category": "Fuel",
+      "initialStock": {"amount": "200", "unit": "LITERS"}
+    },
+    {
+      "id": "s-container",
+      "name": "Sample containers",
+      "category": "Sample container",
+      "initialStock": {"amount": "20", "unit": "UNITS"}
+    },
+    {
+      "id": "s-reagent",
+      "name": "Reagent kits",
+      "category": "Reagent kit",
+      "initialStock": {"amount": "12", "unit": "UNITS"}
+    }
+  ],
+  "staffUnavailabilities": [],
+  "vehicleUnavailabilities": [],
+  "instrumentUnavailabilities": [
+    {
+      "resourceId": "i-drone-2",
+      "period": {"start": "2026-11-03T00:00:00", "end": "2026-11-04T00:00:00"},
+      "reason": "Scheduled maintenance"
+    }
+  ]
+}

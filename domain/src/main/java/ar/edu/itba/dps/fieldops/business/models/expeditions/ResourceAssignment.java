@@ -8,12 +8,7 @@ import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import java.util.Objects;
 import java.util.function.BiConsumer;
 
-/**
- * A resource together with the way an expedition assigns it. Whoever creates it knows what kind of resource it is,
- * so applying it later needs no question about its type.
- */
 public final class ResourceAssignment {
-
     private final Resource resource;
     private final BiConsumer<Expedition, ItineraryItem> assignment;
 

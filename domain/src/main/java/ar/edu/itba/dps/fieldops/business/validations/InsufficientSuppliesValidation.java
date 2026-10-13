@@ -22,7 +22,7 @@ public class InsufficientSuppliesValidation implements ValidationRule {
         final var itinerary = expedition.getItinerary();
         return Stream.concat(
                 itinerary.getItems().stream().flatMap(this::uncoveredRequirements),
-                itinerary.supplyDemands().stream().flatMap(demand -> stockResults(demand, expedition.reservationsItTakesOver()))).toList();
+                itinerary.supplyDemands().stream().flatMap(demand -> stockResults(demand, expedition.reservationsItDoesNotCompeteWith()))).toList();
     }
 
     private Stream<ValidationResult> uncoveredRequirements(ItineraryItem item) {

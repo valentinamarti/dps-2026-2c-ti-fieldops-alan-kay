@@ -13,13 +13,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Stream;
 
-/**
- * When the incident names a resource, offers one option per catalog candidate that covers the same requirement,
- * is free in the period of the activity and is admitted by it, in catalog order and up to {@link #MAX_CANDIDATES}
- * (D46).
- */
 public class ResourceReplacementOptions implements ReplanOptionGenerator {
-
     public static final int MAX_CANDIDATES = 3;
 
     private final ResourceCatalog catalog;

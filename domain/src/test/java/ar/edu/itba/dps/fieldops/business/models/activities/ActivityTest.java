@@ -21,7 +21,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ActivityTest {
-
     private static final TimePeriod WINDOW = new TimePeriod(
             LocalDateTime.of(2026, 10, 1, 8, 0), LocalDateTime.of(2026, 10, 1, 18, 0));
     private static final Zone ZONE = new Zone("z-1", "Coast", Set.of());
@@ -135,11 +134,7 @@ class ActivityTest {
         return new Activity(new ActivityId("a-1"), "Survey", WINDOW, ZONE, List.of(), new DemandingRules());
     }
 
-    /**
-     * Stub with fixed values, so these tests do not depend on any concrete activity type.
-     */
     private static class FixedRules implements ActivityRules {
-
         @Override
         public Duration estimatedDuration() {
             return Duration.ofHours(3);
@@ -167,7 +162,6 @@ class ActivityTest {
     }
 
     private static class DemandingRules extends FixedRules {
-
         @Override
         public Set<Certification> requiredCertificationsForAllStaff() {
             return Set.of(FIRST_AID);

@@ -13,6 +13,7 @@ import ar.edu.itba.dps.fieldops.business.models.resources.Unavailability;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
+import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -30,7 +31,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ResourceOverlapValidationTest {
-
     private static final ExpeditionId ANOTHER_EXPEDITION = new ExpeditionId("e-2");
 
     private final SequentialExpeditionRepository repository = new SequentialExpeditionRepository();
@@ -74,6 +74,36 @@ class ResourceOverlapValidationTest {
     void flagsAResourceThatIsUnavailable() {
         worker.markUnavailable(new Unavailability(hours(10, 11), "Medical leave"));
         scheduleWithWorker("a-1", hours(9, 11));
+
+        final var expected = ValidationResult.critical(ResourceOverlapValidation.ID, ValidationSubject.of(new ActivityId("a-1"), new ResourceId("p-2")), "p-2 is not available during Sampling a-1");
+        assertEquals(List.of(expected), validation.validate(expedition));
+    }
+
+    @Test
+    void acceptsTheResourcesTheExpeditionItselfReserved() {
+        scheduleWithWorker("a-1", hours(9, 11));
+        scheduleWithWorker("a-2", hours(11, 13));
+        new ResourceReservations().reserveFor(expedition);
+
+        assertTrue(validation.validate(expedition).isEmpty());
+    }
+
+    @Test
+    void flagsAResourceReservedByADifferentExpedition() {
+        final var other = expeditionIn(coast, person("p-1")).build(repository);
+        other.assignStaff(other.schedule(sampling("a-9", coast, hours(0, 24)), hours(10, 12)), worker);
+        new ResourceReservations().reserveFor(other);
+        scheduleWithWorker("a-1", hours(9, 11));
+
+        final var expected = ValidationResult.critical(ResourceOverlapValidation.ID, ValidationSubject.of(new ActivityId("a-1"), new ResourceId("p-2")), "p-2 is not available during Sampling a-1");
+        assertEquals(List.of(expected), validation.validate(expedition));
+    }
+
+    @Test
+    void flagsAResourceMarkedUnavailableOverItsOwnReservation() {
+        scheduleWithWorker("a-1", hours(9, 11));
+        new ResourceReservations().reserveFor(expedition);
+        worker.markUnavailable(new Unavailability(hours(10, 11), "Medical leave"));
 
         final var expected = ValidationResult.critical(ResourceOverlapValidation.ID, ValidationSubject.of(new ActivityId("a-1"), new ResourceId("p-2")), "p-2 is not available during Sampling a-1");
         assertEquals(List.of(expected), validation.validate(expedition));

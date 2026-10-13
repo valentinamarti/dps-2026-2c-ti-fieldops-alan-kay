@@ -9,11 +9,7 @@ import ar.edu.itba.dps.fieldops.business.validations.ApprovalPolicy;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * Runs the approval rules without approving, so the responsible can see what stands in the way.
- */
 public class ValidateExpedition {
-
     private final ExpeditionRepository repository;
     private final List<ValidationRule> additionalRules;
 

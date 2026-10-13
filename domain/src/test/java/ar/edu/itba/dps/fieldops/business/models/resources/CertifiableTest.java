@@ -11,11 +11,7 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Certification rules shared by every {@link Certifiable} resource.
- */
 class CertifiableTest {
-
     private static final Certification DIVING = new Certification("Diving");
     private static final Certification FIRST_AID = new Certification("First aid");
     private static final ResourceCategory BOAT = new ResourceCategory("Boat");

@@ -21,20 +21,13 @@ import org.springframework.context.annotation.Configuration;
 
 import java.util.List;
 
-/**
- * Wiring of F3: incidents, the event publisher and its subscribers, and replan proposals (D45).
- */
 @Configuration
 public class ReplanningConfig {
-
     @Bean
     ReplanProposalRepository replanProposalRepository() {
         return new InMemoryReplanProposalRepository();
     }
 
-    /**
-     * The options are offered in this order: reschedule, replace a resource, cancel.
-     */
     @Bean
     ProposeReplan proposeReplan(ExpeditionRepository expeditions, ReplanProposalRepository proposals,
                                 ExpeditionReplanner replanner, ResourceCatalog catalog) {

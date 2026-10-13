@@ -10,11 +10,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/**
- * A resource of the affected activity is withdrawn and another one takes its place, in the same period.
- */
 public record ResourceReplaced(ResourceId withdrawn, ResourceAssignment replacement) implements ReplanReason {
-
     public ResourceReplaced {
         Objects.requireNonNull(withdrawn, "withdrawn is required");
         Objects.requireNonNull(replacement, "replacement is required");

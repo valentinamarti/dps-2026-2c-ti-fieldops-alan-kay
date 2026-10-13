@@ -28,13 +28,7 @@ import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.pers
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.sampling;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
 
-/**
- * The replanning flow wired by hand, with a publisher that delivers synchronously to the proposal subscriber, and an
- * approved expedition in execution: a morning sampling (9-11), an afternoon one (13-15) and a third that depends on
- * the afternoon one (16-17). All windows are 8-18.
- */
 final class IncidentScenario {
-
     static final LocalDateTime TEN = LocalDateTime.of(2026, 10, 1, 10, 0);
 
     final SequentialExpeditionRepository expeditions = new SequentialExpeditionRepository();

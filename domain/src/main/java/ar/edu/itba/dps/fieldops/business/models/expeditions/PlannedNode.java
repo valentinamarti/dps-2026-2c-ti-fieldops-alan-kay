@@ -8,12 +8,7 @@ import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import java.util.List;
 import java.util.function.Function;
 
-/**
- * What someone wants in an itinerary, before an expedition schedules it: an activity with its period, a block of
- * other planned nodes, or an item another expedition already finished.
- */
 public final class PlannedNode {
-
     private final Function<Expedition, ItineraryNode> scheduling;
 
     private PlannedNode(Function<Expedition, ItineraryNode> scheduling) {

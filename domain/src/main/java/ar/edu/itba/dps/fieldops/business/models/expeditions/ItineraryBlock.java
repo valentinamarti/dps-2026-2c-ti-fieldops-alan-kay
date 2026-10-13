@@ -2,6 +2,7 @@ package ar.edu.itba.dps.fieldops.business.models.expeditions;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
 import ar.edu.itba.dps.fieldops.business.interfaces.itinerary.ItineraryNode;
+import ar.edu.itba.dps.fieldops.business.interfaces.itinerary.ItineraryNodeVisitor;
 import ar.edu.itba.dps.fieldops.business.models.activities.DepletableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
 import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
@@ -14,7 +15,6 @@ import java.util.Optional;
 import java.util.function.Function;
 
 public abstract class ItineraryBlock implements ItineraryNode {
-
     private final List<ItineraryNode> children;
 
     ItineraryBlock(List<ItineraryNode> children) {
@@ -71,5 +71,9 @@ public abstract class ItineraryBlock implements ItineraryNode {
 
     List<ItineraryNode> children() {
         return children;
+    }
+
+    <T> List<T> acceptedChildren(ItineraryNodeVisitor<T> visitor) {
+        return children.stream().map(child -> child.accept(visitor)).toList();
     }
 }

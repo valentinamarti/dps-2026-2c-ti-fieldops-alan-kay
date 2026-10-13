@@ -8,12 +8,7 @@ import ar.edu.itba.dps.fieldops.business.providers.ReplanProposalRepository;
 
 import java.util.Objects;
 
-/**
- * Registers an incident in its expedition and announces it. Delivery is synchronous, so by the time the event is
- * published the proposal already exists, and this use case returns it (D45).
- */
 public class RegisterIncident {
-
     private final ExpeditionRepository expeditions;
     private final EventPublisher publisher;
     private final ReplanProposalRepository proposals;

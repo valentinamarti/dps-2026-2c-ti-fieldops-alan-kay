@@ -12,12 +12,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/**
- * What the system proposes after an incident, and what a responsible decided about it. It is the audit record of a
- * replanning: the original expedition, the incident that motivated it, the options offered and the decision (D48).
- */
 public class ReplanProposal {
-
     @Getter
     private final ReplanProposalId id;
     @Getter
@@ -44,9 +39,6 @@ public class ReplanProposal {
         return incident.activity();
     }
 
-    /**
-     * Options are numbered from 1, in the order they were offered.
-     */
     public ReplanOption option(int number) {
         if (number < 1 || number > options.size()) {
             throw new NotFoundException("replan option", "%d of the proposal %s".formatted(number, id));
@@ -79,9 +71,6 @@ public class ReplanProposal {
         status = ReplanProposalStatus.REJECTED;
     }
 
-    /**
-     * Another proposal of the same expedition was accepted, so this one no longer applies to the plan in force.
-     */
     public void supersedeBy(ReplanProposalId accepted) {
         requirePending();
         this.supersededBy = Objects.requireNonNull(accepted, "accepted is required");

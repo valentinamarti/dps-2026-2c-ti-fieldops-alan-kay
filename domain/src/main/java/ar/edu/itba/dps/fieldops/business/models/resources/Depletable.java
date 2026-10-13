@@ -19,6 +19,7 @@ public class Depletable implements DepletableResource {
     private final ResourceId id;
     @Getter
     private final String name;
+    @Getter
     private final ResourceCategory category;
     @Getter
     private Quantity stock;

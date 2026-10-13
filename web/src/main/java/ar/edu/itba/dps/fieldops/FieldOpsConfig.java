@@ -16,8 +16,13 @@ import ar.edu.itba.dps.fieldops.business.usecases.CreateExpedition;
 import ar.edu.itba.dps.fieldops.business.usecases.EstimateExpedition;
 import ar.edu.itba.dps.fieldops.business.usecases.FindAssignmentCandidates;
 import ar.edu.itba.dps.fieldops.business.usecases.FinishExpedition;
+import ar.edu.itba.dps.fieldops.business.usecases.MarkResourceUnavailable;
 import ar.edu.itba.dps.fieldops.business.usecases.QueryActivityTypes;
+import ar.edu.itba.dps.fieldops.business.usecases.QueryCatalog;
 import ar.edu.itba.dps.fieldops.business.usecases.QueryExpeditions;
+import ar.edu.itba.dps.fieldops.business.usecases.QueryZones;
+import ar.edu.itba.dps.fieldops.business.usecases.RegisterResources;
+import ar.edu.itba.dps.fieldops.business.usecases.RegisterZone;
 import ar.edu.itba.dps.fieldops.business.usecases.ReplanExpedition;
 import ar.edu.itba.dps.fieldops.business.usecases.ReportExpedition;
 import ar.edu.itba.dps.fieldops.business.usecases.ScheduleActivity;
@@ -80,13 +85,14 @@ public class FieldOpsConfig {
     }
 
     @Bean
-    ScheduleActivity scheduleActivity(ExpeditionRepository repository) {
-        return new ScheduleActivity(repository);
+    ScheduleActivity scheduleActivity(ExpeditionRepository repository, ZoneRepository zones,
+                                      ActivityTypeRegistry types) {
+        return new ScheduleActivity(repository, zones, types);
     }
 
     @Bean
-    ScheduleBlock scheduleBlock(ExpeditionRepository repository) {
-        return new ScheduleBlock(repository);
+    ScheduleBlock scheduleBlock(ExpeditionRepository repository, ZoneRepository zones, ActivityTypeRegistry types) {
+        return new ScheduleBlock(repository, zones, types);
     }
 
     @Bean
@@ -107,6 +113,31 @@ public class FieldOpsConfig {
     @Bean
     QueryExpeditions queryExpeditions(ExpeditionRepository repository) {
         return new QueryExpeditions(repository);
+    }
+
+    @Bean
+    RegisterResources registerResources(ResourceCatalog catalog) {
+        return new RegisterResources(catalog);
+    }
+
+    @Bean
+    MarkResourceUnavailable markResourceUnavailable(ResourceCatalog catalog) {
+        return new MarkResourceUnavailable(catalog);
+    }
+
+    @Bean
+    QueryCatalog queryCatalog(ResourceCatalog catalog) {
+        return new QueryCatalog(catalog);
+    }
+
+    @Bean
+    RegisterZone registerZone(ZoneRepository zones) {
+        return new RegisterZone(zones);
+    }
+
+    @Bean
+    QueryZones queryZones(ZoneRepository zones) {
+        return new QueryZones(zones);
     }
 
     @Bean

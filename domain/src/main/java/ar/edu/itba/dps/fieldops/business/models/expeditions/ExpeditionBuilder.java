@@ -15,7 +15,6 @@ import java.util.Objects;
 import java.util.Set;
 
 public class ExpeditionBuilder {
-
     private final List<String> objectives = new ArrayList<>();
     private final Set<Zone> zones = new HashSet<>();
     private final Set<Person> responsibles = new HashSet<>();
@@ -82,9 +81,6 @@ public class ExpeditionBuilder {
         return this;
     }
 
-    /**
-     * Incidents an alternative keeps from the expedition it replaces, so its report still tells the whole trip.
-     */
     public ExpeditionBuilder addInheritedIncident(Incident incident) {
         inheritedIncidents.add(incident);
         return this;

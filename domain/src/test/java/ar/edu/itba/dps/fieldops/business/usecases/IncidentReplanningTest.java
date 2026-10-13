@@ -17,11 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * The acceptance criteria of F3, through the use cases.
- */
 class IncidentReplanningTest {
-
     private final IncidentScenario scenario = new IncidentScenario();
 
     @Test

@@ -7,6 +7,7 @@ import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
+import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
@@ -26,7 +27,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class InsufficientSuppliesValidationTest {
-
     private final SequentialExpeditionRepository repository = new SequentialExpeditionRepository();
     private final InsufficientSuppliesValidation validation = new InsufficientSuppliesValidation();
     private final Zone coast = zone("z-1");
@@ -41,6 +41,16 @@ class InsufficientSuppliesValidationTest {
         final var jars = supply("d-1", "Sample container", Quantity.of("6", UNITS));
         expedition.assignSupply(scheduleSampling("a-1", hours(9, 11)), jars);
         expedition.assignSupply(scheduleSampling("a-2", hours(12, 14)), jars);
+
+        assertTrue(validation.validate(expedition).isEmpty());
+    }
+
+    @Test
+    void acceptsTheStockTheExpeditionItselfReserved() {
+        final var jars = supply("d-1", "Sample container", Quantity.of("6", UNITS));
+        expedition.assignSupply(scheduleSampling("a-1", hours(9, 11)), jars);
+        expedition.assignSupply(scheduleSampling("a-2", hours(12, 14)), jars);
+        new ResourceReservations().reserveFor(expedition);
 
         assertTrue(validation.validate(expedition).isEmpty());
     }

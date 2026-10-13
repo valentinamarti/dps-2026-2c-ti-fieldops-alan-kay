@@ -21,12 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * What every {@link ExpeditionRepository} must do, whatever it stores the expeditions in.
- * Each adapter extends this class and supplies a fresh repository.
- */
 public abstract class ExpeditionRepositoryContract {
-
     private final Zone coast = zone("z-1");
     private final Person leader = person("p-1");
     protected ExpeditionRepository repository;

@@ -4,6 +4,8 @@ import ar.edu.itba.dps.fieldops.business.estimations.ExpeditionEstimator;
 import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotEditableException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
 import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
+import ar.edu.itba.dps.fieldops.business.interfaces.itinerary.ItineraryNode;
+import ar.edu.itba.dps.fieldops.business.interfaces.itinerary.ItineraryNodeVisitor;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
@@ -39,6 +41,22 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ItineraryBlocksTest {
+    private static final ItineraryNodeVisitor<String> SHAPE = new ItineraryNodeVisitor<>() {
+        @Override
+        public String activity(ItineraryItem item) {
+            return item.getActivity().getId().value();
+        }
+
+        @Override
+        public String sequence(ItineraryNode block, List<String> parts) {
+            return "sequential(%s)".formatted(String.join(", ", parts));
+        }
+
+        @Override
+        public String parallel(ItineraryNode block, List<String> branches) {
+            return "parallel(%s)".formatted(String.join(", ", branches));
+        }
+    };
 
     private final SequentialExpeditionRepository repository = new SequentialExpeditionRepository();
     private final Zone coast = zone("z-1");
@@ -76,6 +94,18 @@ class ItineraryBlocksTest {
         assertTrue(itinerary.runInParallel(itemOf(dive), itemOf(transect)));
         assertFalse(itinerary.runInParallel(itemOf(landing), itemOf(dive)));
         assertFalse(itinerary.runInParallel(itemOf(transect), itemOf(wrapUp)));
+    }
+
+    @Test
+    void aVisitorReadsTheShapeOfTheTreeWithoutAnyoneAskingWhatKindEachNodeIs() {
+        final var block = expedition.schedule(sequential(
+                activity(landing, hours(8, 9)),
+                parallel(
+                        activity(dive, hours(9, 11)),
+                        activity(transect, hours(9, 10)))));
+
+        assertEquals("sequential(a-1, parallel(a-2, a-3))", block.accept(SHAPE));
+        assertEquals("a-1", itemOf(landing).accept(SHAPE));
     }
 
     @Test

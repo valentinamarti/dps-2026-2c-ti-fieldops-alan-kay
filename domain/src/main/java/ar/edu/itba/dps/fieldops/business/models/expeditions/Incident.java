@@ -9,12 +9,8 @@ import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.Optional;
 
-/**
- * An incident the expedition registered: which activity it affects and what was reported about it.
- */
 public record Incident(IncidentId id, ActivityId activity, String description, LocalDateTime occurredAt,
                        Optional<ResourceId> resource, Optional<Duration> expectedDelay) {
-
     public Incident {
         Objects.requireNonNull(id, "id is required");
         Objects.requireNonNull(activity, "activity is required");

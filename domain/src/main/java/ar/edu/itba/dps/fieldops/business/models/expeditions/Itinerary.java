@@ -16,7 +16,6 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 
 public class Itinerary {
-
     private static final Comparator<ItineraryNode> BY_START = Comparator.comparing(node -> node.getScheduledPeriod().start());
 
     private final List<ItineraryNode> nodes = new ArrayList<>();
@@ -53,26 +52,16 @@ public class Itinerary {
         return nodes.stream().anyMatch(node -> node.runsInParallel(first, second));
     }
 
-    /**
-     * The items that cannot happen without this one: those that depend on it, directly or through others.
-     */
     public List<ItineraryItem> dependentsOf(ItineraryItem item) {
         return reachableFrom(item, this::directDependentsOf);
     }
 
-    /**
-     * The items that have to move later when this one does: those that come after it in a sequential block and
-     * those that depend on it, and in turn the ones that have to move with each of them.
-     */
     public List<ItineraryItem> movingWith(ItineraryItem item) {
         return reachableFrom(item, current -> Stream.concat(
                 nodes.stream().flatMap(node -> node.itemsAfter(current).stream()),
                 directDependentsOf(current).stream()).toList());
     }
 
-    /**
-     * The plans that rebuild this itinerary with the same blocks, in the order its nodes were scheduled.
-     */
     public List<PlannedNode> planKeepingStructure(Function<ItineraryItem, Optional<PlannedNode>> itemPlans) {
         return nodes.stream().flatMap(node -> node.planKeepingStructure(itemPlans).stream()).toList();
     }

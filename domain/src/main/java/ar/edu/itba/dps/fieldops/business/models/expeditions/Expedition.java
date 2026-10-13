@@ -37,7 +37,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class Expedition {
-
     @Getter
     private final ExpeditionId id;
     @Getter
@@ -155,6 +154,10 @@ public class Expedition {
         return getReplacedExpedition().map(Set::of).orElse(Set.of());
     }
 
+    public Set<ExpeditionId> reservationsItDoesNotCompeteWith() {
+        return Stream.concat(Stream.of(id), reservationsItTakesOver().stream()).collect(Collectors.toUnmodifiableSet());
+    }
+
     public Optional<ReplanReason> getReplanReason() {
         return Optional.ofNullable(replanReason);
     }
@@ -174,10 +177,6 @@ public class Expedition {
         requireCanTransitionTo(ExpeditionStatus.REPLACED);
     }
 
-    /**
-     * Leaves the expedition ready to be replaced: one in execution is suspended first, so the field stops
-     * following a plan that is about to change (D47). Nothing changes if it cannot be replaced.
-     */
     public void suspendToReplan() {
         requireNoActivityInProgress();
         if (status.canTransitionTo(ExpeditionStatus.SUSPENDED)) {
@@ -196,9 +195,6 @@ public class Expedition {
         inExecution(item).start(at);
     }
 
-    /**
-     * Closing an activity consumes what it actually used, so the supplies left reflect the field, not the plan.
-     */
     public void finishActivity(ItineraryItem item, LocalDateTime at, String result) {
         final var tracking = inExecution(item).startedTracking();
         tracking.requireCanFinish(at, result);
@@ -210,10 +206,6 @@ public class Expedition {
         inExecution(item).startedTracking().record(observation);
     }
 
-    /**
-     * Registers what went wrong with an activity that has not finished yet, pending or in progress. The incident
-     * may name a resource, which has to be one assigned to that activity.
-     */
     public Incident registerIncident(ItineraryItem item, IncidentReport report) {
         Objects.requireNonNull(report, "report is required");
         final var affected = inExecution(item);
@@ -226,10 +218,6 @@ public class Expedition {
         return incident;
     }
 
-    /**
-     * The incidents of the whole trip, in the order they were registered. An alternative starts with the ones of
-     * the expedition it replaces.
-     */
     public List<Incident> getIncidents() {
         return Collections.unmodifiableList(incidents);
     }

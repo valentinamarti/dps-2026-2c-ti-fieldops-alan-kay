@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.Objects;
 
 public class ApproveExpedition {
-
     private final List<ValidationRule> additionalRules;
     private final ResourceReservations reservations;
     private final ExpeditionRepository repository;
@@ -29,9 +28,6 @@ public class ApproveExpedition {
         this.catalog = Objects.requireNonNull(catalog, "catalog is required");
     }
 
-    /**
-     * Each acceptance has to match a warning the expedition raises right now: accepting one that does not exist is an error.
-     */
     public void approve(ExpeditionId id, List<WarningAcceptance> acceptances) {
         final var expedition = Lookups.expedition(repository, id);
         final var current = new ApprovalPolicy(additionalRules).validate(expedition).warnings();

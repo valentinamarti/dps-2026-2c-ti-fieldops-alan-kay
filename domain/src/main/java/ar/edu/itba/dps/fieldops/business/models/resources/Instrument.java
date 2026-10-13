@@ -14,7 +14,9 @@ public class Instrument extends ScheduledResource implements Equipment, Certifia
     private final ResourceId id;
     @Getter
     private final String name;
+    @Getter
     private final ResourceCategory category;
+    @Getter
     private final Certifications certifications;
 
     public Instrument(ResourceId id, String name, ResourceCategory category, Set<Certification> certifications) {

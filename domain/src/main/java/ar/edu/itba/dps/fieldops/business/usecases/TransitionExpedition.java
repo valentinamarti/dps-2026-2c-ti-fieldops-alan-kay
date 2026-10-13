@@ -7,12 +7,7 @@ import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import java.util.Objects;
 import java.util.function.Consumer;
 
-/**
- * The status changes that only touch the expedition itself. Approving and finishing also move reservations,
- * so they have their own use cases.
- */
 public class TransitionExpedition {
-
     private final ExpeditionRepository repository;
 
     public TransitionExpedition(ExpeditionRepository repository) {

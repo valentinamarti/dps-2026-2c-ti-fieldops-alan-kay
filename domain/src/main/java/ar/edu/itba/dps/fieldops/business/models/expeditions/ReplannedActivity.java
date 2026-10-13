@@ -8,12 +8,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Predicate;
 
-/**
- * How the affected activity comes back in the alternative: when, which of its resources it keeps and which ones it
- * gets on top of those.
- */
 public record ReplannedActivity(TimePeriod period, Predicate<Resource> keeps, List<ResourceAssignment> additions) {
-
     public ReplannedActivity {
         Objects.requireNonNull(period, "period is required");
         Objects.requireNonNull(keeps, "keeps is required");

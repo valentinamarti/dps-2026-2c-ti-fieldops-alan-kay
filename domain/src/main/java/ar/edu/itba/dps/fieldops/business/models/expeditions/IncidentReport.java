@@ -8,13 +8,8 @@ import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.Optional;
 
-/**
- * What someone in the field reports about an activity, before the expedition registers it as an {@link Incident}.
- * It may name the resource that failed and how long the activity is expected to be delayed.
- */
 public record IncidentReport(String description, LocalDateTime occurredAt, Optional<ResourceId> resource,
                              Optional<Duration> expectedDelay) {
-
     public IncidentReport {
         description = DomainArguments.requireText(description, "description");
         Objects.requireNonNull(occurredAt, "occurredAt is required");

@@ -1,6 +1,7 @@
 package ar.edu.itba.dps.fieldops.business.models.expeditions;
 
 import ar.edu.itba.dps.fieldops.business.interfaces.itinerary.ItineraryNode;
+import ar.edu.itba.dps.fieldops.business.interfaces.itinerary.ItineraryNodeVisitor;
 
 import java.time.Duration;
 import java.util.Comparator;
@@ -20,6 +21,11 @@ public final class ParallelBlock extends ItineraryBlock {
     @Override
     public boolean runsInParallel(ItineraryItem first, ItineraryItem second) {
         return areInDifferentBranches(first, second) || super.runsInParallel(first, second);
+    }
+
+    @Override
+    public <T> T accept(ItineraryNodeVisitor<T> visitor) {
+        return visitor.parallel(this, acceptedChildren(visitor));
     }
 
     @Override
