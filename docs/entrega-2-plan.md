@@ -422,6 +422,8 @@ Expone los casos de uso por REST, deja la demostración reproducible y cierra la
 
 **Estado (12/10/2026, antes de empezar):** nada escrito. `web` tiene solo `FieldOpsApplication`, `FieldOpsConfig` y `ReplanningConfig`: no hay paquete `adapters.driving.rest`, ni DTOs, ni `@RestControllerAdvice`, ni springdoc en el `pom`, ni carpeta `demo/`. `DESIGN.md` llega hasta D48 y el README dice que el proyecto todavía no expone endpoints. Las fases 1 a 4 están mergeadas en `main` (último commit `1baba60`).
 
+**Estado al cierre (12/10/2026, rama `assignment-2-phase-5c`): la fase está completa.** Los tres PRs hechos: el 5a (esqueleto de la API), el 5b en seis tramos (los ~48 endpoints, con F1, F2 y F3 expuestas, probadas y documentadas también por API) y el 5c (seed, guion, README y cierre de `DESIGN.md`). `mvn -B verify` pasa con 782 tests y `DESIGN.md` llega a D58. **Nada se empujó todavía:** el push de toda la fase lo decide Matías cuando valide el cierre.
+
 ### Alcance acordado (12/10/2026)
 
 | Punto | Decisión |
@@ -594,10 +596,30 @@ Qué cambió respecto del plan:
 
 ### PR 5c: demo
 
-- [ ] Seed como datos: `demo/catalog.json` y `demo/expedition.json`, más un único cargador genérico que corre con el perfil `demo`. Usa los builders y el registro de tipos de la Fase 3. No hay clases Java propias de la demo.
-- [ ] Guion contra la API en `demo.http`: crear la expedición, intentar aprobar y ver el crítico, corregir, aceptar la advertencia, aprobar, ejecutar, registrar el incidente y elegir una opción.
-- [ ] El escenario cubre lo que sugiere la consigna: diez o más actividades, seis tipos y la nocturna, un paralelo dentro de un secuencial, un recurso compartido, un error crítico, una advertencia aceptable y la replanificación.
-- [ ] Candidatos naturales: el crítico es el permiso nocturno faltante, y la advertencia es el riesgo por encima de la tolerancia, que `RiskToleranceValidation` ya emite como advertencia.
+- [x] Seed como datos: `demo/catalog.json` y `demo/expedition.json`, más un único cargador genérico que corre con el perfil `demo`. Usa los builders y el registro de tipos de la Fase 3. No hay clases Java propias de la demo.
+- [x] Guion contra la API en `demo.http`: crear la expedición, intentar aprobar y ver el crítico, corregir, aceptar la advertencia, aprobar, ejecutar, registrar el incidente y elegir una opción.
+- [x] El escenario cubre lo que sugiere la consigna: diez o más actividades, seis tipos y la nocturna, un paralelo dentro de un secuencial, un recurso compartido, un error crítico, una advertencia aceptable y la replanificación.
+- [x] ~~Candidatos naturales: el crítico es el permiso nocturno faltante~~, y la advertencia es el riesgo por encima de la tolerancia, que `RiskToleranceValidation` ya emite como advertencia. **El crítico cambió:** es la iluminación que falta en la actividad nocturna (`missing-resources`), porque el permiso faltante no se puede corregir por API (ver abajo).
+
+**Estado (rama `assignment-2-phase-5c`, sobre la 5b-replanning): el PR 5c hecho — seed, guion, README y cierre de `DESIGN.md`.** `mvn -B verify` pasa con 782 tests (637 domain, 20 app, 125 web); antes eran 771 y los 637 de `domain` y los 20 de `app` siguen pasando sin tocarlos: este tramo no tocó `domain`. Lo que quedó:
+
+- `demo/catalog.json` (zonas, personal, vehículos, instrumentos, consumibles y tres listas de indisponibilidades) y `demo/expedition.json` (una lista de expediciones, cada una con el cuerpo de creación, los nodos de su itinerario y sus asignaciones), con el esquema de los cuerpos que ya toma la API.
+- En `web`, `adapters.driving.seed.DemoDataLoader` (el único cargador, sin una anotación de Spring, reusando los mappers del adaptador REST) y `DemoDataConfig` (`@Configuration @Profile("demo")`). El pom de `web` declara `../demo` como directorio de recursos. D50 documenta todo, D51 la persistencia en memoria como deuda.
+- `demo.http` en la raíz: 45 pasos comentados en español, con los ids tomados de la respuesta anterior con `client.global.set`.
+- README reescrito: requisitos, build, ejecución, cómo correr la demo, estructura de módulos, la tabla de los 48 endpoints agrupados por recurso con el enlace a Swagger UI, el mapeo de errores, los tests, la CI y la regla de protección de rama, y lo que queda fuera del alcance.
+- `DESIGN.md`: D50 y D51 escritas, el párrafo de modelo de dominio actualizado (el árbol del itinerario, la nocturna, las propuestas), la subsección de API de F2 (la de F1 y la de F3 ya estaban), tres filas nuevas en patrones no aplicados (JPA, clases de Java para la demo) y cuatro supuestos nuevos. Numeración de D1 a D58 sin huecos ni repetidos, en orden, y sin referencias cruzadas a entradas que no existen.
+- Tests: `DemoDataLoaderTest` (8, sin Spring: los archivos cargan, el escenario tiene las diez actividades de los seis tipos, el bloque dentro del bloque, los recursos compartidos y un plan aprobable) y `DemoScriptApiTest` (3, con el perfil `demo`: el estado del seed sobre HTTP y el guion completo de punta a punta).
+
+Qué cambió respecto del plan:
+
+- **El crítico de la demo es la iluminación que falta y no el permiso nocturno.** No hay forma de conceder un permiso a una expedición ya creada: los permisos concedidos son parte de los datos del constructor (D3) y no hay operación ni endpoint que los cambie, así que una crítica de `missing-permits` se puede mostrar pero no corregir sin volver a crear la expedición entera con su itinerario. La iluminación es igual de propia de la variante nocturna (F1 la pide y la suma `NightOperationRules`, D42), bloquea la aprobación y se corrige con un solo `POST .../equipment`. El permiso nocturno igual se ve en la demo: el alta de la nocturna lo publica en `requiredPermits` con el nombre exacto y la expedición del seed lo concede. Justificado en D50 y asentado en los supuestos.
+- **El cargador quedó en `web` y no en `app`.** `app` es el módulo de los adaptadores driven y un cargador de seed es driving: empuja los puertos de entrada igual que un controller. Lo que la tabla de la Fase 1 buscaba (un cargador sin framework) se consiguió igual, con el cargador sin anotaciones y el perfil del otro lado de la puerta. No hizo falta agregarle Jackson a `app`. Está en D50, con notas de revisión en D36 y D37.
+- **El seed deja diez actividades y el guion agrega la nocturna**, en vez de que el seed deje las once. Así el crítico sale de una acción del guion y no de un seed roto a propósito, y el pedido más interesante de F1 (`"atNight": true` y lo que la respuesta devuelve) es parte de la demostración. El escenario completo —once actividades, los seis tipos, la nocturna— es seed más guion.
+- **Los archivos se leen del classpath y no del sistema de archivos.** Viven en `demo/` en la raíz, que es donde el plan los pedía, y el pom de `web` los copia; así el perfil anda igual desde `spring-boot:run`, desde el jar y en los tests, sin un directorio de trabajo que acertar. Dónde están es una propiedad (`fieldops.demo.catalog`, `fieldops.demo.expeditions`).
+- **El guion no es idempotente: hay que reiniciar la aplicación para correrlo de nuevo.** Deja la expedición reemplazada y la nocturna agendada. Está dicho al principio de `demo.http` y en el README, que es la opción que el alcance permitía.
+- **Spring Boot 4 trae Jackson 3** (`tools.jackson`), que es el `ObjectMapper` que el contexto expone; el de Jackson 2 está en el classpath pero no se autoconfigura. El cargador usa el mismo mapper que la API, así que los documentos se interpretan igual que los cuerpos que llegan por HTTP.
+- **Hay 48 endpoints y no "unos treinta"**, contando cada método y cada sub-recurso. La tabla del README los lista agrupados por recurso.
+- **Encontrado al armar el escenario, y no arreglado:** después de aprobar una expedición, `GET .../validation` reporta críticas de `resource-overlap` sobre sus propios recursos, porque la aprobación los reserva y la regla no ignora las reservas de la expedición que está validando (solo ignora las de la que reemplaza). No afecta a la aprobación ni a la demo, que valida antes de aprobar, y arreglarlo es un cambio de dominio que este tramo no tenía en alcance. Queda anotado acá para la fase que toque `ResourceOverlapValidation`.
 
 ### Tests
 
@@ -605,23 +627,23 @@ Qué cambió respecto del plan:
 - [x] Parametrizado: cada excepción de dominio devuelve su código HTTP. **Hecho** en el PR 5a: `DomainExceptionHandlerTest`, que además falla si aparece una excepción en `business.exceptions` sin fila en la tabla.
 - [x] Unitarios de los casos de uso nuevos del catálogo y de las zonas, como el resto de la Fase 1. Con Mockito donde hay puerto de salida (`ZoneRepository`); para el catálogo con la clase real, que es un objeto en memoria sin I/O.
 - [x] Tests de API de lo que absorbemos: ~~agendar un bloque con su árbol~~, ~~alta de una actividad nocturna por tipo, listar tipos~~ (hechos: el bloque y el árbol en el tercer tramo del 5b con `ItineraryApiTest` y `ExpeditionPlanApiTest`; la actividad y los tipos en el segundo, con `ActivityApiTest` y `ActivityTypeApiTest`), ~~el tercer criterio de aceptación de F2 (conflicto de recursos en paralelo)~~ (hecho en el cuarto tramo, con `AssignmentController` expuesto: `ExpeditionPlanApiTest.theValidationReportsAResourceConflictBetweenParallelActivitiesOfTheSameBlock`), y ~~el flujo completo de F3 (incidente, propuesta, aceptar y rechazar)~~ (hecho en el sexto tramo, con `ReplanningApiTest`).
-- [ ] Test del cargador del seed: los archivos de `demo/` cargan sin errores.
-- [ ] Un test de API que recorre el mismo guion de `demo.http`, para que la CI avise si la demo se rompe.
+- [x] Test del cargador del seed: los archivos de `demo/` cargan sin errores. **Hecho** en el PR 5c: `DemoDataLoaderTest` (8), sin Spring, que además verifica el escenario (diez actividades de los seis tipos, el bloque dentro del bloque, los recursos compartidos, la indisponibilidad del dron de repuesto y un plan sin críticas ni advertencias propias).
+- [x] Un test de API que recorre el mismo guion de `demo.http`, para que la CI avise si la demo se rompe. **Hecho** en el PR 5c: `DemoScriptApiTest`, con `@ActiveProfiles("demo")`, los mismos pasos en el mismo orden y con los mismos cuerpos.
 
 ### README y cierre
 
-- [ ] Reescribir el README: requisitos, cómo compilar, ejecutar y probar, estructura de módulos, cómo correr la demo, contratos de la API (tabla de endpoints y enlace a Swagger UI), CI y regla de protección de rama. Hoy dice que el proyecto no expone endpoints.
-- [ ] Revisión final de `DESIGN.md`: numeración, referencias cruzadas, párrafo de modelo de dominio, tabla de patrones no aplicados y supuestos.
-- [ ] Completar las subsecciones de F1, F2 y F3 con los endpoints que agregamos, porque cada funcionalidad las tiene abiertas por su parte de API.
-- [ ] Correr la demo completa desde un clon limpio.
-- [ ] Anotar la URL del repo y el hash del commit de entrega.
-- [ ] Recordarle al grupo los dos pendientes que no son de esta fase y están en el checklist: la regla de protección de `main` (falta permiso de admin) y el frontend mínimo.
+- [x] Reescribir el README: requisitos, cómo compilar, ejecutar y probar, estructura de módulos, cómo correr la demo, contratos de la API (tabla de endpoints y enlace a Swagger UI), CI y regla de protección de rama. ~~Hoy dice que el proyecto no expone endpoints.~~ **Hecho** en el PR 5c, con los 48 endpoints agrupados por recurso, el mapeo de errores y la sección de lo que queda fuera del alcance.
+- [x] Revisión final de `DESIGN.md`: numeración, referencias cruzadas, párrafo de modelo de dominio, tabla de patrones no aplicados y supuestos. **Hecha** en el PR 5c: D1 a D58 sin huecos ni repetidos y en orden, sin referencias a entradas inexistentes, el párrafo de modelo de dominio reescrito con el árbol del itinerario, la nocturna y las propuestas, tres filas nuevas de patrones no aplicados y cuatro supuestos nuevos.
+- [x] Completar las subsecciones de F1, F2 y F3 con los endpoints que agregamos, porque cada funcionalidad las tiene abiertas por su parte de API. **Hecho**: la de F1 en el segundo tramo del 5b, la de F3 en el sexto, y la de F2 en el PR 5c (nueve endpoints: bloques, itinerario, validación, estimación, asignaciones y candidatos).
+- [x] Correr la demo completa desde un clon limpio. **Corrida** en el PR 5c contra la aplicación levantada con el perfil `demo` (no sólo con `MockMvc`): los 45 pasos del guion, de `GET /api/expeditions` a los dos informes. Los comandos están en el README.
+- [ ] Anotar la URL del repo y el hash del commit de entrega. **Queda para el push:** el hash de entrega es el del último commit, que se conoce cuando Matías valide el cierre y empuje la fase.
+- [x] Recordarle al grupo los dos pendientes que no son de esta fase y están en el checklist: la regla de protección de `main` (falta permiso de admin) y el frontend mínimo. **Hecho**: los dos están explícitos en el checklist de abajo y en la sección "Out of scope of this delivery" del README.
 
 ### `DESIGN.md`
 
 - D49: la API como adaptador driving, con DTOs propios y el mapeo de errores fuera del dominio. Alternativas descartadas: serializar entidades, anotar excepciones de dominio con códigos HTTP. Se escribe en el PR 5a y se le agrega después cómo se serializa el árbol del itinerario sin condicionales por tipo de nodo, y por qué no se expone la replanificación manual. **Lo primero se completó en el tercer tramo del 5b, con D54; lo segundo en el sexto, con D58**, que además cerró la deuda de los críticos estructurados. La entrada no tiene pendientes.
-- D50: seed como datos con un cargador genérico. Alternativas descartadas: clases Java de demo, `data.sql` antes de tener persistencia.
-- D51: persistencia en memoria detrás de los puertos y tests de repositorio como contrato. Se registra como deuda técnica de la entrega.
+- D50: seed como datos con un cargador genérico. Alternativas descartadas: clases Java de demo, `data.sql` antes de tener persistencia. **Escrita** en el PR 5c, con el cargador en `web` y no en `app` y sus razones, el esquema de los documentos igual a los cuerpos de la API, el escenario que dejan y por qué el crítico es la iluminación y no el permiso. Revisa D36, D37 y extiende D52.
+- D51: persistencia en memoria detrás de los puertos y tests de repositorio como contrato. Se registra como deuda técnica de la entrega. **Escrita** en el PR 5c, con los tres contratos corriendo contra los adaptadores reales, qué habría que hacer para pasar a JPA y el riesgo asumido frente a la consigna.
 - D52: casos de uso de alta del catálogo y de zonas. Extiende D38. Alternativa descartada: que el controller llame directo a `ResourceCatalog` y `ZoneRepository` y construya los objetos de dominio. **Escrita** en el primer tramo del PR 5b, con la agrupación en cinco casos de uso, los dos sub-recursos de equipo y la deuda del catálogo sin puerto de salida.
 - D53: el alta de actividad entra por ids, nombre de tipo y parámetros. Revisa D38 y D44. Alternativas descartadas: que el adaptador arme la `Activity`, que el comando reciba la zona y las dependencias ya resueltas, un endpoint por tipo de actividad. **Escrita** en el segundo tramo del PR 5b. Es la primera entrada tomada de la numeración libre: **avisado al resto, el próximo que necesite una toma desde D54.**
 - D54: cómo se serializa el árbol del itinerario, con un Visitor. Revisa D39 y completa D49. Alternativa descartada: sumar hijos y un nombre de tipo a `ItineraryNode`. **Escrita** en el tercer tramo del PR 5b.
@@ -632,7 +654,7 @@ Qué cambió respecto del plan:
 - Revisión de D38: ~~los comandos de agendar actividad y bloque pasan a recibir ids, tipo y parámetros, que es lo que la Fase 1 dejó anotado como pendiente y la Fase 3 como deuda~~. Hecha para la actividad en D53 y para el bloque en D55, con el pendiente de D38 cerrado del todo y "Revisado en D53" y "Revisado en D55" en D38.
 - Patrones no aplicados: JPA en esta entrega. La fila de Visitor de la Fase 2 se actualizó en el tercer tramo del 5b (D54): sigue sin usarse para las operaciones propias del dominio, y se adoptó para mostrar el árbol en la respuesta del itinerario.
 
-**Terminado cuando:** un clon limpio compila, pasa los tests, arranca con el perfil `demo` y el guion de `demo.http` corre de principio a fin.
+**Terminado cuando:** un clon limpio compila, pasa los tests, arranca con el perfil `demo` y el guion de `demo.http` corre de principio a fin. **Se cumple todo** al cerrar el PR 5c: `mvn -B verify` pasa con 782 tests, `mvn spring-boot:run -pl web -Dspring-boot.run.profiles=demo` deja el escenario cargado y los 45 pasos del guion corren contra la aplicación levantada. La fase queda completa; lo único que falta es el push, que decide Matías.
 
 ## `DESIGN.md`: qué escribe cada fase
 
@@ -721,8 +743,9 @@ La fecha de entrega es el pendiente que más condiciona el plan: el calendario d
 | ~~Quién escribe los endpoints de F1, F2 y F3~~ | Resuelto el 12/10: los absorbe la Fase 5, con sus tests y los cambios de dominio que habilitan | Fase 5 |
 | ~~Cómo se serializa el árbol del itinerario~~ | Resuelto en el tercer tramo del PR 5b: un Visitor (D54) | Endpoint del itinerario |
 | ~~Si `NotAResponsibleException` es 403 o 422~~ | Resuelto en el PR 5a: 422, porque hoy quién decide llega como un id en el cuerpo y no de una credencial (D49) | Endpoints de decisión de F3 |
-| Persistencia real | El grupo | Tests de repositorio |
-| Frontend mínimo | El grupo. **Fuera del alcance de la Fase 5**, que entrega API, Swagger y guion | Entregable de frontend y checklist |
+| Persistencia real | El grupo, después de la clase de Spring Data. **Registrada como deuda técnica de la entrega en D51**, con los tres contratos de repositorio corriendo contra los adaptadores reales y lo que haría falta para pasar a JPA | Tests de repositorio |
+| Frontend mínimo | El grupo. **Fuera del alcance de la Fase 5**, que entrega API, Swagger y guion. Queda sin tildar y explícito en el checklist de entrega | Entregable de frontend y checklist |
+| Regla de protección de `main` | Quien tenga admin en el repo de la materia: se configura a mano y la fase no tiene el permiso. Documentada en el README. Queda sin tildar y explícita en el checklist de entrega | La CI bloqueando el merge |
 
 ### Riesgos
 
@@ -737,12 +760,23 @@ Si la fecha es el 13/10, el orden de recorte recomendado es: primero el dominio 
 
 ### Checklist de entrega
 
-- [ ] URL del repositorio y hash del último commit.
-- [ ] Código organizado en dominio, casos de uso, infraestructura y API REST según la arquitectura hexagonal.
-- [ ] F1, F2 y F3 implementadas, con test por criterio de aceptación y su subsección en `DESIGN.md`.
-- [ ] Tests unitarios, parametrizados, de repositorio y de API corriendo en la CI.
-- [ ] La CI bloquea el merge de un PR que falla.
-- [ ] Datos de demostración repetibles: seed y guion.
-- [ ] README con instrucciones para compilar, ejecutar y probar, y los contratos de la API.
-- [ ] `DESIGN.md` con D35 a D51, patrones no aplicados, supuestos y la sección por funcionalidad.
-- [ ] Frontend mínimo, cuando se defina.
+Estado al cerrar el PR 5c (12/10/2026). Los dos que quedan sin tildar están abiertos a propósito y no son de la Fase 5; el detalle está debajo de la lista.
+
+- [ ] **URL del repositorio y hash del último commit.** La URL es la del repo de la materia (`dps-2026-2c-ti-fieldops-alan-kay`); el hash es el del último commit de la Fase 5, que se conoce al empujarla. **Lo completa Matías cuando valide el cierre y haga el push.**
+- [x] Código organizado en dominio, casos de uso, infraestructura y API REST según la arquitectura hexagonal. Tres módulos Maven con la dependencia impuesta por el compilador (D35, D36): `domain` (modelo, reglas, validaciones, servicios, casos de uso como puertos de entrada y `business.providers` como puertos de salida), `app` (adaptadores driven) y `web` (Spring Boot, composition root y adaptadores driving: REST y el cargador del seed).
+- [x] F1, F2 y F3 implementadas, con test por criterio de aceptación y su subsección en `DESIGN.md`. Las tres secciones de "Funcionalidades nuevas de la Entrega 2" tienen decisiones, API, clases agregadas y modificadas, refactorizaciones, deuda técnica que se decidió no resolver y cada criterio con el test que lo cubre, en el dominio y sobre HTTP.
+- [x] Tests unitarios, parametrizados, de repositorio y de API corriendo en la CI. 782 en verde con `mvn -B verify` (637 `domain`, 20 `app`, 125 `web`): unitarios con Mockito sólo donde hay puerto de salida, el parametrizado de la tabla de errores (que además falla si aparece una excepción sin fila), los tres contratos de repositorio corriendo contra los adaptadores reales y no contra mocks, y los tests de API con el contexto completo sin mocks.
+- [x] La CI bloquea el merge de un PR que falla. `.github/workflows/ci.yml` corre `mvn -B verify` con JDK 25 en cada pull request y en cada push a `main`. **La regla de protección de rama que lo exige todavía no está puesta** (ver abajo): el workflow corre y falla el check, pero no impide el merge.
+- [x] Datos de demostración repetibles: seed y guion. `demo/catalog.json` y `demo/expedition.json` con el perfil `demo`, y `demo.http` con los 45 pasos (D50). Los dos tienen test: `DemoDataLoaderTest` y `DemoScriptApiTest`, que recorre el mismo guion.
+- [x] README con instrucciones para compilar, ejecutar y probar, y los contratos de la API. Reescrito en el PR 5c, con los 48 endpoints agrupados por recurso, el mapeo de errores, el enlace a Swagger UI y cómo correr la demo desde un clon limpio.
+- [x] `DESIGN.md` con D35 a D51, patrones no aplicados, supuestos y la sección por funcionalidad. Llega a **D58** (D35 a D58 son de esta entrega), con la numeración de D1 a D58 sin huecos ni repetidos y sin referencias a entradas inexistentes.
+- [ ] **Frontend mínimo, cuando se defina.** Sigue sin definir y **fuera del alcance de la Fase 5**, que entrega API, Swagger y guion. Anotado como pendiente del grupo en el README (sección "Out of scope of this delivery") y en el alcance acordado de la fase. Swagger UI permite operar la API pero no es un frontend.
+
+Los dos que quedan abiertos, explícitos para que no se escondan:
+
+| Pendiente | Por qué sigue abierto | Quién lo cierra |
+| --- | --- | --- |
+| **Regla de protección de `main`** | Se configura a mano en GitHub (Settings > Branches) y hace falta permiso de admin del repo, que la fase no tiene. Está documentada en el README con los dos puntos exactos a marcar: exigir pull request antes de mergear y exigir que pase el check `verify` del workflow `CI`, que aparece en la lista después de la primera corrida | Quien tenga admin en `dps-2026-2c-ti-fieldops-alan-kay` |
+| **Frontend mínimo** | Decisión del grupo, nunca tomada, y fuera del alcance de la Fase 5 por el alcance acordado el 12/10 | El grupo |
+
+Y la URL con el hash de entrega, que se completa con el push de la fase.
