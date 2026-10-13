@@ -268,7 +268,7 @@ Cambios respecto del plan y cosas que las otras fases tienen que saber:
 
 - **La certificación nocturna no se suma a cada `StaffRequirement`**, como decía el plan. Se exige a cada persona asignada con una pregunta nueva de `ActivityRules`, y la validación reporta una crítica por persona (D43). Con las dos cosas a la vez, la misma falta habría salido reportada dos veces.
 - **`ApprovalPolicy.MANDATORY_RULES` no cambió**, aunque la tabla de archivos compartidos preveía una línea de esta fase. Se ampliaron `MissingCertificationsValidation` y `MissingPermitsValidation`; las reglas obligatorias siguen siendo siete.
-- **`ScheduleActivityCommand` sigue recibiendo la `Activity` ya armada.** El registro existe, pero que el comando reciba tipo, parámetros e indicador de nocturna queda **pendiente para la API**: además de las reglas hay que resolver por id la zona y las dependencias, y eso se define con el endpoint (nota en D38 y consecuencia de D44).
+- **`ScheduleActivityCommand` sigue recibiendo la `Activity` ya armada.** El registro existe, pero que el comando reciba tipo, parámetros e indicador de nocturna queda **pendiente para la API**: además de las reglas hay que resolver por id la zona y las dependencias, y eso se define con el endpoint (nota en D38 y consecuencia de D44). **Resuelto en el segundo tramo del PR 5b (D53)**, y el árbol de un bloque con el mismo resolver en el tercero (D55).
 - **`FindAssignmentCandidates` cambió y no estaba en el plan:** filtra el personal con `Activity.admits`, para no proponer en una actividad nocturna gente que la validación después rechaza.
 - **Los parámetros del registro son enteros** (`Map<String, Integer>`) y sus nombres se comparan tal cual (`maxDepthMeters`). El nombre del tipo sí se normaliza como en D34.
 - **Tampoco estaban en el plan:** `ActivityTypeName`, `ActivityParameters`, `SingleParameterActivityType` y las dos excepciones del registro (D44).
@@ -303,8 +303,8 @@ Tres huecos del modelo actual que esta fase tiene que cerrar:
 
 ### API
 
-- [ ] El alta de actividad recibe tipo, parámetros e indicador de nocturna. **Pendiente:** el registro ya existe; falta que `ScheduleActivityCommand` reciba tipo y parámetros en vez de la `Activity` armada, y el controller con sus DTOs.
-- [ ] Endpoint que lista los tipos disponibles y sus parámetros. **Pendiente:** el caso de uso `QueryActivityTypes` ya existe y está expuesto como bean.
+- [x] El alta de actividad recibe tipo, parámetros e indicador de nocturna. **Hecho** en el segundo tramo del PR 5b: `ScheduleActivityCommand` recibe tipo, parámetros e indicador, y `ScheduleActivity` resuelve zona, dependencias y reglas (D53).
+- [x] Endpoint que lista los tipos disponibles y sus parámetros. **Hecho** en el segundo tramo del PR 5b: `GET /api/activity-types` (D53).
 
 ### Tests
 
@@ -314,7 +314,7 @@ Tres huecos del modelo actual que esta fase tiene que cerrar:
 - [x] Un test por criterio de aceptación: expedición con una actividad nocturna; crítico sin certificación; crítico sin permiso; la estimación refleja el factor.
 - [x] El informe de una expedición con actividad nocturna sale de `ExpeditionReporter` sin modificarlo.
 - [x] Registro: cada tipo por nombre, la variante nocturna, tipo desconocido y parámetro faltante o inválido. Una actividad nocturna dentro de un bloque se valida y se estima igual que suelta.
-- [ ] Test de API del alta de una actividad nocturna. **Pendiente**, con el endpoint.
+- [x] Test de API del alta de una actividad nocturna. **Hecho** en el segundo tramo del PR 5b: `ActivityApiTest`, con la nocturna de punta a punta sobre HTTP.
 
 ### `DESIGN.md`
 
@@ -327,7 +327,7 @@ Tres huecos del modelo actual que esta fase tiene que cerrar:
 
 Todo escrito: D42, D43 y D44; notas "Revisado en D44" en D1 y "Revisado en D43" en D10, D11 y D13; la nota de pendiente en la consecuencia de D38; la fila de Decorator actualizada en patrones no aplicados; la subsección de F1 antes de la de F2, y seis supuestos nuevos. La deuda técnica suma que `ScheduleActivityCommand` no usa el registro, que una actividad no dice que es nocturna, que el permiso especial es una convención de nombre, que los parámetros son enteros y que el horario de una actividad nocturna no se verifica.
 
-**Terminado cuando:** los cuatro criterios de aceptación tienen test, y agregar la nocturna no sumó ningún condicional por tipo en validaciones, estimación ni informes. Hoy se cumple todo en el dominio; queda la API.
+**Terminado cuando:** los cuatro criterios de aceptación tienen test, y agregar la nocturna no sumó ningún condicional por tipo en validaciones, estimación ni informes. Se cumple todo: el dominio desde esta fase, y los dos endpoints con sus tests desde el segundo tramo del PR 5b (D53).
 
 ## Fase 4: F3, replanificación automática
 
@@ -393,9 +393,9 @@ El código actual choca con el criterio de aceptación en cuatro lugares. Hay qu
 
 ### API
 
-- [ ] Registrar un incidente sobre una actividad. La respuesta incluye la propuesta generada. **Pendiente:** `RegisterIncident` ya existe y está expuesto como bean.
-- [ ] Consultar las propuestas de una expedición y una propuesta por id. **Pendiente:** `QueryReplanProposals`.
-- [ ] Aceptar una opción y rechazar la propuesta. **Pendiente:** `DecideReplanProposal`.
+- [x] Registrar un incidente sobre una actividad. La respuesta incluye la propuesta generada. **Hecho** en el sexto tramo del PR 5b: `POST /api/expeditions/{id}/incidents` responde 201 con la propuesta en el cuerpo (D58).
+- [x] Consultar las propuestas de una expedición y una propuesta por id. **Hecho** en el sexto tramo del PR 5b: `GET /api/expeditions/{id}/replan-proposals` y `GET /api/replan-proposals/{id}` (D58).
+- [x] Aceptar una opción y rechazar la propuesta. **Hecho** en el sexto tramo del PR 5b: `POST /api/replan-proposals/{id}/acceptance`, que devuelve la alternativa en borrador, y `/rejection`, que responde 204 (D58).
 
 ### Tests
 
@@ -404,7 +404,7 @@ El código actual choca con el criterio de aceptación en cuatro lugares. Hay qu
 - [x] Parametrizado: qué opciones se generan según lo que afecta el incidente y el estado del itinerario.
 - [x] Un test por criterio de aceptación: el incidente genera la propuesta; aceptar; rechazar; original, incidente y decisión consultables después.
 - [x] Contrato de repositorio para `ReplanProposalRepository`.
-- [ ] Test de API del flujo completo. **Pendiente**, con los endpoints.
+- [x] Test de API del flujo completo. **Hecho** en el sexto tramo del PR 5b: `ReplanningApiTest`, con los tres criterios de aceptación sobre HTTP, el recorrido de la demo y los cinco errores de la tabla de D49.
 
 ### `DESIGN.md`
 
@@ -414,7 +414,7 @@ El código actual choca con el criterio de aceptación en cuatro lugares. Hay qu
 - D48: auditoría. Alternativa descartada: Event Sourcing, que va a la tabla de patrones no aplicados.
 - Subsección F3: clases agregadas, clases modificadas (`Incident`, `Expedition`, `ExpeditionReplanner`, `ResourceWithdrawn`, `ExpeditionReporter`), refactorizaciones y deuda técnica. Candidatas a deuda: entrega sin reintentos ni transacción, un solo incidente por propuesta.
 
-**Terminado cuando:** los tres criterios de aceptación tienen test, y después de aceptar o rechazar se pueden consultar el plan original, el incidente y la decisión. Hoy se cumple todo en el dominio; queda la API.
+**Terminado cuando:** los tres criterios de aceptación tienen test, y después de aceptar o rechazar se pueden consultar el plan original, el incidente y la decisión. Se cumple todo: el dominio desde esta fase, y los cinco endpoints con sus tests desde el sexto tramo del PR 5b (D58), que deja la auditoría recorrible por HTTP.
 
 ## Fase 5: API REST, demo y documentación
 
@@ -426,7 +426,7 @@ Expone los casos de uso por REST, deja la demostración reproducible y cierra la
 
 | Punto | Decisión |
 | --- | --- |
-| Endpoints pendientes de F1, F2 y F3 | **Los absorbe la Fase 5**, con sus tests de API y los cambios de dominio que habilitan. Son siete: agendar bloque, itinerario en árbol, alta de actividad por tipo, listar tipos, registrar incidente, consultar propuestas y decidir |
+| Endpoints pendientes de F1, F2 y F3 | **Los absorbe la Fase 5**, con sus tests de API y los cambios de dominio que habilitan. Son siete: agendar bloque, itinerario en árbol, alta de actividad por tipo, listar tipos, registrar incidente, consultar propuestas y decidir. **Los siete están hechos** al cerrar el PR 5b: los cuatro primeros en el segundo y tercer tramo (D53, D54, D55) y los tres de F3 en el sexto (D58) |
 | Alta del catálogo | **Casos de uso nuevos** en `business.usecases`. El controller no arma objetos de dominio, como fija D38 (D52) |
 | Guion de la demo | **`demo.http`**, el cliente HTTP de IntelliJ. La repetibilidad en la CI la cubre el test de API que recorre el mismo guion |
 | Frontend | **Fuera del alcance de la fase.** Queda anotado como pendiente del grupo en el README y en `DESIGN.md`; Swagger UI no lo reemplaza |
@@ -473,7 +473,7 @@ Mapeo de errores, con las dieciocho excepciones que hay hoy en `business.excepti
 Qué cambió respecto del plan:
 
 - **`-parameters` en el compilador de `web`.** Spring resuelve `@PathVariable` por el nombre del parámetro y javac no lo conserva por defecto; como el build no hereda de `spring-boot-starter-parent`, nadie lo había puesto. Sin el flag, `GET /api/expeditions/{id}` devolvía 400. Está en `web/pom.xml`, no toca a los otros módulos.
-- **La lista de críticos de `ExpeditionNotApprovableException` viaja en el mensaje, no como un arreglo en el cuerpo.** La excepción solo guarda el texto ya unido; para exponerla estructurada tiene que conservar los `ValidationResult`, que es un cambio en `domain`. Queda para el PR que escribe `POST /api/expeditions/{id}/approval`.
+- ~~**La lista de críticos de `ExpeditionNotApprovableException` viaja en el mensaje, no como un arreglo en el cuerpo.** La excepción solo guarda el texto ya unido; para exponerla estructurada tiene que conservar los `ValidationResult`, que es un cambio en `domain`. Queda para el PR que escribe `POST /api/expeditions/{id}/approval`.~~ **Resuelto en el sexto tramo del PR 5b (D58):** la excepción conserva los `ValidationResult` con su getter y el 422 lleva la propiedad `criticals`, además del `detail`, que no cambió. El quinto tramo, que escribió el endpoint de aprobación, lo había dejado como estaba por alcance (D57).
 - **La convención de sub-recursos está decidida y escrita en D49, pero todavía no hay ningún endpoint que no sea CRUD**: los cinco de estados, el de aprobación, el de cierre y los dos de decisión de propuesta son del PR 5b.
 - **El README se corrigió solo donde quedaba falso** (decía que el proyecto no expone endpoints). La reescritura completa sigue siendo del cierre de la fase.
 
@@ -499,11 +499,11 @@ Inventario completo, con el caso de uso que hay detrás de cada uno. Los marcado
 | Aprobación | [x] `POST /api/expeditions/{id}/approval` (cuerpo: advertencias aceptadas) | `ApproveExpedition.approve(id, acceptances)` |
 | Cierre | [x] `POST /api/expeditions/{id}/completion` | `FinishExpedition.finish(id)` |
 | Seguimiento | [x] `POST /api/expeditions/{id}/activities/{activityId}/start`, `/completion`, `/observations` | `TrackActivity` |
-| Incidentes | `POST /api/expeditions/{id}/incidents` (devuelve la propuesta) | `RegisterIncident` **(F3)** |
-| Propuestas | `GET /api/expeditions/{id}/replan-proposals`, `GET /api/replan-proposals/{id}` | `QueryReplanProposals` **(F3)** |
-| Propuestas | `POST /api/replan-proposals/{id}/acceptance` (número de opción + responsable, justificación y fecha), `/rejection` | `DecideReplanProposal` **(F3)** |
+| Incidentes | [x] `POST /api/expeditions/{id}/incidents` (devuelve la propuesta) | `RegisterIncident` **(F3)** |
+| Propuestas | [x] `GET /api/expeditions/{id}/replan-proposals`, `GET /api/replan-proposals/{id}` | `QueryReplanProposals` **(F3)** |
+| Propuestas | [x] `POST /api/replan-proposals/{id}/acceptance` (número de opción + responsable, justificación y fecha), `/rejection` | `DecideReplanProposal` **(F3)** |
 
-Son unos treinta endpoints sobre diecisiete casos de uso existentes y cinco nuevos (eran seis a título indicativo: las cuatro altas del catálogo quedaron juntas en `RegisterResources`, por el mismo criterio con el que `TransitionExpedition` juntó las transiciones; el detalle está en D52). `ReplanExpedition` (la replanificación manual, sin incidente) **no se expone**: la consigna pide la replanificación por incidente y el caso de uso manual ya tiene cobertura unitaria. Queda anotado en D49.
+Son unos treinta endpoints sobre diecisiete casos de uso existentes y cinco nuevos (eran seis a título indicativo: las cuatro altas del catálogo quedaron juntas en `RegisterResources`, por el mismo criterio con el que `TransitionExpedition` juntó las transiciones; el detalle está en D52). `ReplanExpedition` (la replanificación manual, sin incidente) **no se expone**: la consigna pide la replanificación por incidente y el caso de uso manual ya tiene cobertura unitaria. **Anotado en D49** en el sexto tramo, con las tres razones que lo sostienen (su parámetro es una estrategia del dominio, el camino de las propuestas no deja nada afuera, y replanificar a mano no dejaría registro de auditoría).
 
 **Estado del primer tramo (rama `assignment-2-phase-5b`, sobre la 5a): catálogo y zonas hechos.** `mvn -B verify` pasa con 688 tests (608 domain, 20 app, 60 web); antes eran 638 y los 20 de `app` siguen pasando sin tocarlos. Lo que quedó:
 
@@ -575,6 +575,23 @@ Qué cambió respecto del plan:
 - **No hizo falta ninguna excepción nueva ni ninguna fila nueva en el mapeo de errores.** Las ocho transiciones y los tres endpoints de seguimiento solo usan excepciones que D49 ya clasificaba (`InvalidStatusTransitionException`, `ExpeditionNotApprovableException`, `UnacceptedWarningException`, `NotFoundException`, `InvalidTrackingException`, `InsufficientStockException`).
 - **`ActivityTrackingController` quedó separado de `AssignmentController`** aunque comparten la misma base de ruta (`.../activities/{activityId}`): son dos concerns distintos sobre el mismo sub-recurso, el mismo criterio con el que `ActivityController` y `AssignmentController` ya estaban separados.
 
+**Estado del sexto tramo (rama `assignment-2-phase-5b-replanning`, sobre la 5b-lifecycle): la replanificación automática hecha — incidente, propuestas y decisión.** `mvn -B verify` pasa con 771 tests (637 domain, 20 app, 114 web); antes eran 761 y los 637 de `domain` y los 20 de `app` siguen pasando sin tocarlos. Son las tres filas de "Incidentes" y "Propuestas" de la tabla de arriba. **Con esto el PR 5b está completo:** las tres funcionalidades nuevas de la entrega (F1, F2 y F3) quedan expuestas, probadas y documentadas también por API, y lo único que queda de la Fase 5 es el PR 5c. Lo que quedó:
+
+- `RegisterIncident`, `QueryReplanProposals` y `DecideReplanProposal` ya eran casos de uso completos y ya eran beans de `ReplanningConfig` desde la Fase 4: no hizo falta ningún caso de uso nuevo.
+- En `web`, `adapters.driving.rest.IncidentController` (`POST /api/expeditions/{id}/incidents`) y `ReplanProposalController` (`GET /api/expeditions/{id}/replan-proposals`, `GET /api/replan-proposals/{id}`, `POST /api/replan-proposals/{id}/acceptance` y `/rejection`), con sus DTOs (`RegisterIncidentRequest`, `ReplanProposalResponse`, `ReplanOptionDto`, `ReplanDecisionDto`, `AcceptReplanOptionRequest`, `ReplanDecisionRequest`) y su mapper (`ReplanningMapper`). `IncidentDto` se reusó tal cual del informe y `ExpeditionResponse` tal cual para la alternativa.
+- En `domain`, el único cambio del tramo: `ExpeditionNotApprovableException` guarda sus `ValidationResult` con un getter.
+- Tests: `ReplanningApiTest` (9: los tres criterios de aceptación de F3 sobre HTTP, el recorrido completo de la demo, la auditoría entera y los cinco errores de la tabla de D49) y una entrada más en `OpenApiDocumentationTest`.
+
+Qué cambió respecto del plan:
+
+- **La deuda de D49 sobre `ExpeditionNotApprovableException` se resolvió**, al revés de lo que había decidido el quinto tramo. Fueron tres líneas en `domain` (un campo con `@Getter`, `List.copyOf` en el constructor) sin ningún llamador afectado, y `DomainExceptionHandler` publica los críticos como la propiedad `criticals` del `ProblemDetail` con el mismo `ValidationFindingDto` de `GET .../validation`. El `detail` no cambió, así que es compatible hacia atrás. Al ajustar `ExpeditionLifecycleApiTest.approvingWithACriticalStillOpenFailsAndTheBodyListsIt` quedó a la vista que ese escenario tiene **tres** críticas y no dos: la de `insufficient-supplies` ya estaba en el mensaje y el test solo buscaba dos subcadenas. Es exactamente lo que la lista estructurada hace fácil de ver.
+- **Se tomó D58**, porque qué devuelve cada escritura de F3 tiene tamaño propio: es el único lugar de la API donde un `POST` tiene algo propio que devolver, a diferencia de los 204 de D52, D56 y D57. **Avisado al resto: el próximo que necesite una entrada toma desde D59.**
+- **La traducción del incidente se mudó de `ReportMapper` a `ReplanningMapper`.** El `IncidentDto` se reusó sin tocarlo, como pedía el alcance, pero la traducción se movió hacia el dueño del concepto (D48) en vez de dejarla en el mapper que la necesitó primero, para que un incidente tenga una sola forma de leerse en el informe y en la propuesta.
+- **El `Location` del incidente apunta a la propuesta y el de la aceptación, a la alternativa.** Las dos direcciones son de recursos de otros controllers, así que salieron a `Locations` en vez de armarse a mano; `ExpeditionController` pasó a usar la de la expedición, que antes construía inline.
+- **`DuplicateReplanProposalException` no tiene camino por HTTP.** Está mapeada a 409 desde el PR 5a, pero el id de la propuesta lo genera el repositorio (D48), así que ningún pedido puede provocarla: sigue cubierta por el parametrizado de `DomainExceptionHandlerTest`, que recorre la tabla entera. Los otros cuatro errores del alcance sí tienen test de API. **No hizo falta ninguna excepción nueva ni ninguna fila nueva** en el mapeo.
+- **En el recorrido de la demo hay que cerrar la actividad entre registrar el incidente y aceptar.** El alcance pedía "iniciar la actividad, registrar un incidente, aceptar una", y D47 exige que la actividad afectada esté cerrada para aceptar (`ActivitiesInProgressException`). El orden que quedó es el que D47 ya describía: se inicia, se registra el incidente en curso, se cierra con el resultado real que conoce quien la ejecutó (D29) y recién entonces se acepta. El `demo.http` del PR 5c tiene que seguir ese orden.
+- **El vínculo de la alternativa a la original es inmediato; el de la original a la alternativa, no.** Al aceptar, la alternativa ya trae `replacedExpeditionId`, pero `replacementId` de la original sigue en `null` y la original queda `SUSPENDED`: el vínculo de vuelta y el estado `REPLACED` aparecen cuando se aprueba la alternativa (D33, D47). El test de auditoría recorre las dos etapas.
+
 ### PR 5c: demo
 
 - [ ] Seed como datos: `demo/catalog.json` y `demo/expedition.json`, más un único cargador genérico que corre con el perfil `demo`. Usa los builders y el registro de tipos de la Fase 3. No hay clases Java propias de la demo.
@@ -584,10 +601,10 @@ Qué cambió respecto del plan:
 
 ### Tests
 
-- [ ] Tests de API con el contexto completo y los adaptadores reales en memoria, sin mocks: un caso feliz por capacidad.
-- [ ] Parametrizado: cada excepción de dominio devuelve su código HTTP.
+- [x] Tests de API con el contexto completo y los adaptadores reales en memoria, sin mocks: un caso feliz por capacidad. **Hecho** a lo largo del PR 5b: cada fila de la tabla de endpoints tiene su test de API (114 tests en `web` al cerrarlo).
+- [x] Parametrizado: cada excepción de dominio devuelve su código HTTP. **Hecho** en el PR 5a: `DomainExceptionHandlerTest`, que además falla si aparece una excepción en `business.exceptions` sin fila en la tabla.
 - [x] Unitarios de los casos de uso nuevos del catálogo y de las zonas, como el resto de la Fase 1. Con Mockito donde hay puerto de salida (`ZoneRepository`); para el catálogo con la clase real, que es un objeto en memoria sin I/O.
-- [ ] Tests de API de lo que absorbemos: ~~agendar un bloque con su árbol~~, ~~alta de una actividad nocturna por tipo, listar tipos~~ (hechos: el bloque y el árbol en el tercer tramo del 5b con `ItineraryApiTest` y `ExpeditionPlanApiTest`; la actividad y los tipos en el segundo, con `ActivityApiTest` y `ActivityTypeApiTest`), ~~el tercer criterio de aceptación de F2 (conflicto de recursos en paralelo)~~ (hecho en el cuarto tramo, con `AssignmentController` expuesto: `ExpeditionPlanApiTest.theValidationReportsAResourceConflictBetweenParallelActivitiesOfTheSameBlock`), y el flujo completo de F3 (incidente, propuesta, aceptar y rechazar), que sigue pendiente.
+- [x] Tests de API de lo que absorbemos: ~~agendar un bloque con su árbol~~, ~~alta de una actividad nocturna por tipo, listar tipos~~ (hechos: el bloque y el árbol en el tercer tramo del 5b con `ItineraryApiTest` y `ExpeditionPlanApiTest`; la actividad y los tipos en el segundo, con `ActivityApiTest` y `ActivityTypeApiTest`), ~~el tercer criterio de aceptación de F2 (conflicto de recursos en paralelo)~~ (hecho en el cuarto tramo, con `AssignmentController` expuesto: `ExpeditionPlanApiTest.theValidationReportsAResourceConflictBetweenParallelActivitiesOfTheSameBlock`), y ~~el flujo completo de F3 (incidente, propuesta, aceptar y rechazar)~~ (hecho en el sexto tramo, con `ReplanningApiTest`).
 - [ ] Test del cargador del seed: los archivos de `demo/` cargan sin errores.
 - [ ] Un test de API que recorre el mismo guion de `demo.http`, para que la CI avise si la demo se rompe.
 
@@ -602,7 +619,7 @@ Qué cambió respecto del plan:
 
 ### `DESIGN.md`
 
-- D49: la API como adaptador driving, con DTOs propios y el mapeo de errores fuera del dominio. Alternativas descartadas: serializar entidades, anotar excepciones de dominio con códigos HTTP. Se escribe en el PR 5a y se le agrega después cómo se serializa el árbol del itinerario sin condicionales por tipo de nodo, y por qué no se expone la replanificación manual. **Lo primero se completó en el tercer tramo del 5b, con D54**; lo segundo sigue pendiente.
+- D49: la API como adaptador driving, con DTOs propios y el mapeo de errores fuera del dominio. Alternativas descartadas: serializar entidades, anotar excepciones de dominio con códigos HTTP. Se escribe en el PR 5a y se le agrega después cómo se serializa el árbol del itinerario sin condicionales por tipo de nodo, y por qué no se expone la replanificación manual. **Lo primero se completó en el tercer tramo del 5b, con D54; lo segundo en el sexto, con D58**, que además cerró la deuda de los críticos estructurados. La entrada no tiene pendientes.
 - D50: seed como datos con un cargador genérico. Alternativas descartadas: clases Java de demo, `data.sql` antes de tener persistencia.
 - D51: persistencia en memoria detrás de los puertos y tests de repositorio como contrato. Se registra como deuda técnica de la entrega.
 - D52: casos de uso de alta del catálogo y de zonas. Extiende D38. Alternativa descartada: que el controller llame directo a `ResourceCatalog` y `ZoneRepository` y construya los objetos de dominio. **Escrita** en el primer tramo del PR 5b, con la agrupación en cinco casos de uso, los dos sub-recursos de equipo y la deuda del catálogo sin puerto de salida.
@@ -610,7 +627,8 @@ Qué cambió respecto del plan:
 - D54: cómo se serializa el árbol del itinerario, con un Visitor. Revisa D39 y completa D49. Alternativa descartada: sumar hijos y un nombre de tipo a `ItineraryNode`. **Escrita** en el tercer tramo del PR 5b.
 - D55: el alta de un bloque entra por un árbol de descripciones, con el resolver de D53 compartido entre `ScheduleActivity` y `ScheduleBlock`. Revisa D38, D39 y D53. Alternativas descartadas: rechazar con 404 una dependencia hacia un hermano del mismo bloque, resolución en dos pasadas, duplicar el resolver. **Escrita** en el tercer tramo del PR 5b. Toma la entrada siguiente a D53.
 - D56: asignación de recursos y candidatos sin cambios de dominio, con la forma del DTO de candidatos y la decisión de mostrar lo asignado en la respuesta del itinerario. Revisa D49 y D52. Alternativas descartadas: dejar la asignación sin forma de observarse por HTTP, devolver el recurso completo en vez de su id, una sola lista de equipo con discriminador, agregar los endpoints a `ActivityController`, un `GET` propio de una asignación. **Escrita** en el cuarto tramo del PR 5b. Toma la entrada siguiente a D55: **avisado al resto, el próximo que necesite una toma desde D57.**
-- D57: el ciclo de vida de una expedición (estados, aprobación, cierre, seguimiento e informe), sin cambios de dominio. Revisa D49 y D32. Alternativas descartadas: devolver el estado o el informe completo en cada transición, que `ExpeditionNotApprovableException` exponga los críticos estructurados, un value object propio para el par regla-sujeto, un mapper para `Observation`/`at`/`result`. **Escrita** en el quinto tramo del PR 5b, que lo cierra salvo F3. Toma la entrada siguiente a D56.
+- D57: el ciclo de vida de una expedición (estados, aprobación, cierre, seguimiento e informe), sin cambios de dominio. Revisa D49 y D32. Alternativas descartadas: devolver el estado o el informe completo en cada transición, que `ExpeditionNotApprovableException` exponga los críticos estructurados, un value object propio para el par regla-sujeto, un mapper para `Observation`/`at`/`result`. **Escrita** en el quinto tramo del PR 5b, que lo cierra salvo F3. Toma la entrada siguiente a D56. La segunda alternativa descartada dejó de estarlo en D58.
+- D58: qué devuelve cada endpoint de F3 — la propuesta al registrar el incidente, la alternativa al aceptar — y los críticos estructurados en el 422. Revisa D49 y D57. Alternativas descartadas: que el `POST` del incidente responda 204 y la propuesta se busque aparte, que su `Location` apunte a un endpoint de incidente que no existe, un DTO propio para la alternativa, exponer el tipo de motivo de cada opción, un `GET` que liste todas las propuestas, `PATCH` para decidir, exponer `ReplanExpedition`, validar en los DTOs. **Escrita** en el sexto tramo del PR 5b, que lo cierra. Toma la entrada siguiente a D57: **avisado al resto, el próximo que necesite una toma desde D59.**
 - Revisión de D38: ~~los comandos de agendar actividad y bloque pasan a recibir ids, tipo y parámetros, que es lo que la Fase 1 dejó anotado como pendiente y la Fase 3 como deuda~~. Hecha para la actividad en D53 y para el bloque en D55, con el pendiente de D38 cerrado del todo y "Revisado en D53" y "Revisado en D55" en D38.
 - Patrones no aplicados: JPA en esta entrega. La fila de Visitor de la Fase 2 se actualizó en el tercer tramo del 5b (D54): sigue sin usarse para las operaciones propias del dominio, y se adoptó para mostrar el árbol en la respuesta del itinerario.
 
@@ -647,8 +665,9 @@ Cada fase escribe sus entradas en el mismo PR que el código, con numeración re
 | D55 | Alta de bloque por un árbol de descripciones, con el resolver compartido | 5 |
 | D56 | Asignación de recursos y candidatos, sin cambios de dominio | 5 |
 | D57 | Ciclo de vida de una expedición (estados, aprobación, cierre, seguimiento, informe), sin cambios de dominio | 5 |
+| D58 | Qué devuelve cada endpoint de F3, y los críticos estructurados en el 422 | 5 |
 
-~~Si una fase necesita una entrada más, toma desde D53 y avisa al resto.~~ D53 la tomó el segundo tramo del PR 5b, D54 y D55 el tercero, D56 el cuarto y D57 el quinto; la próxima entrada que haga falta toma desde D58 y avisa al resto.
+~~Si una fase necesita una entrada más, toma desde D53 y avisa al resto.~~ D53 la tomó el segundo tramo del PR 5b, D54 y D55 el tercero, D56 el cuarto, D57 el quinto y D58 el sexto; la próxima entrada que haga falta toma desde D59 y avisa al resto.
 
 ### Formato de cada decisión
 
