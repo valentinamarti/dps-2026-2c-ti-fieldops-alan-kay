@@ -155,6 +155,16 @@ public class Expedition {
         return getReplacedExpedition().map(Set::of).orElse(Set.of());
     }
 
+    /**
+     * The owners whose reservations are not a conflict when this expedition's own plan is validated: itself,
+     * because the reservations its approval made are that same plan, and the one it replaces, whose
+     * reservations it takes over (D33). Only reservations are ignored: an unavailability has no owner and
+     * always counts (D59).
+     */
+    public Set<ExpeditionId> reservationsItDoesNotCompeteWith() {
+        return Stream.concat(Stream.of(id), reservationsItTakesOver().stream()).collect(Collectors.toUnmodifiableSet());
+    }
+
     public Optional<ReplanReason> getReplanReason() {
         return Optional.ofNullable(replanReason);
     }

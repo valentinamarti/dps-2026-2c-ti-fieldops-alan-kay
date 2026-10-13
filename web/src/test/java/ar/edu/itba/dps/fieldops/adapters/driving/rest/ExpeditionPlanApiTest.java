@@ -17,11 +17,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Validating and estimating an expedition over HTTP, without approving it. It covers the second acceptance
- * criterion of F2 (the duration of a sequential block is the sum of its parts and of a parallel one, the
- * maximum) through {@code GET /estimate}, and the third (the resource conflict between parallel activities of
- * the same block) through {@code GET /validation}, now that {@code AssignmentController} can assign the
- * shared resource that triggers it.
+ * Validating and estimating an expedition over HTTP. It covers the second acceptance criterion of F2 (the
+ * duration of a sequential block is the sum of its parts and of a parallel one, the maximum) through
+ * {@code GET /estimate}, and the third (the resource conflict between parallel activities of the same block)
+ * through {@code GET /validation}, now that {@code AssignmentController} can assign the shared resource that
+ * triggers it. The validation is asked both before approving and right after, which is where the defect D59
+ * fixed showed up.
  *
  * <p>The whole wiring of {@code FieldOpsConfig} with the in-memory adapters and no mocks (D37).
  */
@@ -142,6 +143,29 @@ class ExpeditionPlanApiTest {
                         .value(Matchers.everyItem(Matchers.is("p-2"))));
     }
 
+    /**
+     * The regression of D59 over HTTP: approving an expedition reserves the resources of its plan, and asking
+     * for its validation again does not turn those reservations against it. Before the fix every resource the
+     * expedition had assigned came back as a critical of {@code resource-overlap}.
+     */
+    @Test
+    void theValidationOfAnApprovedExpeditionIgnoresTheReservationsItsOwnApprovalMade() throws Exception {
+        final var expedition = anExpeditionWithASampleCollectionFullyResourced();
+
+        api.perform(post("/api/expeditions/{id}/review", expedition)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNoContent());
+        api.perform(post("/api/expeditions/{id}/approval", expedition)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isNoContent());
+
+        api.perform(get("/api/expeditions/{id}/validation", expedition))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.canBeApproved").value(true))
+                .andExpect(jsonPath("$.criticals").value(Matchers.empty()))
+                .andExpect(jsonPath("$.warnings").value(Matchers.empty()));
+    }
+
     @Test
     void answersNotFoundWhenValidatingAnExpeditionThatDoesNotExist() throws Exception {
         api.perform(get("/api/expeditions/{id}/validation", "e-404"))
@@ -155,11 +179,43 @@ class ExpeditionPlanApiTest {
     }
 
     private ResultActions assign(String expeditionId, String activityId, String personId) throws Exception {
-        return api.perform(post("/api/expeditions/{expeditionId}/activities/{activityId}/staff",
-                        expeditionId, activityId)
+        return assign(expeditionId, activityId, "staff", personId);
+    }
+
+    private ResultActions assign(String expeditionId, String activityId, String kind, String resourceId) throws Exception {
+        return api.perform(post("/api/expeditions/{expeditionId}/activities/{activityId}/{kind}",
+                        expeditionId, activityId, kind)
                 .contentType(MediaType.APPLICATION_JSON).content("""
                         {"resourceId": "%s"}
-                        """.formatted(personId)));
+                        """.formatted(resourceId)));
+    }
+
+    /**
+     * A "Sample collection" with a field worker, a cooler and a sample container assigned: nothing missing
+     * and low risk, so it goes all the way to approved without accepting anything.
+     */
+    private String anExpeditionWithASampleCollectionFullyResourced() throws Exception {
+        final var expedition = anExpeditionInTheCoastalReef();
+        api.perform(post("/api/staff").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"id": "p-2", "name": "Lee", "certifications": []}
+                        """))
+                .andExpect(status().isCreated());
+        api.perform(post("/api/instruments").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"id": "i-1", "name": "Field cooler", "category": "Cooler", "certifications": []}
+                        """))
+                .andExpect(status().isCreated());
+        api.perform(post("/api/supplies").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"id": "s-1", "name": "Sample containers", "category": "Sample container",
+                         "initialStock": {"amount": "5", "unit": "UNITS"}}
+                        """))
+                .andExpect(status().isCreated());
+
+        scheduleActivity(expedition, activity("a-1", 8, 10, "Sample collection", "{\"sampleCount\": 1}"))
+                .andExpect(status().isCreated());
+        assign(expedition, "a-1", "staff", "p-2").andExpect(status().isNoContent());
+        assign(expedition, "a-1", "equipment", "i-1").andExpect(status().isNoContent());
+        assign(expedition, "a-1", "supplies", "s-1").andExpect(status().isNoContent());
+        return expedition;
     }
 
     private static String activity(String id, int fromHour, int toHour, String type, String parameters) {

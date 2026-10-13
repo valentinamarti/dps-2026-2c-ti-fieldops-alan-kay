@@ -24,11 +24,12 @@ public class ResourceOverlapValidation implements ValidationRule {
     public List<ValidationResult> validate(Expedition expedition) {
         final var itinerary = expedition.getItinerary();
         final var items = itinerary.pendingItems();
+        final var ignoredOwners = expedition.reservationsItDoesNotCompeteWith();
         final var results = new ArrayList<ValidationResult>();
         for (int i = 0; i < items.size(); i++) {
             final var item = items.get(i);
             items.subList(i + 1, items.size()).forEach(later -> results.addAll(sharedResources(itinerary, item, later)));
-            results.addAll(unavailableResources(item, expedition.reservationsItTakesOver()));
+            results.addAll(unavailableResources(item, ignoredOwners));
         }
         return results;
     }
