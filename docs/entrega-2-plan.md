@@ -494,11 +494,11 @@ Inventario completo, con el caso de uso que hay detrás de cada uno. Los marcado
 | Asignación | [x] `POST /api/expeditions/{id}/activities/{activityId}/staff`, `/equipment`, `/supplies` | `AssignResources` |
 | Asignación | [x] `GET /api/expeditions/{id}/activities/{activityId}/candidates` | `FindAssignmentCandidates` |
 | Validación y estimación | [x] `GET /api/expeditions/{id}/validation`, `/estimate` | `ValidateExpedition`, `EstimateExpedition` |
-| Informes | `GET /api/expeditions/{id}/report` | `ReportExpedition` |
-| Estados | `POST /api/expeditions/{id}/review`, `/draft`, `/execution`, `/suspension`, `/resumption` | `TransitionExpedition` |
-| Aprobación | `POST /api/expeditions/{id}/approval` (cuerpo: advertencias aceptadas) | `ApproveExpedition.approve(id, acceptances)` |
-| Cierre | `POST /api/expeditions/{id}/completion` | `FinishExpedition.finish(id)` |
-| Seguimiento | `POST /api/expeditions/{id}/activities/{activityId}/start`, `/completion`, `/observations` | `TrackActivity` |
+| Informes | [x] `GET /api/expeditions/{id}/report` | `ReportExpedition` |
+| Estados | [x] `POST /api/expeditions/{id}/review`, `/draft`, `/execution`, `/suspension`, `/resumption` | `TransitionExpedition` |
+| Aprobación | [x] `POST /api/expeditions/{id}/approval` (cuerpo: advertencias aceptadas) | `ApproveExpedition.approve(id, acceptances)` |
+| Cierre | [x] `POST /api/expeditions/{id}/completion` | `FinishExpedition.finish(id)` |
+| Seguimiento | [x] `POST /api/expeditions/{id}/activities/{activityId}/start`, `/completion`, `/observations` | `TrackActivity` |
 | Incidentes | `POST /api/expeditions/{id}/incidents` (devuelve la propuesta) | `RegisterIncident` **(F3)** |
 | Propuestas | `GET /api/expeditions/{id}/replan-proposals`, `GET /api/replan-proposals/{id}` | `QueryReplanProposals` **(F3)** |
 | Propuestas | `POST /api/replan-proposals/{id}/acceptance` (número de opción + responsable, justificación y fecha), `/rejection` | `DecideReplanProposal` **(F3)** |
@@ -563,6 +563,18 @@ Qué cambió respecto del plan:
 - **El dominio no rechaza una asignación que no cumple el requisito.** `Expedition.assignStaff/assignEquipment/assignSupply` solo verifica que la expedición esté en borrador y que la actividad no haya empezado; la coincidencia con el requisito la chequea `ApprovalPolicy` al validar, no la asignación. No era un supuesto: se confirmó leyendo `ItineraryItem.assignStaff/assignEquipment/assignSupply` antes de escribir el controller, y quedó demostrado con un test (`AssignmentApiTest.assigningEquipmentOfTheWrongCategorySucceedsAndTheMismatchShowsUpOnlyAtValidation`) en vez de asumirse.
 - **No hizo falta ninguna excepción nueva.** Los 404 de expedición, actividad y recurso ya estaban mapeados desde D49.
 
+**Estado del quinto tramo (rama `assignment-2-phase-5b-lifecycle`, sobre la 5b-assignment): el ciclo de vida de la expedición hecho — estados, aprobación, cierre, seguimiento e informe.** `mvn -B verify` pasa con 761 tests (637 domain, 20 app, 104 web); antes eran 754 y los 637 de `domain` y los 20 de `app` siguen pasando sin tocarlos: este tramo tampoco tocó `domain`. Son las cinco filas de "Informes", "Estados", "Aprobación", "Cierre" y "Seguimiento" de la tabla de arriba. **Con esto el PR 5b queda completo salvo F3** (registrar incidente, consultar propuestas y decidir), que es el próximo y último tramo pendiente de la tabla de endpoints. Lo que quedó:
+
+- `TransitionExpedition`, `ApproveExpedition`, `FinishExpedition`, `TrackActivity` y `ReportExpedition` ya eran casos de uso completos y ya eran beans de `FieldOpsConfig` desde fases anteriores: no hizo falta ningún cambio en `domain`, solo el adaptador.
+- En `web`, `adapters.driving.rest.ExpeditionLifecycleController` (las cinco transiciones de `TransitionExpedition`, `POST .../approval`, `POST .../completion` y `GET .../report`) y `ActivityTrackingController` (`POST .../activities/{activityId}/start`, `/completion`, `/observations`, sobre la misma base de ruta que `AssignmentController` pero como controller aparte, D49). DTOs nuevos: `ApprovalRequest`, `WarningAcceptanceRequest`, `StartActivityRequest`, `FinishActivityRequest`, `ObservationRequest`, `ExpeditionReportResponse`, `IncidentDto`, `AcceptedWarningDto`; mappers `ApprovalMapper` y `ReportMapper`. `ValidationMapper` sumó `toSubject` (la inversa de `toDto(ValidationSubject)`); `EstimateMapper` sumó `toConsumptionDtos`, reusado por `ReportMapper` para el consumo real.
+- Tests: `ExpeditionLifecycleApiTest` (6: el ciclo completo de borrador a finalizada con el seguimiento de una actividad y el informe final, la aprobación aceptando una advertencia copiada de `GET .../validation` y el informe mostrándola de vuelta, una crítica pendiente que bloquea la aprobación con 422 y el detalle listando cuáles son, aceptar una advertencia no levantada con 404, una transición ilegal con 409, y los 404 de una expedición inexistente en cada operación) y una entrada más en `OpenApiDocumentationTest`.
+
+Qué cambió respecto del plan:
+
+- **La deuda de D49 sobre `ExpeditionNotApprovableException` (la lista de críticos viaja en el mensaje y no como arreglo estructurado) se deja como estaba, a propósito, en vez de resolverse como D49 anticipaba.** Resolverla exigía un cambio de dominio (un getter nuevo en la excepción, o que guarde la lista en vez de solo el mensaje), y el alcance de este tramo pedía evitar tocar `domain` salvo necesidad real. El mensaje ya enumera cada crítica, así que el criterio de aceptación ("el cuerpo dice cuáles son las críticas") se cumple con el `detail` de texto; queda anotado en D57 como la extensión natural si algún cliente necesita la lista estructurada.
+- **No hizo falta ninguna excepción nueva ni ninguna fila nueva en el mapeo de errores.** Las ocho transiciones y los tres endpoints de seguimiento solo usan excepciones que D49 ya clasificaba (`InvalidStatusTransitionException`, `ExpeditionNotApprovableException`, `UnacceptedWarningException`, `NotFoundException`, `InvalidTrackingException`, `InsufficientStockException`).
+- **`ActivityTrackingController` quedó separado de `AssignmentController`** aunque comparten la misma base de ruta (`.../activities/{activityId}`): son dos concerns distintos sobre el mismo sub-recurso, el mismo criterio con el que `ActivityController` y `AssignmentController` ya estaban separados.
+
 ### PR 5c: demo
 
 - [ ] Seed como datos: `demo/catalog.json` y `demo/expedition.json`, más un único cargador genérico que corre con el perfil `demo`. Usa los builders y el registro de tipos de la Fase 3. No hay clases Java propias de la demo.
@@ -598,6 +610,7 @@ Qué cambió respecto del plan:
 - D54: cómo se serializa el árbol del itinerario, con un Visitor. Revisa D39 y completa D49. Alternativa descartada: sumar hijos y un nombre de tipo a `ItineraryNode`. **Escrita** en el tercer tramo del PR 5b.
 - D55: el alta de un bloque entra por un árbol de descripciones, con el resolver de D53 compartido entre `ScheduleActivity` y `ScheduleBlock`. Revisa D38, D39 y D53. Alternativas descartadas: rechazar con 404 una dependencia hacia un hermano del mismo bloque, resolución en dos pasadas, duplicar el resolver. **Escrita** en el tercer tramo del PR 5b. Toma la entrada siguiente a D53.
 - D56: asignación de recursos y candidatos sin cambios de dominio, con la forma del DTO de candidatos y la decisión de mostrar lo asignado en la respuesta del itinerario. Revisa D49 y D52. Alternativas descartadas: dejar la asignación sin forma de observarse por HTTP, devolver el recurso completo en vez de su id, una sola lista de equipo con discriminador, agregar los endpoints a `ActivityController`, un `GET` propio de una asignación. **Escrita** en el cuarto tramo del PR 5b. Toma la entrada siguiente a D55: **avisado al resto, el próximo que necesite una toma desde D57.**
+- D57: el ciclo de vida de una expedición (estados, aprobación, cierre, seguimiento e informe), sin cambios de dominio. Revisa D49 y D32. Alternativas descartadas: devolver el estado o el informe completo en cada transición, que `ExpeditionNotApprovableException` exponga los críticos estructurados, un value object propio para el par regla-sujeto, un mapper para `Observation`/`at`/`result`. **Escrita** en el quinto tramo del PR 5b, que lo cierra salvo F3. Toma la entrada siguiente a D56.
 - Revisión de D38: ~~los comandos de agendar actividad y bloque pasan a recibir ids, tipo y parámetros, que es lo que la Fase 1 dejó anotado como pendiente y la Fase 3 como deuda~~. Hecha para la actividad en D53 y para el bloque en D55, con el pendiente de D38 cerrado del todo y "Revisado en D53" y "Revisado en D55" en D38.
 - Patrones no aplicados: JPA en esta entrega. La fila de Visitor de la Fase 2 se actualizó en el tercer tramo del 5b (D54): sigue sin usarse para las operaciones propias del dominio, y se adoptó para mostrar el árbol en la respuesta del itinerario.
 
@@ -633,8 +646,9 @@ Cada fase escribe sus entradas en el mismo PR que el código, con numeración re
 | D54 | Árbol del itinerario serializado con un Visitor | 5 |
 | D55 | Alta de bloque por un árbol de descripciones, con el resolver compartido | 5 |
 | D56 | Asignación de recursos y candidatos, sin cambios de dominio | 5 |
+| D57 | Ciclo de vida de una expedición (estados, aprobación, cierre, seguimiento, informe), sin cambios de dominio | 5 |
 
-~~Si una fase necesita una entrada más, toma desde D53 y avisa al resto.~~ D53 la tomó el segundo tramo del PR 5b, D54 y D55 el tercero, y D56 el cuarto; la próxima entrada que haga falta toma desde D57 y avisa al resto.
+~~Si una fase necesita una entrada más, toma desde D53 y avisa al resto.~~ D53 la tomó el segundo tramo del PR 5b, D54 y D55 el tercero, D56 el cuarto y D57 el quinto; la próxima entrada que haga falta toma desde D58 y avisa al resto.
 
 ### Formato de cada decisión
 
