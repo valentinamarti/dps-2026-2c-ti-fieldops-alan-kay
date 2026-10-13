@@ -1,0 +1,450 @@
+# Field Ops — guion de la demostración
+#
+# Cliente HTTP de IntelliJ (Tools > HTTP Client, o el botón ▶ al lado de cada pedido).
+# También corre en VS Code con la extensión REST Client.
+#
+# ANTES DE EMPEZAR: hay que levantar la aplicación con el perfil `demo`, que carga
+# `demo/catalog.json` y `demo/expedition.json` al arrancar:
+#
+#   mvn -B install -DskipTests
+#   mvn spring-boot:run -pl web -Dspring-boot.run.profiles=demo
+#
+# El seed deja el catálogo (8 personas, 2 vehículos, 9 instrumentos, 3 consumibles),
+# las 2 zonas y una expedición en borrador con 10 actividades de los 6 tipos, con un
+# bloque paralelo dentro de un secuencial y recursos compartidos entre actividades que
+# no se superponen. Este guion arranca desde ahí: agrega la actividad NOCTURNA (F1),
+# choca con el error crítico, lo corrige, acepta la advertencia, aprueba, ejecuta,
+# registra un incidente y replanifica (F3).
+#
+# EL GUION NO ES IDEMPOTENTE: deja la expedición reemplazada y la nocturna agendada.
+# Para correrlo de nuevo hay que REINICIAR LA APLICACIÓN (Ctrl+C y volver a levantarla
+# con el perfil `demo`), que vuelve a cargar los datos desde los archivos.
+#
+# Los ids de expedición y de propuesta los genera el sistema (D26, D48), así que cada
+# paso que los necesita los toma de la respuesta anterior con `client.global.set`.
+#
+# El mismo recorrido, paso por paso, está en `DemoScriptApiTest`: si el guion y el test
+# se separan, la CI avisa.
+
+@host = http://localhost:8080
+
+
+### Paso 1 — Qué tipos de actividad conoce el dominio
+# Los seis tipos con el nombre y los parámetros con los que hay que pedirlos (D44).
+# Es el contrato del cuerpo del alta de una actividad.
+GET {{host}}/api/activity-types
+Accept: application/json
+
+
+### Paso 2 — Las zonas del catálogo
+# Cada zona exige sus permisos. El permiso especial de operación nocturna no está acá:
+# lo pide la actividad, con el nombre `night operations in zone <id>` (D43).
+GET {{host}}/api/zones
+Accept: application/json
+
+
+### Paso 3 — El personal, con sus certificaciones
+# Ada y Grace son las dos buzas certificadas también para operación nocturna.
+GET {{host}}/api/staff
+Accept: application/json
+
+
+### Paso 4 — El equipamiento, en dos listas
+# Vehículos (tienen patente) e instrumentos (no), con el listado combinado de los dos
+# en un solo documento (D52). `i-lamp-1` es el único de categoría `lighting`.
+GET {{host}}/api/equipment
+Accept: application/json
+
+
+### Paso 5 — Los consumibles, con el stock que les queda
+GET {{host}}/api/supplies
+Accept: application/json
+
+
+### Paso 6 — La expedición que dejó el seed
+# Guarda su id para todo el resto del guion.
+GET {{host}}/api/expeditions
+Accept: application/json
+
+> {%
+    client.test("hay una expedición en borrador", function() {
+        client.assert(response.status === 200);
+        client.assert(response.body.length === 1, "el seed deja una sola expedición");
+        client.assert(response.body[0].status === "DRAFT");
+    });
+    client.global.set("expedition", response.body[0].id);
+    client.log("Expedición de la demo: " + response.body[0].id);
+%}
+
+
+### Paso 7 — El itinerario: el bloque paralelo dentro del secuencial (F2)
+# Siete nodos raíz. El segundo es el bloque `sequential` "línea de base del arrecife",
+# con tres partes, y la segunda parte es un bloque `parallel` con el buceo y el
+# relevamiento con dron corriendo a la vez.
+# La duración de un secuencial es la suma de sus partes (90 + 210 + 180 = 480 min) y la
+# de un paralelo, el máximo de sus ramas (210 min) (D39).
+GET {{host}}/api/expeditions/{{expedition}}/itinerary
+Accept: application/json
+
+
+### Paso 8 — La estimación del plan de partida
+# 1475 minutos y riesgo general MEDIUM, sumando los nodos raíz.
+GET {{host}}/api/expeditions/{{expedition}}/estimate
+Accept: application/json
+
+
+### Paso 9 — La validación del plan de partida: nada en contra
+# `canBeApproved: true`, sin críticas y sin advertencias. Los recursos compartidos
+# (la heladera y Lee entre a-05 y a-08, el dron y Alan entre a-04 y a-09, la camioneta
+# y Nils entre a-01 y a-11) no son conflicto, porque esas actividades no se superponen
+# ni corren en paralelo en el mismo bloque (D41).
+GET {{host}}/api/expeditions/{{expedition}}/validation
+Accept: application/json
+
+
+### Paso 10 — Se agrega la actividad NOCTURNA al plan (F1)
+# Un buceo de 35 m con `atNight: true`. Nadie escribió "iluminación", "certificación
+# nocturna" ni "un nivel más de riesgo": lo agrega el decorador que el registro de tipos
+# envuelve alrededor de las reglas de buceo (D42, D44).
+# En la respuesta hay que mirar:
+#   - `estimatedRisk: "EXTREME"`     -> HIGH (buceo profundo) + un nivel por ser nocturna
+#   - `requiredEquipment`            -> boat, oxygen tank x2 y **lighting**
+#   - `requiredCertifications`       -> ["night operations"], para TODO el personal asignado
+#   - `requiredPermits`              -> ["night operations in zone z-coast"], ya concedido
+POST {{host}}/api/expeditions/{{expedition}}/activities
+Content-Type: application/json
+
+{
+  "id": "a-10",
+  "name": "Night dive at the reef",
+  "timeWindow": {"start": "2026-11-05T18:00:00", "end": "2026-11-06T06:00:00"},
+  "scheduledPeriod": {"start": "2026-11-05T20:00:00", "end": "2026-11-05T22:00:00"},
+  "zoneId": "z-coast",
+  "dependencyIds": ["a-09"],
+  "type": "Diving",
+  "parameters": {"maxDepthMeters": 35},
+  "atNight": true
+}
+
+
+### Paso 11 — Qué puede ofrecer el catálogo para cada requisito de la nocturna
+# Para el requisito de personal, sólo Ada y Grace: son las únicas que la actividad admite,
+# porque exige la certificación nocturna a todo el personal (D43). Para el requisito de
+# `lighting`, el foco `i-lamp-1`.
+GET {{host}}/api/expeditions/{{expedition}}/activities/a-10/candidates
+Accept: application/json
+
+
+### Paso 12 — Se asignan las dos buzas
+POST {{host}}/api/expeditions/{{expedition}}/activities/a-10/staff
+Content-Type: application/json
+
+{"resourceId": "p-ada"}
+
+
+### Paso 13 — La segunda buza
+POST {{host}}/api/expeditions/{{expedition}}/activities/a-10/staff
+Content-Type: application/json
+
+{"resourceId": "p-grace"}
+
+
+### Paso 14 — El bote, que es el mismo del buceo diurno de tres días antes
+POST {{host}}/api/expeditions/{{expedition}}/activities/a-10/equipment
+Content-Type: application/json
+
+{"resourceId": "v-boat-1"}
+
+
+### Paso 15 — El primer tubo de oxígeno
+POST {{host}}/api/expeditions/{{expedition}}/activities/a-10/equipment
+Content-Type: application/json
+
+{"resourceId": "i-tank-1"}
+
+
+### Paso 16 — El segundo tubo de oxígeno
+POST {{host}}/api/expeditions/{{expedition}}/activities/a-10/equipment
+Content-Type: application/json
+
+{"resourceId": "i-tank-2"}
+
+
+### Paso 17 — El combustible
+# Hasta acá, todo lo que la nocturna pide MENOS la iluminación.
+POST {{host}}/api/expeditions/{{expedition}}/activities/a-10/supplies
+Content-Type: application/json
+
+{"resourceId": "s-fuel"}
+
+
+### Paso 18 — La validación: UNA CRÍTICA y UNA ADVERTENCIA
+#   - crítica  (`missing-resources`): "Night dive at the reef has 0 of the 1 lighting it
+#     needs". Bloquea la aprobación y hay que corregirla.
+#   - advertencia (`risk-tolerance`): el riesgo EXTREME está por encima de la tolerancia
+#     HIGH de la expedición. Un responsable la puede aceptar con una justificación.
+GET {{host}}/api/expeditions/{{expedition}}/validation
+Accept: application/json
+
+
+### Paso 19 — La expedición pasa a revisión
+# Las operaciones que no son CRUD son sub-recursos en POST, no verbos en la URL (D49).
+POST {{host}}/api/expeditions/{{expedition}}/review
+Content-Type: application/json
+
+
+### Paso 20 — Intento de aprobación: 422, Y EL CUERPO DICE CUÁL ES LA CRÍTICA
+# El `detail` la enumera en texto y la propiedad `criticals` la trae estructurada, con la
+# misma forma que `GET .../validation` (D58). La expedición queda en IN_REVIEW.
+POST {{host}}/api/expeditions/{{expedition}}/approval
+Content-Type: application/json
+
+{}
+
+
+### Paso 21 — Vuelve a borrador para poder corregir
+# Una expedición en revisión no se puede editar (D21): asignar un recurso ahí respondería
+# 409. El camino es volver a borrador, corregir y volver a revisión.
+POST {{host}}/api/expeditions/{{expedition}}/draft
+Content-Type: application/json
+
+
+### Paso 22 — LA CORRECCIÓN: se asigna el equipo de iluminación
+POST {{host}}/api/expeditions/{{expedition}}/activities/a-10/equipment
+Content-Type: application/json
+
+{"resourceId": "i-lamp-1"}
+
+
+### Paso 23 — La validación otra vez: no quedan críticas, queda la advertencia
+# `canBeApproved: true`, `criticals: []` y la advertencia de riesgo todavía ahí.
+GET {{host}}/api/expeditions/{{expedition}}/validation
+Accept: application/json
+
+
+### Paso 24 — La estimación con la nocturna adentro
+# 1475 + 115 = 1590 minutos, y el riesgo general sube a EXTREME: la estimación refleja el
+# factor nocturno sin que nadie pregunte si la actividad es nocturna (F1, D42).
+GET {{host}}/api/expeditions/{{expedition}}/estimate
+Accept: application/json
+
+
+### Paso 25 — De nuevo a revisión
+POST {{host}}/api/expeditions/{{expedition}}/review
+Content-Type: application/json
+
+
+### Paso 26 — LA APROBACIÓN, ACEPTANDO LA ADVERTENCIA CON SU JUSTIFICACIÓN
+# El cuerpo se arma copiando el hallazgo de `GET .../validation` (la regla y el sujeto) y
+# agregando quién lo acepta y por qué (D22, D57). Ada es responsable de la expedición: si
+# no lo fuera, sería un 422.
+# Aceptar una advertencia que no existe es un 404, y dejar una advertencia sin aceptar
+# también bloquea la aprobación.
+POST {{host}}/api/expeditions/{{expedition}}/approval
+Content-Type: application/json
+
+{
+  "acceptedWarnings": [
+    {
+      "rule": "risk-tolerance",
+      "subject": {"activityId": "a-10"},
+      "responsibleId": "p-ada",
+      "justification": "Two divers certified for night operations, a floodlight and a boat on site"
+    }
+  ]
+}
+
+
+### Paso 27 — Aprobada, y con los recursos reservados
+GET {{host}}/api/expeditions/{{expedition}}
+Accept: application/json
+
+
+### Paso 28 — A ejecución
+POST {{host}}/api/expeditions/{{expedition}}/execution
+Content-Type: application/json
+
+
+### Paso 29 — Arranca la recolección de muestras del humedal (a-08)
+POST {{host}}/api/expeditions/{{expedition}}/activities/a-08/start
+Content-Type: application/json
+
+{"at": "2026-11-04T11:30:00"}
+
+
+### Paso 30 — Una observación de campo
+POST {{host}}/api/expeditions/{{expedition}}/activities/a-08/observations
+Content-Type: application/json
+
+{
+  "note": "The water level rose and the first station is under water",
+  "recordedAt": "2026-11-04T11:55:00"
+}
+
+
+### Paso 31 — SE REGISTRA EL INCIDENTE (F3)
+# La tormenta inunda la estación y Lee vuelve al campamento: el incidente reporta un
+# retraso de 120 minutos Y un recurso afectado.
+# La respuesta YA TRAE LA PROPUESTA, porque el evento se entrega de forma síncrona (D45),
+# con CINCO opciones en el orden de los generadores (D46):
+#   1. reprogramar 2 h más tarde, arrastrando lo que tiene que moverse con ella
+#   2-4. reemplazar a Lee por cada candidato del catálogo que esté libre (hasta tres)
+#   5. cancelar la actividad y lo que depende de ella
+# El `Location` apunta a la propuesta.
+POST {{host}}/api/expeditions/{{expedition}}/incidents
+Content-Type: application/json
+
+{
+  "activityId": "a-08",
+  "description": "A storm flooded the station and Lee went back to the camp",
+  "occurredAt": "2026-11-04T12:10:00",
+  "resourceId": "p-lee",
+  "expectedDelayMinutes": 120
+}
+
+> {%
+    client.test("la propuesta se generó con sus opciones", function() {
+        client.assert(response.status === 201);
+        client.assert(response.body.status === "PENDING");
+        client.assert(response.body.options.length === 5, "cinco opciones");
+    });
+    client.global.set("proposal", response.body.id);
+    client.log("Propuesta de replanificación: " + response.body.id);
+%}
+
+
+### Paso 32 — Las propuestas de la expedición
+GET {{host}}/api/expeditions/{{expedition}}/replan-proposals
+Accept: application/json
+
+
+### Paso 33 — La propuesta en detalle, todavía pendiente
+# Trae el incidente que la motivó, las opciones numeradas y `decision: null`.
+GET {{host}}/api/replan-proposals/{{proposal}}
+Accept: application/json
+
+
+### Paso 34 — SE CIERRA LA ACTIVIDAD AFECTADA, ANTES DE ACEPTAR
+# D47 lo exige: con una actividad en curso, aceptar una opción falla con 409
+# (`ActivitiesInProgressException`). El resultado real lo pone quien la ejecutó (D29).
+POST {{host}}/api/expeditions/{{expedition}}/activities/a-08/completion
+Content-Type: application/json
+
+{
+  "at": "2026-11-04T12:40:00",
+  "result": "One of the four samples collected before the station flooded"
+}
+
+
+### Paso 35 — SE ACEPTA LA OPCIÓN 1 (reprogramar)
+# Responde 201 con LA ALTERNATIVA, en borrador y apuntando a la original con
+# `replacedExpeditionId`. OJO: `replacementId` de la original todavía es `null` y la
+# original queda SUSPENDED; el vínculo de vuelta aparece al aprobar la alternativa
+# (D33, D47). El `Location` apunta a la alternativa.
+POST {{host}}/api/replan-proposals/{{proposal}}/acceptance
+Content-Type: application/json
+
+{
+  "optionNumber": 1,
+  "responsibleId": "p-ada",
+  "justification": "The water goes down in two hours and the crew stays on site",
+  "decidedAt": "2026-11-04T12:45:00"
+}
+
+> {%
+    client.test("la alternativa es un borrador que apunta a la original", function() {
+        client.assert(response.status === 201);
+        client.assert(response.body.status === "DRAFT");
+        client.assert(response.body.replacedExpeditionId === client.global.get("expedition"));
+        client.assert(response.body.replacementId === null, "el vínculo de vuelta todavía no");
+    });
+    client.global.set("alternative", response.body.id);
+    client.log("Alternativa: " + response.body.id);
+%}
+
+
+### Paso 36 — La original quedó suspendida y todavía sin reemplazo
+GET {{host}}/api/expeditions/{{expedition}}
+Accept: application/json
+
+
+### Paso 37 — EL ITINERARIO DE LA ALTERNATIVA: conserva los bloques y corre lo que sigue
+# Ocho nodos, con el bloque secuencial y el paralelo adentro intactos, y la actividad
+# afectada más todo lo que tiene que moverse con ella dos horas más tarde (el horario de
+# abajo es el de inicio, antes -> después):
+#   a-08  11:30 -> 13:30
+#   a-09  15:00 -> 17:00   (depende de a-08)
+#   a-10  20:00 -> 22:00   (depende de a-09; la ventana nocturna llega hasta las 06:00)
+#   a-11  08:00 -> 10:00   (depende de a-09)
+# La actividad afectada se rehace aunque se haya cerrado (D47).
+GET {{host}}/api/expeditions/{{alternative}}/itinerary
+Accept: application/json
+
+
+### Paso 38 — La alternativa pasa a revisión
+POST {{host}}/api/expeditions/{{alternative}}/review
+Content-Type: application/json
+
+
+### Paso 39 — Y se aprueba, VOLVIENDO A ACEPTAR LA ADVERTENCIA
+# Las aceptaciones no se heredan: la alternativa es una expedición nueva y la nocturna
+# sigue por encima de la tolerancia (D22, D33). Al aprobarla, la alternativa toma las
+# reservas de la original.
+POST {{host}}/api/expeditions/{{alternative}}/approval
+Content-Type: application/json
+
+{
+  "acceptedWarnings": [
+    {
+      "rule": "risk-tolerance",
+      "subject": {"activityId": "a-10"},
+      "responsibleId": "p-ada",
+      "justification": "Two divers certified for night operations, a floodlight and a boat on site"
+    }
+  ]
+}
+
+
+### Paso 40 — AHORA SÍ: la original es REPLACED y apunta a la alternativa
+GET {{host}}/api/expeditions/{{expedition}}
+Accept: application/json
+
+> {%
+    client.test("la original quedó reemplazada por la alternativa", function() {
+        client.assert(response.body.status === "REPLACED");
+        client.assert(response.body.replacementId === client.global.get("alternative"));
+    });
+%}
+
+
+### Paso 41 — LA AUDITORÍA (tercer criterio de F3)
+# La propuesta ES el registro: el incidente que la motivó, las cinco opciones que se
+# ofrecieron, qué se eligió, quién lo decidió, por qué y cuándo, y a qué expedición
+# llevó (D48).
+GET {{host}}/api/replan-proposals/{{proposal}}
+Accept: application/json
+
+
+### Paso 42 — El plan original sigue consultable, con sus horarios de antes
+# a-08 sigue a las 11:30 en la original: la alternativa es otra expedición, no un parche.
+GET {{host}}/api/expeditions/{{expedition}}/itinerary
+Accept: application/json
+
+
+### Paso 43 — El informe de la original
+# Once actividades agendadas, una terminada, el incidente y la advertencia aceptada con
+# su justificación.
+GET {{host}}/api/expeditions/{{expedition}}/report
+Accept: application/json
+
+
+### Paso 44 — El informe de la alternativa
+# Hereda el incidente de la original (D48): el historial no se pierde al replanificar.
+GET {{host}}/api/expeditions/{{alternative}}/report
+Accept: application/json
+
+
+### Paso 45 — El contrato completo de la API
+# Swagger UI está en http://localhost:8080/swagger-ui.html
+GET {{host}}/v3/api-docs
+Accept: application/json
