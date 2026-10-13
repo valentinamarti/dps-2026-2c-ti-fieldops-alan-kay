@@ -69,6 +69,24 @@
     </dependencies>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <!--
+                The demonstration data lives in demo/ at the root of the repository, where whoever reads the
+                demo looks for it, and is read off the classpath, so the demo profile works the same from
+                spring-boot:run, from the packaged jar and from the tests, with no working directory to get
+                right (D50).
+            -->
+            <resource>
+                <directory>${project.basedir}/../demo</directory>
+                <targetPath>demo</targetPath>
+                <includes>
+                    <include>*.json</include>
+                </includes>
+            </resource>
+        </resources>
         <plugins>
             <!--
                 Spring resolves @PathVariable and @RequestParam by parameter name, which javac only keeps with

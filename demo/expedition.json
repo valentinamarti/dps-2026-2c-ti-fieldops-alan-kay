@@ -1,0 +1,223 @@
+{
+  "expeditions": [
+    {
+      "expedition": {
+        "name": "Patagonia coastal survey",
+        "period": {"start": "2026-11-02T00:00:00", "end": "2026-11-07T00:00:00"},
+        "objectives": [
+          "Map the coastal reef and the wetland basin",
+          "Measure water quality at both sites",
+          "Collect biological samples for the lab"
+        ],
+        "zoneIds": ["z-coast", "z-wetland"],
+        "responsibleIds": ["p-ada", "p-nils"],
+        "grantedPermits": ["Marine research", "Wetland access", "night operations in zone z-coast"],
+        "restrictions": {"maxParticipants": 12, "riskTolerance": "HIGH"}
+      },
+      "itinerary": [
+        {
+          "activity": {
+            "id": "a-01",
+            "name": "Transfer to the coastal camp",
+            "timeWindow": {"start": "2026-11-02T06:00:00", "end": "2026-11-02T20:00:00"},
+            "scheduledPeriod": {"start": "2026-11-02T08:00:00", "end": "2026-11-02T12:30:00"},
+            "zoneId": "z-coast",
+            "dependencyIds": [],
+            "type": "Transfer",
+            "parameters": {"distanceKilometers": 120},
+            "atNight": false
+          }
+        },
+        {
+          "type": "sequential",
+          "children": [
+            {
+              "activity": {
+                "id": "a-02",
+                "name": "Reef water quality baseline",
+                "timeWindow": {"start": "2026-11-03T06:00:00", "end": "2026-11-03T20:00:00"},
+                "scheduledPeriod": {"start": "2026-11-03T08:00:00", "end": "2026-11-03T09:30:00"},
+                "zoneId": "z-coast",
+                "dependencyIds": ["a-01"],
+                "type": "Water quality measurement",
+                "parameters": {"stationCount": 4},
+                "atNight": false
+              }
+            },
+            {
+              "type": "parallel",
+              "children": [
+                {
+                  "activity": {
+                    "id": "a-03",
+                    "name": "Reef dive survey",
+                    "timeWindow": {"start": "2026-11-03T06:00:00", "end": "2026-11-03T20:00:00"},
+                    "scheduledPeriod": {"start": "2026-11-03T10:00:00", "end": "2026-11-03T12:00:00"},
+                    "zoneId": "z-coast",
+                    "dependencyIds": ["a-02"],
+                    "type": "Diving",
+                    "parameters": {"maxDepthMeters": 18},
+                    "atNight": false
+                  }
+                },
+                {
+                  "activity": {
+                    "id": "a-04",
+                    "name": "Reef aerial survey",
+                    "timeWindow": {"start": "2026-11-03T06:00:00", "end": "2026-11-03T20:00:00"},
+                    "scheduledPeriod": {"start": "2026-11-03T10:00:00", "end": "2026-11-03T13:30:00"},
+                    "zoneId": "z-coast",
+                    "dependencyIds": ["a-02"],
+                    "type": "Drone survey",
+                    "parameters": {"areaHectares": 60},
+                    "atNight": false
+                  }
+                }
+              ]
+            },
+            {
+              "activity": {
+                "id": "a-05",
+                "name": "Reef sample collection",
+                "timeWindow": {"start": "2026-11-03T06:00:00", "end": "2026-11-03T23:00:00"},
+                "scheduledPeriod": {"start": "2026-11-03T14:00:00", "end": "2026-11-03T17:00:00"},
+                "zoneId": "z-coast",
+                "dependencyIds": ["a-03", "a-04"],
+                "type": "Sample collection",
+                "parameters": {"sampleCount": 6},
+                "atNight": false
+              }
+            }
+          ]
+        },
+        {
+          "activity": {
+            "id": "a-06",
+            "name": "Wetland bird census",
+            "timeWindow": {"start": "2026-11-04T06:00:00", "end": "2026-11-04T23:00:00"},
+            "scheduledPeriod": {"start": "2026-11-04T06:30:00", "end": "2026-11-04T09:30:00"},
+            "zoneId": "z-wetland",
+            "dependencyIds": ["a-05"],
+            "type": "Wildlife observation",
+            "parameters": {"observationPoints": 3},
+            "atNight": false
+          }
+        },
+        {
+          "activity": {
+            "id": "a-07",
+            "name": "Wetland water quality",
+            "timeWindow": {"start": "2026-11-04T06:00:00", "end": "2026-11-04T23:00:00"},
+            "scheduledPeriod": {"start": "2026-11-04T10:00:00", "end": "2026-11-04T11:00:00"},
+            "zoneId": "z-wetland",
+            "dependencyIds": ["a-06"],
+            "type": "Water quality measurement",
+            "parameters": {"stationCount": 2},
+            "atNight": false
+          }
+        },
+        {
+          "activity": {
+            "id": "a-08",
+            "name": "Wetland sample collection",
+            "timeWindow": {"start": "2026-11-04T06:00:00", "end": "2026-11-04T23:00:00"},
+            "scheduledPeriod": {"start": "2026-11-04T11:30:00", "end": "2026-11-04T13:50:00"},
+            "zoneId": "z-wetland",
+            "dependencyIds": ["a-07"],
+            "type": "Sample collection",
+            "parameters": {"sampleCount": 4},
+            "atNight": false
+          }
+        },
+        {
+          "activity": {
+            "id": "a-09",
+            "name": "Wetland aerial survey",
+            "timeWindow": {"start": "2026-11-04T06:00:00", "end": "2026-11-04T23:00:00"},
+            "scheduledPeriod": {"start": "2026-11-04T15:00:00", "end": "2026-11-04T16:30:00"},
+            "zoneId": "z-wetland",
+            "dependencyIds": ["a-08"],
+            "type": "Drone survey",
+            "parameters": {"areaHectares": 20},
+            "atNight": false
+          }
+        },
+        {
+          "activity": {
+            "id": "a-11",
+            "name": "Transfer back to base",
+            "timeWindow": {"start": "2026-11-06T06:00:00", "end": "2026-11-06T20:00:00"},
+            "scheduledPeriod": {"start": "2026-11-06T08:00:00", "end": "2026-11-06T12:30:00"},
+            "zoneId": "z-coast",
+            "dependencyIds": ["a-09"],
+            "type": "Transfer",
+            "parameters": {"distanceKilometers": 120},
+            "atNight": false
+          }
+        }
+      ],
+      "assignments": [
+        {
+          "activityId": "a-01",
+          "staffIds": ["p-nils"],
+          "equipmentIds": ["v-truck-1"],
+          "supplyIds": ["s-fuel"]
+        },
+        {
+          "activityId": "a-02",
+          "staffIds": ["p-rita"],
+          "equipmentIds": ["i-probe-1"],
+          "supplyIds": ["s-reagent"]
+        },
+        {
+          "activityId": "a-03",
+          "staffIds": ["p-ada", "p-grace"],
+          "equipmentIds": ["v-boat-1", "i-tank-1", "i-tank-2"],
+          "supplyIds": ["s-fuel"]
+        },
+        {
+          "activityId": "a-04",
+          "staffIds": ["p-alan"],
+          "equipmentIds": ["i-drone-1"],
+          "supplyIds": []
+        },
+        {
+          "activityId": "a-05",
+          "staffIds": ["p-lee"],
+          "equipmentIds": ["i-cooler-1"],
+          "supplyIds": ["s-container"]
+        },
+        {
+          "activityId": "a-06",
+          "staffIds": ["p-max", "p-emmy"],
+          "equipmentIds": ["i-binocular-1", "i-binocular-2"],
+          "supplyIds": []
+        },
+        {
+          "activityId": "a-07",
+          "staffIds": ["p-rita"],
+          "equipmentIds": ["i-probe-1"],
+          "supplyIds": ["s-reagent"]
+        },
+        {
+          "activityId": "a-08",
+          "staffIds": ["p-lee"],
+          "equipmentIds": ["i-cooler-1"],
+          "supplyIds": ["s-container"]
+        },
+        {
+          "activityId": "a-09",
+          "staffIds": ["p-alan"],
+          "equipmentIds": ["i-drone-1"],
+          "supplyIds": []
+        },
+        {
+          "activityId": "a-11",
+          "staffIds": ["p-nils"],
+          "equipmentIds": ["v-truck-1"],
+          "supplyIds": ["s-fuel"]
+        }
+      ]
+    }
+  ]
+}
