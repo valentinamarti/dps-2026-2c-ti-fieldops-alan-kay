@@ -7,6 +7,7 @@ import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
+import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
@@ -41,6 +42,20 @@ class InsufficientSuppliesValidationTest {
         final var jars = supply("d-1", "Sample container", Quantity.of("6", UNITS));
         expedition.assignSupply(scheduleSampling("a-1", hours(9, 11)), jars);
         expedition.assignSupply(scheduleSampling("a-2", hours(12, 14)), jars);
+
+        assertTrue(validation.validate(expedition).isEmpty());
+    }
+
+    /**
+     * The same as D59 for the stock: once approved, an expedition has reserved the supplies of its own
+     * activities, and those reservations cannot be what makes it insufficient.
+     */
+    @Test
+    void acceptsTheStockTheExpeditionItselfReserved() {
+        final var jars = supply("d-1", "Sample container", Quantity.of("6", UNITS));
+        expedition.assignSupply(scheduleSampling("a-1", hours(9, 11)), jars);
+        expedition.assignSupply(scheduleSampling("a-2", hours(12, 14)), jars);
+        new ResourceReservations().reserveFor(expedition);
 
         assertTrue(validation.validate(expedition).isEmpty());
     }
