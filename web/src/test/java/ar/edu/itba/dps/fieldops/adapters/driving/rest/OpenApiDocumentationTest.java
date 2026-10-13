@@ -88,6 +88,25 @@ class OpenApiDocumentationTest {
     }
 
     @Test
+    void publishesTheLifecycleTheTrackingAndTheReportOfAnExpedition() throws Exception {
+        api.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/expeditions/{expeditionId}/review'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/expeditions/{expeditionId}/draft'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/expeditions/{expeditionId}/approval'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/expeditions/{expeditionId}/execution'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/expeditions/{expeditionId}/suspension'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/expeditions/{expeditionId}/resumption'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/expeditions/{expeditionId}/completion'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/expeditions/{expeditionId}/report'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/expeditions/{expeditionId}/activities/{activityId}/start'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/expeditions/{expeditionId}/activities/{activityId}/completion'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/expeditions/{expeditionId}/activities/{activityId}/observations'].post").exists())
+                .andExpect(jsonPath("$.components.schemas.ApprovalRequest").exists())
+                .andExpect(jsonPath("$.components.schemas.ExpeditionReportResponse").exists());
+    }
+
+    @Test
     void servesSwaggerUi() throws Exception {
         api.perform(get("/swagger-ui/index.html")).andExpect(status().isOk());
     }
