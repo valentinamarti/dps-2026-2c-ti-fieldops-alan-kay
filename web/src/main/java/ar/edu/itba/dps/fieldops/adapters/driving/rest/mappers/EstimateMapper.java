@@ -7,6 +7,7 @@ import ar.edu.itba.dps.fieldops.business.models.estimation.ExpeditionEstimate;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
 
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -24,10 +25,19 @@ public final class EstimateMapper {
         return new EstimateResponse(
                 estimate.totalDuration().toMinutes(),
                 estimate.overallRisk(),
-                estimate.estimatedConsumption().entrySet().stream()
-                        .sorted(Comparator.comparing(consumption -> consumption.getKey().name()))
-                        .map(EstimateMapper::toDto)
-                        .toList());
+                toConsumptionDtos(estimate.estimatedConsumption()));
+    }
+
+    /**
+     * The same category-and-quantity list, sorted by category, for any {@code Map<ResourceCategory, Quantity>}:
+     * what is estimated to be consumed and, since D57, what the report shows was actually consumed. Package-
+     * private so {@link ReportMapper} reuses it instead of sorting and translating the map a second time.
+     */
+    static List<SupplyRequirementDto> toConsumptionDtos(Map<ResourceCategory, Quantity> consumption) {
+        return consumption.entrySet().stream()
+                .sorted(Comparator.comparing(entry -> entry.getKey().name()))
+                .map(EstimateMapper::toDto)
+                .toList();
     }
 
     private static SupplyRequirementDto toDto(Map.Entry<ResourceCategory, Quantity> consumption) {
