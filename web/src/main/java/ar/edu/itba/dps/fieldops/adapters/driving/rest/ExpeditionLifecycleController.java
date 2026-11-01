@@ -65,7 +65,8 @@ public class ExpeditionLifecycleController {
     @Operation(summary = "Approves an expedition in review, accepting the warnings a responsible takes on")
     @ApiResponse(responseCode = "204", description = "Approved")
     @ApiResponse(responseCode = "404", description = "The expedition, a responsible or an accepted warning does not exist")
-    @ApiResponse(responseCode = "409", description = "The expedition is not in review")
+    @ApiResponse(responseCode = "409", description = "The expedition is not in review, or it is an alternative "
+            + "built on a plan of the original that kept running since then")
     @ApiResponse(responseCode = "422",
             description = "A critical is still open, or a warning the expedition raises was not accepted")
     public void approve(@PathVariable String expeditionId, @RequestBody ApprovalRequest request) {

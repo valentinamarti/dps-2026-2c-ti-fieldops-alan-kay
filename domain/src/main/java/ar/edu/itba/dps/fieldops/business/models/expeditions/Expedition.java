@@ -8,6 +8,7 @@ import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidTrackingException;
 import ar.edu.itba.dps.fieldops.business.exceptions.NotAResponsibleException;
+import ar.edu.itba.dps.fieldops.business.exceptions.StaleAlternativeException;
 import ar.edu.itba.dps.fieldops.business.exceptions.UnacceptedWarningException;
 import ar.edu.itba.dps.fieldops.business.interfaces.itinerary.ItineraryNode;
 import ar.edu.itba.dps.fieldops.business.interfaces.replanning.ReplanReason;
@@ -60,13 +61,14 @@ public class Expedition {
     @Getter
     private List<AcceptedWarning> acceptedWarnings = List.of();
     private final List<Incident> incidents = new ArrayList<>();
-    private final ExpeditionId replacedExpedition;
+    private final ReplacedPlan replacedPlan;
     private final ReplanReason replanReason;
     private ExpeditionId replacement;
+    private int executionRevision;
 
     Expedition(ExpeditionId id, String name, TimePeriod period, List<String> objectives, Set<Zone> zones,
                Set<Person> responsibles, ExpeditionRestrictions restrictions, Set<Permit> grantedPermits,
-               ExpeditionId replacedExpedition, ReplanReason replanReason, List<Incident> inheritedIncidents) {
+               ReplacedPlan replacedPlan, ReplanReason replanReason, List<Incident> inheritedIncidents) {
         this.id = Objects.requireNonNull(id, "id is required");
         this.name = DomainArguments.requireText(name, "name");
         this.period = Objects.requireNonNull(period, "period is required");
@@ -76,7 +78,7 @@ public class Expedition {
         this.responsibles = DomainArguments.requireNonEmptySet(responsibles, "responsibles");
         this.restrictions = Objects.requireNonNull(restrictions, "restrictions are required");
         this.grantedPermits = DomainArguments.requireSet(grantedPermits, "grantedPermits");
-        this.replacedExpedition = replacedExpedition;
+        this.replacedPlan = replacedPlan;
         this.replanReason = replanReason;
         this.incidents.addAll(DomainArguments.requireList(inheritedIncidents, "inheritedIncidents"));
     }
@@ -147,7 +149,7 @@ public class Expedition {
     }
 
     public Optional<ExpeditionId> getReplacedExpedition() {
-        return Optional.ofNullable(replacedExpedition);
+        return Optional.ofNullable(replacedPlan).map(ReplacedPlan::expedition);
     }
 
     public Set<ExpeditionId> reservationsItTakesOver() {
@@ -185,6 +187,20 @@ public class Expedition {
         requireCanTransitionTo(ExpeditionStatus.REPLACED);
     }
 
+    public boolean isBuiltOnCurrentPlanOf(Expedition original) {
+        return replacedPlan != null && replacedPlan.isCurrentFor(original.id, original.executionRevision);
+    }
+
+    public void requireBuiltOnCurrentPlanOf(Expedition original) {
+        if (!isBuiltOnCurrentPlanOf(original)) {
+            throw new StaleAlternativeException(id, original.id);
+        }
+    }
+
+    ReplacedPlan currentPlan() {
+        return new ReplacedPlan(id, executionRevision);
+    }
+
     public void requireResponsible(Person person) {
         if (!responsibles.contains(person)) {
             throw new NotAResponsibleException(person.getId(), id);
@@ -193,6 +209,7 @@ public class Expedition {
 
     public void startActivity(ItineraryItem item, LocalDateTime at) {
         inExecution(item).start(at);
+        executionRevision++;
     }
 
     public void finishActivity(ItineraryItem item, LocalDateTime at, String result) {
@@ -200,10 +217,12 @@ public class Expedition {
         tracking.requireCanFinish(at, result);
         consumeAssignedSupplies(item);
         tracking.finish(at, result);
+        executionRevision++;
     }
 
     public void recordObservation(ItineraryItem item, Observation observation) {
         inExecution(item).startedTracking().record(observation);
+        executionRevision++;
     }
 
     public Incident registerIncident(ItineraryItem item, IncidentReport report) {
@@ -215,6 +234,7 @@ public class Expedition {
         report.resource().ifPresent(resource -> requireAssigned(affected, resource));
         final var incident = Incident.registered(new IncidentId(id, incidents.size() + 1), affected.getActivity().getId(), report);
         incidents.add(incident);
+        executionRevision++;
         return incident;
     }
 

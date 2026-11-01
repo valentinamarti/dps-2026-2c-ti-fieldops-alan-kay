@@ -484,6 +484,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - Elegir automáticamente el reemplazo del recurso indisponible — haría falta un criterio de selección que el enunciado no define; el catálogo ya ofrece candidatos (D18).
 - **Revisado en D39:** la alternativa conserva los bloques de la original. El replanificador ya no pasa los terminados con `ExpeditionBuilder.addFinishedItem` y el resto con `addActivity` ordenados por inicio: le pide al itinerario un plan con su misma estructura (`Itinerary.planKeepingStructure`) y decide por actividad (la terminada va como `PlannedNode.finished`, la afectada como diga el motivo, el resto con su horario). La alternativa se agenda en el orden en que se agendó la original. `addFinishedItem` sigue existiendo como atajo; `addFinishedCopyOf` ya no.
 - **Revisado en D46 y D47:** la actividad afectada ya no tiene que estar pendiente. Si había empezado (un incidente sobre una actividad en curso, que se cierra antes de aceptar), la alternativa la rehace cuando el motivo la devuelve y la deja cerrada cuando la cancela. El replanificador saca las consecuencias del motivo para el resto del itinerario: lo que vuelve más tarde corre lo que viene después en sus secuenciales y lo que depende de ella; lo que no vuelve se lleva lo que depende de ella. Hay un motivo más, `ResourceReplaced` (reemplazo elegido entre candidatos del catálogo), y `canPlan` responde si una alternativa se puede armar sin mirar el estado de la original. El reemplazo automático sigue descartado: las propuestas ofrecen candidatos y decide un responsable. La alternativa hereda la bitácora de incidentes de la original (D48).
+- **Revisado en D61:** lo ya hecho no se vuelve a reservar también cuando la original siguió ejecutándose después de armar la alternativa: esa alternativa ya no se puede aprobar.
 - **Revisado en D59:** `reservationsItTakesOver()` sigue siendo solo la expedición reemplazada, y el servicio de reservas y la validación de consumibles siguen preguntando por ella. La validación de superposición pasó a preguntar por `reservationsItDoesNotCompeteWith()`, que le suma el propio id: una expedición tampoco compite con las reservas que creó su propia aprobación.
 
 ### D34 — Las categorías y las certificaciones se normalizan al construirse (corrección de la Entrega 1)
@@ -812,6 +813,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - Dejar pendientes las demás propuestas — aceptar otra crearía una segunda alternativa de la misma original, y la que se aprobara segunda fallaría.
   - Que la fecha de la decisión la ponga un `Clock` inyectado — sería el único lugar del dominio que toma la hora del sistema.
 - **Consecuencia:** entre aceptar y aprobar la alternativa, la expedición no registra seguimiento (está suspendida) ni nuevos incidentes (D23). Si hace falta seguir trabajando, se reanuda la original y la alternativa queda sin aprobar.
+- **Revisado en D61:** "queda sin aprobar" no estaba garantizado por el código, y una alternativa armada antes de seguir ejecutando se aprobaba igual. Ahora la aprobación la rechaza. Reanudar y registrar un incidente nuevo también puede generar una segunda alternativa de la misma original, y la que queda vigente es la armada sobre lo último ejecutado.
 
 ### D48 — Auditoría: la propuesta es el registro, el plan original sigue siendo la expedición original (Entrega 2, F3, revisa D23)
 
@@ -1197,6 +1199,22 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - Recibir un `Supplier<ExpeditionId>` — no nombra el concepto en el lenguaje del dominio, y `ExpeditionRepository` no podría extenderlo con la misma claridad.
 - **Consecuencia:** un id de vista previa no sale del replanificador, porque `canPlan` descarta la alternativa que arma. Las llamadas a `build` con un repositorio siguen compilando sin cambios.
 
+### D61 — Una alternativa solo se aprueba si la original no siguió ejecutándose (corrección de la Entrega 2, F3, revisa D33 y D47)
+
+- **Origen:** corrección de la Entrega 2. Al aceptar una propuesta se suspende la original y se arma la alternativa en borrador. Si después se reanudaba la original y seguía ejecutándose, la alternativa vieja se aprobaba igual: volvía a agendar actividades hechas y a reservar sus insumos. Con un incidente nuevo, además, aprobar la primera dejaba la segunda sin poder aprobarse y sin ese incidente en la que quedaba vigente.
+- **Patrón / principio:** Information Expert: la expedición sabe qué ejecutó y si una alternativa se armó sobre su plan vigente. El chequeo va en el único punto por donde pasa cualquier reemplazo (`ApproveExpedition`), con el criterio de todo o nada de D27.
+- **Dónde:** `Expedition.executionRevision`, `isBuiltOnCurrentPlanOf` y `requireBuiltOnCurrentPlanOf`; value object `ReplacedPlan`, que reemplaza al id suelto de la expedición reemplazada; `ExpeditionBuilder.withReplacedExpedition(Expedition)`; `StaleAlternativeException`, que responde 409; `ApproveExpedition`; `QueryExpeditions.isStaleAlternative` y el campo `staleAlternative` de `ExpeditionResponse`.
+- **Por qué:**
+  - La revisión aumenta con lo que cambia lo que la alternativa copió de la original: iniciar o finalizar una actividad, registrar una observación y registrar un incidente. Reanudar y suspender no la cambian, así que reanudar sin ejecutar nada no invalida una alternativa que sigue siendo correcta.
+  - El chequeo corre antes de mutar nada, junto a `requireReplaceable`: si falla, la original, la alternativa, las reservas y el stock quedan como estaban.
+  - Vive en la aprobación y no en `resume`, así que también cubre una alternativa creada sin propuesta y un segundo incidente, sin que `TransitionExpedition` tenga que conocer las propuestas.
+  - La respuesta de la expedición dice si la alternativa está vencida (`staleAlternative`), para saberlo antes de intentar aprobarla. La propuesta sigue `ACCEPTED`, porque la decisión se tomó y queda auditada tal como fue.
+- **Alternativas descartadas:**
+  - Que reanudar descarte la alternativa y lo registre en la propuesta — no cubre la alternativa sin propuesta, pierde una alternativa válida cuando no se ejecutó nada y hace que las transiciones dependan de las propuestas.
+  - Comparar la alternativa con la original ítem por ítem — repite en otro lugar lo que la revisión ya responde, y las observaciones y los incidentes también cuentan.
+  - Usar la versión de la base de datos — cambia con cualquier modificación, incluso reanudar, y el dominio no debe conocerla.
+- **Consecuencia:** una alternativa vencida queda en borrador o en revisión como registro, sin poder aprobarse. Si todavía hace falta replanificar, se registra un incidente nuevo sobre la original en ejecución y se decide su propuesta. El consumo real y las reservas de la original no se tocan al rechazar la aprobación.
+
 ## Funcionalidades nuevas de la Entrega 2
 
 ### F1 — Actividades nocturnas
@@ -1361,6 +1379,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - `adapters.driving.rest.IncidentController` (módulo `web`) — `POST /api/expeditions/{id}/incidents`, que responde con la propuesta que generó (D58).
   - `adapters.driving.rest.ReplanProposalController` (módulo `web`) — las dos lecturas de propuestas y los dos sub-recursos de decisión (D58).
   - `rest.dtos.RegisterIncidentRequest`, `ReplanProposalResponse`, `ReplanOptionDto`, `ReplanDecisionDto`, `AcceptReplanOptionRequest`, `ReplanDecisionRequest` y `rest.mappers.ReplanningMapper` (módulo `web`) — D58. `IncidentDto` se reusa tal cual del informe (D57).
+  - `business.exceptions.StaleAlternativeException` y `business.models.expeditions.ReplacedPlan` — la alternativa vencida y la revisión de la original sobre la que se armó, agregadas en la corrección de la Entrega 2 (D61).
 - **Clases modificadas:**
   - `Incident` — suma id, actividad afectada, recurso y retraso informados.
   - `Expedition` — `registerIncident` reemplaza a `reportIncident` y guarda la bitácora (`getIncidents`); suma `suspendToReplan` y `requireResponsible`; el constructor recibe los incidentes heredados.
@@ -1370,6 +1389,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - `Itinerary` — suma `dependentsOf` y `movingWith`.
   - `ReplannedActivity` — suma los recursos que la actividad gana (`additions`).
   - `ExpeditionReplanner` — suma `canPlan`; aplica la cascada de cancelación y el arrastre de un retraso; rehace una actividad afectada que ya empezó; copia la bitácora de incidentes a la alternativa.
+  - `Expedition`, `ExpeditionBuilder`, `ApproveExpedition`, `QueryExpeditions` y `ExpeditionResponse` — llevan la revisión de ejecución y rechazan o informan una alternativa vencida (D61).
   - `ExpeditionReporter` — toma los incidentes de la expedición.
   - `Lookups` — suma la búsqueda de una propuesta.
   - `FieldOpsConfig` (módulo `web`) — el `ExpeditionReplanner` pasa a ser un bean compartido.

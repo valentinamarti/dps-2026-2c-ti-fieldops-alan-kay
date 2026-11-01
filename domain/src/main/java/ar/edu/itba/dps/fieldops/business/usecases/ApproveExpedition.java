@@ -45,6 +45,7 @@ public class ApproveExpedition {
     public void approve(Expedition expedition, List<AcceptedWarning> acceptances) {
         final var replaced = expedition.getReplacedExpedition().map(this::findReplaced);
         replaced.ifPresent(Expedition::requireReplaceable);
+        replaced.ifPresent(expedition::requireBuiltOnCurrentPlanOf);
         reservations.requireReservable(expedition);
         expedition.approve(additionalRules, acceptances);
         replaced.ifPresent(reservations::releaseFor);

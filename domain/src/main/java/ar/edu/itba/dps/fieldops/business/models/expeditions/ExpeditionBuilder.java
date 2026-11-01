@@ -24,7 +24,7 @@ public class ExpeditionBuilder {
     private String name;
     private TimePeriod period;
     private ExpeditionRestrictions restrictions;
-    private ExpeditionId replacedExpedition;
+    private ReplacedPlan replacedPlan;
     private ReplanReason replanReason;
 
     public ExpeditionBuilder withName(String name) {
@@ -71,8 +71,8 @@ public class ExpeditionBuilder {
         return this;
     }
 
-    public ExpeditionBuilder withReplacedExpedition(ExpeditionId original) {
-        this.replacedExpedition = original;
+    public ExpeditionBuilder withReplacedExpedition(Expedition original) {
+        this.replacedPlan = original.currentPlan();
         return this;
     }
 
@@ -92,7 +92,7 @@ public class ExpeditionBuilder {
 
     public Expedition build(ExpeditionIdProvider ids) {
         Objects.requireNonNull(ids, "ids are required");
-        final var expedition = new Expedition(ids.nextId(), name, period, objectives, zones, responsibles, restrictions, grantedPermits, replacedExpedition, replanReason, inheritedIncidents);
+        final var expedition = new Expedition(ids.nextId(), name, period, objectives, zones, responsibles, restrictions, grantedPermits, replacedPlan, replanReason, inheritedIncidents);
         plannedNodes.forEach(expedition::schedule);
         return expedition;
     }

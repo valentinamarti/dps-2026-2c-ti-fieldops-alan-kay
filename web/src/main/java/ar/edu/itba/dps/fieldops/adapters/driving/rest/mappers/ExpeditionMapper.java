@@ -31,6 +31,10 @@ public final class ExpeditionMapper {
     }
 
     public static ExpeditionResponse toResponse(Expedition expedition) {
+        return toResponse(expedition, false);
+    }
+
+    public static ExpeditionResponse toResponse(Expedition expedition, boolean staleAlternative) {
         final var restrictions = expedition.getRestrictions();
         return new ExpeditionResponse(
                 expedition.getId().value(),
@@ -43,7 +47,8 @@ public final class ExpeditionMapper {
                 Mappings.sorted(expedition.getGrantedPermits().stream().map(Permit::name)),
                 new RestrictionsDto(restrictions.maxParticipants(), restrictions.riskTolerance()),
                 expedition.getReplacedExpedition().map(ExpeditionId::value).orElse(null),
-                expedition.getReplacement().map(ExpeditionId::value).orElse(null));
+                expedition.getReplacement().map(ExpeditionId::value).orElse(null),
+                staleAlternative);
     }
 
     private static ExpeditionRestrictions toRestrictions(RestrictionsDto restrictions) {

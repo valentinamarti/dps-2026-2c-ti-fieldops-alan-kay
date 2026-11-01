@@ -62,7 +62,7 @@ public class ExpeditionReplanner {
 
     private ExpeditionBuilder draftReplacing(Expedition original, ReplanReason reason, Map<ItineraryItem, CarriedItem> carried) {
         final var builder = sameGeneralDataAs(original)
-                .withReplacedExpedition(original.getId())
+                .withReplacedExpedition(original)
                 .withReplanReason(reason);
         original.getIncidents().forEach(builder::addInheritedIncident);
         original.getItinerary().planKeepingStructure(item -> planOf(item, carried)).forEach(builder::addNode);

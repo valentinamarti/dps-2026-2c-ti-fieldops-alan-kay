@@ -17,6 +17,7 @@ import ar.edu.itba.dps.fieldops.business.exceptions.NotAResponsibleException;
 import ar.edu.itba.dps.fieldops.business.exceptions.NotFoundException;
 import ar.edu.itba.dps.fieldops.business.exceptions.ProposalAlreadyDecidedException;
 import ar.edu.itba.dps.fieldops.business.exceptions.ResourceUnavailableException;
+import ar.edu.itba.dps.fieldops.business.exceptions.StaleAlternativeException;
 import ar.edu.itba.dps.fieldops.business.exceptions.UnacceptedWarningException;
 import ar.edu.itba.dps.fieldops.business.exceptions.UnknownActivityTypeException;
 import org.springframework.http.HttpStatus;
@@ -53,6 +54,7 @@ public class DomainExceptionHandler extends ResponseEntityExceptionHandler {
             entry(DuplicateZoneException.class, HttpStatus.CONFLICT),
             entry(DuplicateReplanProposalException.class, HttpStatus.CONFLICT),
             entry(ProposalAlreadyDecidedException.class, HttpStatus.CONFLICT),
+            entry(StaleAlternativeException.class, HttpStatus.CONFLICT),
 
             entry(ExpeditionNotApprovableException.class, HttpStatus.UNPROCESSABLE_ENTITY),
             entry(UnacceptedWarningException.class, HttpStatus.UNPROCESSABLE_ENTITY),

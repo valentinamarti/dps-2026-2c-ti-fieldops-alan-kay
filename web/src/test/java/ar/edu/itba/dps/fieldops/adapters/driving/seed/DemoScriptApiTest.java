@@ -297,6 +297,64 @@ class DemoScriptApiTest {
                 .andExpect(jsonPath("$.incidents[0].id").value(expedition + "/incidents/1"));
     }
 
+    @Test
+    void anAlternativeBuiltBeforeTheOriginalKeptRunningAnswersConflictWhenApproved() throws Exception {
+        final var expedition = theDemoExpedition();
+        transition(expedition, "review").andExpect(status().isNoContent());
+        approveWithoutWarnings(expedition).andExpect(status().isNoContent());
+        transition(expedition, "execution").andExpect(status().isNoContent());
+        final var registered = api.perform(post("/api/expeditions/{id}/incidents", expedition)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {
+                                  "activityId": "a-08",
+                                  "description": "A storm is forecast over the wetland",
+                                  "occurredAt": "2026-11-02T07:00:00",
+                                  "expectedDelayMinutes": 120
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        final var accepted = api.perform(post("/api/replan-proposals/{proposalId}/acceptance",
+                        JsonPath.<String>read(registered, "$.id"))
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"optionNumber": 1, "responsibleId": "p-ada",
+                                 "justification": "We wait for the storm to pass",
+                                 "decidedAt": "2026-11-02T07:30:00"}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        final String alternative = JsonPath.read(accepted, "$.id");
+
+        transition(expedition, "resumption").andExpect(status().isNoContent());
+        api.perform(post("/api/expeditions/{id}/activities/{activityId}/start", expedition, "a-01")
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"at": "2026-11-02T08:00:00"}
+                                """))
+                .andExpect(status().isNoContent());
+        api.perform(post("/api/expeditions/{id}/activities/{activityId}/completion", expedition, "a-01")
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"at": "2026-11-02T12:30:00", "result": "The crew reached the coastal camp"}
+                                """))
+                .andExpect(status().isNoContent());
+        transition(expedition, "suspension").andExpect(status().isNoContent());
+        transition(alternative, "review").andExpect(status().isNoContent());
+
+        approveWithoutWarnings(alternative).andExpect(status().isConflict());
+
+        assertStatus(expedition, "SUSPENDED");
+        assertStatus(alternative, "IN_REVIEW");
+        api.perform(get("/api/expeditions/{id}", alternative))
+                .andExpect(jsonPath("$.staleAlternative").value(true));
+        api.perform(get("/api/expeditions/{id}", expedition))
+                .andExpect(jsonPath("$.staleAlternative").value(false))
+                .andExpect(jsonPath("$.replacementId").value(Matchers.nullValue()));
+    }
+
+    private ResultActions approveWithoutWarnings(String expedition) throws Exception {
+        return api.perform(post("/api/expeditions/{id}/approval", expedition)
+                .contentType(MediaType.APPLICATION_JSON).content("{}"));
+    }
+
     private String theDemoExpedition() throws Exception {
         final var expeditions = api.perform(get("/api/expeditions"))
                 .andExpect(status().isOk())

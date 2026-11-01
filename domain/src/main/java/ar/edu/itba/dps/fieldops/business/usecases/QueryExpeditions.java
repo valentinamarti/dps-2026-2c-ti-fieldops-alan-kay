@@ -22,4 +22,11 @@ public class QueryExpeditions {
     public List<Expedition> list() {
         return repository.findAll();
     }
+
+    public boolean isStaleAlternative(Expedition expedition) {
+        return expedition.getReplacedExpedition()
+                .flatMap(repository::findById)
+                .filter(original -> !expedition.isBuiltOnCurrentPlanOf(original))
+                .isPresent();
+    }
 }
