@@ -5,6 +5,7 @@ import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
 import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.IncidentReport;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
@@ -19,6 +20,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.completeAssignments;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
@@ -535,5 +537,29 @@ class ExpeditionReplannerTest {
 
         assertEquals(2, alternative.getItinerary().getNodes().size());
         assertTrue(alternative.getItinerary().itemFor(dependent).isPresent());
+    }
+
+    @Test
+    void takesTheIdOfTheAlternativeFromItsProvider() {
+        final var affectedItem = expedition.schedule(sampling("a-1", coast, hours(8, 18)), hours(9, 11));
+        approve();
+        final var alternativeId = new ExpeditionId("alternative");
+
+        final var alternative = new ExpeditionReplanner(() -> alternativeId)
+                .planAlternative(expedition, affectedItem, new Cancellation());
+
+        assertEquals(alternativeId, alternative.getId());
+    }
+
+    @Test
+    void canPlanDoesNotSpendAnIdOfItsProvider() {
+        final var affectedItem = expedition.schedule(sampling("a-1", coast, hours(8, 18)), hours(9, 11));
+        approve();
+        final var spentIds = new AtomicInteger();
+        final var counting = new ExpeditionReplanner(() -> new ExpeditionId("e-" + spentIds.incrementAndGet()));
+
+        assertTrue(counting.canPlan(expedition, affectedItem, new Cancellation()));
+
+        assertEquals(0, spentIds.get());
     }
 }

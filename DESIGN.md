@@ -47,8 +47,8 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
 - **Dónde:** `ExpeditionBuilder` + `Expedition` (en `business.models.expeditions`).
 - **Por qué:**
   - `Expedition` tiene muchos datos y colecciones (objetivos, zonas, responsables, permisos otorgados, restricciones, actividades), lo que hace ilegible un constructor tradicional. El constructor de `Expedition` es package-private: desde afuera del paquete, la única forma de crear una expedición es el builder.
-  - El builder no elige la identidad de la expedición: `build(ExpeditionRepository)` le pide el id al repositorio con `nextId()`, así que quien arma la expedición no lo inventa (D26).
-  - El builder no repite validaciones. `build(ExpeditionRepository)` llama al constructor, que aplica los guards de D16 (textos obligatorios, colecciones obligatorias y no vacías), y agenda las actividades con el mismo `Expedition.schedule` que se usa después de crear la expedición. Así las reglas para agendar (D21) viven en un solo lugar, se agende desde el builder o después.
+  - El builder no elige la identidad de la expedición: `build(ExpeditionIdProvider)` le pide el id a su proveedor con `nextId()`, así que quien arma la expedición no lo inventa (D26).
+  - El builder no repite validaciones. `build(ExpeditionIdProvider)` llama al constructor, que aplica los guards de D16 (textos obligatorios, colecciones obligatorias y no vacías), y agenda las actividades con el mismo `Expedition.schedule` que se usa después de crear la expedición. Así las reglas para agendar (D21) viven en un solo lugar, se agende desde el builder o después.
   - La validación de negocio pesada corre aparte, en `Expedition.approve` con la `ApprovalPolicy` (D22, D31), antes de permitir el paso a "Approved" — así el builder no termina siendo responsable de todo.
 - **Alternativas descartadas:**
   - Builder + Director — más estructura de la que hace falta para este caso.
@@ -346,16 +346,16 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
 
 - **Origen:** corrección de la Entrega 1, punto 5 (el id de la expedición lo inventa el cliente). Se construían dos expediciones con el mismo id sin ningún error. Evaluamos la sugerencia del informe (que la expedición obtenga su id de un `nextId()` en un repositorio) y la seguimos.
 - **Patrón / principio:** value object (D8) + Dependency Inversion (el negocio define el contrato del repositorio y la implementación es un detalle).
-- **Dónde:** `ExpeditionId`; interfaz `ExpeditionRepository` (en `business.providers`: `nextId`, `add`, `findById`) e implementación `InMemoryExpeditionRepository` (en `providers`); `DuplicateExpeditionException`; `ExpeditionBuilder.build(ExpeditionRepository)`; el caso de uso `CreateExpedition` (D28) y `ExpeditionReplanner`, que recibe el repositorio por constructor (D25).
+- **Dónde:** `ExpeditionId`; interfaz `ExpeditionRepository` (en `business.providers`: `nextId`, `add`, `findById`) e implementación `InMemoryExpeditionRepository` (en `providers`); `DuplicateExpeditionException`; `ExpeditionBuilder.build(ExpeditionIdProvider)`; el caso de uso `CreateExpedition` (D28) y `ExpeditionReplanner`, que recibe el proveedor de ids por constructor (D25, D60).
 - **Por qué:**
   - Las reservas y el stock reservado usan este id para saber de qué expedición son (D27, D30). Si el id pudiera repetirse, "liberar lo de e-1" sería ambiguo.
-  - No es el mismo caso que los recursos: el id de un recurso es **natural** (una patente, un documento), viene de afuera y el catálogo garantiza que no se repita (D18). El de una expedición es **sustituto**: no significa nada fuera del sistema, así que lo genera el sistema. El builder le pide el id al repositorio al construir (`build(repository)`): `CreateExpedition` construye la expedición y la guarda, y `ExpeditionReplanner` (que tiene el repositorio por constructor) construye así la alternativa de una replanificación, que `ReplanExpedition` guarda. Ningún cliente le pone el id a una expedición. Dos `build` seguidos con el mismo repositorio dan ids distintos. `add` rechaza un id que ya existe, con el mismo criterio que el catálogo.
-  - El builder ya no tiene `withId` ni un `build` que reciba un id: recibe el repositorio en `build(ExpeditionRepository)` y de ahí saca el id. Arma la expedición con los datos de negocio, pero no permite inventarle la identidad. Para tener ids predecibles, los tests usan un repositorio de prueba que los da en secuencia (`e-1`, `e-2`).
+  - No es el mismo caso que los recursos: el id de un recurso es **natural** (una patente, un documento), viene de afuera y el catálogo garantiza que no se repita (D18). El de una expedición es **sustituto**: no significa nada fuera del sistema, así que lo genera el sistema. El builder le pide el id al repositorio al construir (`build(repository)`): `CreateExpedition` construye la expedición y la guarda, y `ExpeditionReplanner` (que tiene el proveedor de ids por constructor, D60) construye así la alternativa de una replanificación, que `ReplanExpedition` guarda. Ningún cliente le pone el id a una expedición. Dos `build` seguidos con el mismo repositorio dan ids distintos. `add` rechaza un id que ya existe, con el mismo criterio que el catálogo.
+  - El builder ya no tiene `withId` ni un `build` que reciba un id: recibe un proveedor en `build(ExpeditionIdProvider)` y de ahí saca el id; en producción ese proveedor es el repositorio (D60). Arma la expedición con los datos de negocio, pero no permite inventarle la identidad. Para tener ids predecibles, los tests usan un repositorio de prueba que los da en secuencia (`e-1`, `e-2`).
   - El repositorio es una interfaz de `business.providers` porque dónde se guardan las expediciones es un detalle (Clase 3). La implementación en memoria usa UUID, así que dos ids generados no coinciden aunque haya expediciones cargadas de otro lado.
   - Como value object, `ExpeditionId` compara por valor (D15), falla en blanco o nulo con la división de D16 y su `toString()` devuelve solo el valor.
 - **Alternativas descartadas:**
   - Dejar el `String` y controlar solo la unicidad — no evita confundirlo con otro id.
-  - Un `IdGenerator` aparte del repositorio — generar el id y garantizar que no se repita quedarían en lugares distintos, y la unicidad depende de lo que ya está guardado.
+  - Un `IdGenerator` aparte del repositorio — generar el id y garantizar que no se repita quedarían en lugares distintos, y la unicidad depende de lo que ya está guardado. **Revisado en D60:** el contrato de generar se separó, pero el repositorio lo sigue cumpliendo, así que las dos responsabilidades siguen juntas en producción.
   - Dejar `withId` y validar la unicidad recién al guardar — el builder seguiría invitando a inventar el id.
 
 
@@ -1181,6 +1181,21 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
 - **Consecuencia:**
   - `InsufficientSuppliesValidation` tiene el mismo defecto latente y **no se arregló acá**: usa `reservationsItTakesOver()`, así que el stock que una expedición aprobada tiene reservado para sí misma se descuenta de lo que tiene disponible, y un consumible con stock de menos del doble de lo que el plan pide se reportaría como insuficiente después de aprobar. La demo no lo muestra porque el seed deja justo el doble (20 contenedores para 10, 12 reactivos para 6, 200 litros para 56), y arreglarlo es un cambio de dominio que este tramo no tenía en alcance. Queda anotado en el plan: la corrección es que esa regla pregunte por `reservationsItDoesNotCompeteWith()`, la misma línea que acá.
   - Validar un plan aprobado ahora dice la verdad, y eso es lo que hace útil al endpoint: las críticas que aparezcan son recursos que se cayeron después de aprobar, que es cuando conviene replanificar (D46, D47).
+
+### D60 — El id de una expedición sale de un proveedor y no de todo el repositorio (corrección de la Entrega 2, revisa D26)
+
+- **Origen:** observación de la corrección de la Entrega 2. Para armar la alternativa de prueba de `canPlan`, `ExpeditionReplanner` implementaba un `ExpeditionRepository` entero (`PreviewIds`) que no cumplía el contrato: `nextId()` devolvía siempre `preview` y `add` lanzaba `UnsupportedOperationException`. La causa era que `ExpeditionBuilder.build` recibía todo el repositorio y solo usaba `nextId()`.
+- **Patrón / principio:** Interface Segregation y Liskov Substitution: el builder y el replanificador dependen solo de lo que usan, y ninguna clase promete un contrato que no cumple.
+- **Dónde:** interfaz `ExpeditionIdProvider` (en `business.providers`), que `ExpeditionRepository` extiende; `ExpeditionBuilder.build(ExpeditionIdProvider)`; `ExpeditionReplanner`, cuyo constructor recibe el proveedor y cuya vista previa es una lambda; `FieldOpsConfig`.
+- **Por qué:**
+  - La vista previa de `canPlan` necesita un id y nada más, y nunca se guarda. Con un proveedor alcanza una lambda.
+  - `ExpeditionRepository` extiende el proveedor, así que quien genera un id en producción sigue siendo el repositorio, y `add` sigue garantizando la unicidad que D26 quiere junto a él.
+  - Agregar `save` al puerto para la persistencia real habría obligado a `PreviewIds` a implementar otro método que tampoco cumplía.
+- **Alternativas descartadas:**
+  - Mantener `PreviewIds` — seguiría siendo una implementación del puerto que no respeta su contrato.
+  - Validar el plan sin construir la expedición — duplicaría las reglas de armado que hoy aplica el builder.
+  - Recibir un `Supplier<ExpeditionId>` — no nombra el concepto en el lenguaje del dominio, y `ExpeditionRepository` no podría extenderlo con la misma claridad.
+- **Consecuencia:** un id de vista previa no sale del replanificador, porque `canPlan` descarta la alternativa que arma. Las llamadas a `build` con un repositorio siguen compilando sin cambios.
 
 ## Funcionalidades nuevas de la Entrega 2
 

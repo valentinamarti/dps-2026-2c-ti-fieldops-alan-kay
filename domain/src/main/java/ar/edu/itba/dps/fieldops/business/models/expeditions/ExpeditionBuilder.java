@@ -6,7 +6,7 @@ import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
-import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
+import ar.edu.itba.dps.fieldops.business.providers.ExpeditionIdProvider;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -90,9 +90,9 @@ public class ExpeditionBuilder {
         return addNode(PlannedNode.finished(finished));
     }
 
-    public Expedition build(ExpeditionRepository repository) {
-        Objects.requireNonNull(repository, "repository is required");
-        final var expedition = new Expedition(repository.nextId(), name, period, objectives, zones, responsibles, restrictions, grantedPermits, replacedExpedition, replanReason, inheritedIncidents);
+    public Expedition build(ExpeditionIdProvider ids) {
+        Objects.requireNonNull(ids, "ids are required");
+        final var expedition = new Expedition(ids.nextId(), name, period, objectives, zones, responsibles, restrictions, grantedPermits, replacedExpedition, replanReason, inheritedIncidents);
         plannedNodes.forEach(expedition::schedule);
         return expedition;
     }

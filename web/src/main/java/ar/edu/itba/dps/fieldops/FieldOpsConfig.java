@@ -4,6 +4,7 @@ import ar.edu.itba.dps.fieldops.adapters.driven.InMemoryExpeditionRepository;
 import ar.edu.itba.dps.fieldops.adapters.driven.InMemoryZoneRepository;
 import ar.edu.itba.dps.fieldops.business.estimations.ExpeditionEstimator;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.providers.ExpeditionIdProvider;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
 import ar.edu.itba.dps.fieldops.business.replanning.ExpeditionReplanner;
@@ -70,8 +71,8 @@ public class FieldOpsConfig {
     }
 
     @Bean
-    ExpeditionReplanner expeditionReplanner(ExpeditionRepository repository) {
-        return new ExpeditionReplanner(repository);
+    ExpeditionReplanner expeditionReplanner(ExpeditionIdProvider ids) {
+        return new ExpeditionReplanner(ids);
     }
 
     @Bean
