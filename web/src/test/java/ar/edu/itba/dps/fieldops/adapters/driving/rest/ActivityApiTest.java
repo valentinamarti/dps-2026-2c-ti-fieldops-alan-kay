@@ -148,6 +148,28 @@ class ActivityApiTest {
                 .andExpect(jsonPath("$.detail").value("Night sampling must be scheduled within its time window"));
     }
 
+    @Test
+    void answersBadRequestWhenTheScheduleIsShorterThanTheEstimateOfTheActivity() throws Exception {
+        final var expedition = anExpeditionInTheCoastalReef();
+
+        scheduleIn(expedition, """
+                {
+                  "id": "a-1",
+                  "name": "Reef sampling",
+                  "timeWindow": {"start": "2026-10-01T08:00:00", "end": "2026-10-01T18:00:00"},
+                  "scheduledPeriod": {"start": "2026-10-01T09:00:00", "end": "2026-10-01T10:00:00"},
+                  "zoneId": "z-1",
+                  "dependencyIds": [],
+                  "type": "Sample collection",
+                  "parameters": {"sampleCount": 3},
+                  "atNight": false
+                }
+                """)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(
+                        "Reef sampling is estimated to take 120 minutes and cannot be scheduled for 60"));
+    }
+
     private ResultActions scheduleIn(String expeditionId, String body) throws Exception {
         return api.perform(post("/api/expeditions/{expeditionId}/activities", expeditionId)
                 .contentType(MediaType.APPLICATION_JSON).content(body));

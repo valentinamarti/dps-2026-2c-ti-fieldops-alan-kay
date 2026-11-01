@@ -40,6 +40,10 @@ public class ItineraryItem implements ItineraryNode {
         if (!activity.getTimeWindow().contains(scheduledPeriod)) {
             throw new InvalidScheduleException("%s must be scheduled within its time window".formatted(activity.getName()));
         }
+        if (scheduledPeriod.duration().compareTo(activity.estimatedDuration()) < 0) {
+            throw new InvalidScheduleException("%s is estimated to take %d minutes and cannot be scheduled for %d"
+                    .formatted(activity.getName(), activity.estimatedDuration().toMinutes(), scheduledPeriod.duration().toMinutes()));
+        }
     }
 
     static ItineraryItem finishedCopyOf(ItineraryItem finished) {

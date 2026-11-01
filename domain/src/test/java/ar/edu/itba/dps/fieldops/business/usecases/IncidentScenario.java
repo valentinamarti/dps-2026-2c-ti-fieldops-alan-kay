@@ -24,6 +24,7 @@ import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.comp
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.createExpeditionOn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.oneHourSampling;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.sampling;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
@@ -50,7 +51,7 @@ final class IncidentScenario {
     final Person outsider = person("p-99");
     final Activity morning = sampling("a-1", coast, hours(8, 18));
     final Activity afternoon = sampling("a-2", coast, hours(8, 18));
-    final Activity dependent = sampling("a-3", coast, hours(8, 18), afternoon);
+    final Activity dependent = oneHourSampling("a-3", coast, hours(8, 18), afternoon);
     final Expedition expedition;
 
     IncidentScenario() {

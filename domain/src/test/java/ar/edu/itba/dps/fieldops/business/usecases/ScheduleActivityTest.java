@@ -73,6 +73,7 @@ class ScheduleActivityTest {
         final var diving = scheduleActivity.schedule(command("a-1")
                 .typeName("Diving")
                 .parameters(Map.of("maxDepthMeters", 40))
+                .scheduledPeriod(hours(9, 12))
                 .build());
 
         assertEquals(RiskLevel.HIGH, diving.estimatedRisk());

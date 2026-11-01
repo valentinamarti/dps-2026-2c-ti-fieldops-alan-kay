@@ -10,7 +10,7 @@ import java.util.List;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
-import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.sampling;
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.oneHourSampling;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
 import static ar.edu.itba.dps.fieldops.business.models.expeditions.PlannedNode.activity;
 import static ar.edu.itba.dps.fieldops.business.models.expeditions.PlannedNode.parallel;
@@ -24,7 +24,7 @@ class ItineraryCascadeTest {
     private final Itinerary itinerary = expedition.getItinerary();
 
     private Activity activityAt(String id, Activity... dependencies) {
-        return sampling(id, coast, hours(0, 24), dependencies);
+        return oneHourSampling(id, coast, hours(0, 24), dependencies);
     }
 
     private ItineraryItem itemOf(Activity activity) {

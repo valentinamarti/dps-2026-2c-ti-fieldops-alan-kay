@@ -63,6 +63,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
 - **Dónde:** `ExpeditionEstimator` (en `business.estimations`) y su resultado `ExpeditionEstimate` (en `business.models.estimation`); el informe (`ExpeditionReporter` + `ExpeditionReport`) reutiliza este servicio.
 - **Por qué:** la estimación no calcula nada propio: recorre el itinerario y le pregunta a cada actividad, que a su vez delega en su `ActivityRules` (D1), así que agregar un tipo de actividad no toca al estimador. Las tres agregaciones tienen reglas distintas: la duración se suma, el riesgo global es el más alto de sus actividades (`RiskLevel.isAbove`) y el consumo se acumula por categoría sumando `Quantity`, que es la aritmética que ya existe (D8). Estimar no cambia nada ni exige un estado, así que se puede estimar un borrador, que es cuando más sirve para decidir. El equipamiento no se agrega: sumar "1 bote" de tres actividades daría 3 botes cuando puede ser el mismo reutilizado, y lo que hace falta por actividad ya lo verifica `MissingResourcesValidation` (D2).
 - **Alternativas descartadas:** calcular el resumen de riesgos del informe con lógica propia, independiente de `ExpeditionEstimator` — duplicaría reglas de cálculo. Builder para `ExpeditionEstimate` — no tiene invariantes que proteger, es una proyección de datos. Que la duración total sea el lapso entre el primer inicio y el último fin del itinerario — eso mide cuánto dura el plan en el calendario y no cuánto trabajo hay, porque los huecos entre actividades no son esfuerzo estimado.
+- **Revisado en D62:** la estimación mide cuánto tarda en ejecutarse, sin contar huecos, y no cuánto trabajo hay: esa formulación explicaba la suma pero no el máximo de un paralelo.
 - **Revisado en D39:** la duración ya no es una suma plana de todas las actividades. El estimador agrega sobre los nodos raíz del itinerario, y cada bloque combina a sus hijos: suma en secuencial y máximo en paralelo. Un itinerario sin bloques da el mismo resultado que antes. El riesgo y el consumo se siguen combinando igual (el más alto y la suma).
 
 
@@ -282,7 +283,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
 - **Patrón / principio:** fail fast para planes mal formados + separación entre "está bien formado" y "es válido para operar" (mismo criterio que D3).
 - **Dónde:** `Expedition.schedule`, `Itinerary.add` e `ItineraryItem` lanzan `InvalidScheduleException`; `TimePeriod.contains`.
 - **Por qué:**
-  - Al agendar se rechaza lo que no tiene sentido como plan, sin importar qué recursos haya: una actividad en una zona que no es de la expedición, un horario fuera del período de la expedición o fuera de la ventana de la actividad, la misma actividad dos veces, o una actividad cuya dependencia no está agendada o todavía no terminó. Tampoco se reasigna un ítem que ya ocurrió (D33). Son errores de quien arma el itinerario y conviene enterarse en el momento.
+  - Al agendar se rechaza lo que no tiene sentido como plan, sin importar qué recursos haya: una actividad en una zona que no es de la expedición, un horario fuera del período de la expedición o fuera de la ventana de la actividad, un horario más corto que la duración estimada de la actividad (D62), la misma actividad dos veces, o una actividad cuya dependencia no está agendada o todavía no terminó. Tampoco se reasigna un ítem que ya ocurrió (D33). Son errores de quien arma el itinerario y conviene enterarse en el momento.
   - En cambio, la superposición de recursos, la falta de recursos, las certificaciones, los permisos y la capacidad dependen de asignaciones y del catálogo, que cambian mientras se planifica. Esos problemas se juntan todos con la validación (D2) en vez de frenar en el primero, porque un borrador puede estar incompleto a propósito.
   - Exigir que las dependencias ya estén agendadas obliga a armar el itinerario en orden, y a cambio garantiza que ninguna actividad queda antes de algo que necesita.
   - La contención de períodos vive en `TimePeriod.contains`, junto a `overlapsWith` y con el mismo intervalo semiabierto de D8: una actividad puede empezar justo cuando termina su dependencia.
@@ -616,7 +617,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
 - **Patrón / principio:** fail fast para planes mal formados, con cada invariante en el objeto que lo puede garantizar (mismo criterio que D21).
 - **Dónde:** constructores de `ItineraryBlock` y `SequentialBlock`; `Expedition.schedule(PlannedNode)`; `Itinerary.add`. Todos lanzan `InvalidScheduleException`.
 - **Por qué:**
-  - Se rechaza al agendar, sin importar qué recursos haya: un bloque vacío; un secuencial donde un hijo empieza antes de que termine el anterior; una actividad del bloque fuera de las zonas o del período de la expedición, o fuera de su ventana; una actividad que ya está agendada o que aparece dos veces en el bloque; una dependencia sin agendar o que termina después; y una dependencia entre ramas paralelas.
+  - Se rechaza al agendar, sin importar qué recursos haya: un bloque vacío; un secuencial donde un hijo empieza antes de que termine el anterior; una actividad del bloque fuera de las zonas o del período de la expedición, fuera de su ventana o con un horario más corto que su estimación (D62); una actividad que ya está agendada o que aparece dos veces en el bloque; una dependencia sin agendar o que termina después; y una dependencia entre ramas paralelas.
   - En un secuencial, "cada hijo empieza cuando terminó el anterior" significa que no empieza antes, con huecos permitidos. Es la misma comparación que usan las dependencias (D21), con el borde compartido válido (D8): un plan real tiene traslados y esperas entre una actividad y la siguiente.
   - El orden de un secuencial es el declarado y no se reordena por horario: si se declara `[A, B]` y B está agendada antes que A, el bloque se rechaza. Un hijo que es un bloque ocupa su lugar con su período completo.
   - Un paralelo no exige nada a los horarios de sus ramas: pueden pisarse o no.
@@ -1215,6 +1216,24 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - Usar la versión de la base de datos — cambia con cualquier modificación, incluso reanudar, y el dominio no debe conocerla.
 - **Consecuencia:** una alternativa vencida queda en borrador o en revisión como registro, sin poder aprobarse. Si todavía hace falta replanificar, se registra un incidente nuevo sobre la original en ejecución y se decide su propuesta. El consumo real y las reservas de la original no se tocan al rechazar la aprobación.
 
+### D62 — Una actividad no se agenda por menos que su estimación (corrección de la Entrega 2, F2, revisa D4, D21, D39 y D40)
+
+- **Origen:** corrección de la Entrega 2. Una recolección estimada en 2 h se podía agendar de 9 a 10, seguida de otra de 10 a 12 con la misma persona, y la validación no reportaba superposición aunque según la estimación esa persona seguía ocupada. D21 y D40 no decían qué pasaba con ese caso, y la justificación "cuánto trabajo hay" no explicaba el máximo de un bloque paralelo.
+- **Patrón / principio:** fail fast para un plan mal formado, con el mismo criterio de D21: el dato depende solo de la actividad y del horario, no de recursos ni del catálogo. La invariante vive en el objeto que la puede garantizar, el constructor de `ItineraryItem`.
+- **Dónde:** `ItineraryItem`, junto a la verificación de la ventana. Lanza `InvalidScheduleException`, que la API responde con 400.
+- **Por qué:**
+  - Al estar en el constructor del ítem cubre todos los caminos: actividad suelta, bloque, builder y replanificación. Un retraso corre el horario sin acortarlo, así que una alternativa no puede violarla.
+  - Un período más largo que la estimación sigue siendo válido: un plan real tiene márgenes.
+  - La superposición sigue comparando períodos agendados. Con esta regla, ningún período esconde tiempo estimado, y no hace falta una segunda definición de cuándo está ocupado un recurso.
+  - El período de un bloque nunca dura menos que su estimación: cada hoja dura al menos lo estimado, un secuencial no solapa a sus hijos y un paralelo dura al menos lo que su rama más larga.
+  - **La duración estimada mide cuánto tarda en ejecutarse, sin contar huecos.** Por eso en paralelo se toma el máximo, porque los tiempos se solapan, y no la suma, que sería el trabajo total.
+  - **El estimador sigue sumando los nodos raíz aunque se pisen en el calendario.** Queda como definición: dos raíces no declaran que corran a la vez, y quien quiera ese máximo lo expresa con un bloque paralelo. No es el lapso del plan, que D4 ya descartó.
+- **Alternativas descartadas:**
+  - Una advertencia aceptable con regla propia — permitiría comprimir un plan con justificación, pero obligaría a definir contra qué período comparan la superposición, el orden del secuencial y las reservas.
+  - Hacer que la superposición compare contra la estimación además del período — el mismo problema repartido en varias validaciones, y las reservas seguirían usando el período agendado.
+  - Rechazar en `Expedition.schedule` — no cubriría los ítems que se arman desde un `PlannedNode`.
+- **Consecuencia:** quien agenda se entera en el momento si el horario no alcanza. Si la operación real se va a hacer más rápido, hay que cambiar los parámetros de la actividad, porque la estimación es lo que declara cuánto tarda. El seed y `demo.http` ya cumplían la regla y no cambiaron. Los tests cuyo punto no es la duración usan `oneHourSampling`, un fixture con una estimación de 1 h, porque ninguna regla real baja de ese tiempo con la asignación que esos tests necesitan.
+
 ## Funcionalidades nuevas de la Entrega 2
 
 ### F1 — Actividades nocturnas
@@ -1466,7 +1485,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
 - El enunciado nombra seis estados de una expedición. Agregamos un séptimo, reemplazada (`REPLACED`), para la expedición original cuando se aprueba la alternativa de una replanificación (D33): no es una cancelación ni una finalización, y necesitaba su propio estado terminal.
 - En un bloque secuencial se admiten huecos entre un hijo y el siguiente: el enunciado dice que se ejecutan en secuencia, no que sean contiguos (D40).
 - Un bloque paralelo declara que sus ramas pueden ejecutarse a la vez. Por eso dos ramas no comparten un recurso reutilizable ni tienen dependencias entre sí, aunque sus horarios agendados no se pisen (D40, D41).
-- La duración estimada de un bloque sale de la duración estimada de sus actividades (D4), no de su período agendado: el período dice cuándo ocurre y la estimación, cuánto trabajo hay.
+- La duración estimada de un bloque sale de la duración estimada de sus actividades (D4), no de su período agendado: el período dice cuándo ocurre y la estimación, cuánto tarda en ejecutarse sin contar huecos. En paralelo los tiempos se solapan y por eso se toma el máximo, y en secuencia se suman. Como ninguna actividad se agenda por menos que su estimación (D62), el período de un bloque nunca dura menos que su duración estimada.
 - El consumo estimado de un bloque paralelo es la suma del de sus ramas y no el máximo: los consumibles se gastan aunque las actividades corran a la vez.
 - Los valores de `DroneSurveyRules`, `WildlifeObservationRules`, `WaterQualityMeasurementRules` y `TransferRules` (tiempos, umbrales de riesgo, personal, equipamiento y consumo) son ilustrativos, igual que los de los dos tipos de la Entrega 1: el enunciado no los define.
 - Una actividad nocturna se declara como tal al crearla; no se infiere de su horario. El enunciado la describe como una variante con requisitos propios, y cuándo es de noche depende del lugar y de la época, que el modelo no conoce. Nada verifica que su horario agendado caiga de noche.
