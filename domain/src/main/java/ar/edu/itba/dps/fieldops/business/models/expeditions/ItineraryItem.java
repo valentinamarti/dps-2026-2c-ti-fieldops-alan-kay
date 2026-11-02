@@ -55,6 +55,20 @@ public class ItineraryItem implements ItineraryNode {
         return copy;
     }
 
+    static ItineraryItem restored(ItemSnapshot snapshot) {
+        final var item = new ItineraryItem(snapshot.activity(), snapshot.scheduledPeriod());
+        item.assignedStaff.addAll(snapshot.staff());
+        item.assignedEquipment.addAll(snapshot.equipment());
+        item.assignedSupplies.addAll(snapshot.supplies());
+        item.tracking = snapshot.tracking().map(ActivityTracking::restored).orElse(null);
+        return item;
+    }
+
+    ItemSnapshot snapshot() {
+        return new ItemSnapshot(activity, scheduledPeriod, List.copyOf(assignedStaff), List.copyOf(assignedEquipment),
+                List.copyOf(assignedSupplies), getTracking().map(ActivityTracking::snapshot));
+    }
+
     public boolean isFor(Activity activity) {
         return this.activity.equals(activity);
     }

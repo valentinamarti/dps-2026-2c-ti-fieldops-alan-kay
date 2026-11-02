@@ -4,4 +4,6 @@ import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 
 public interface Resource {
     ResourceId getId();
+
+    <T> T accept(ResourceVisitor<T> visitor);
 }

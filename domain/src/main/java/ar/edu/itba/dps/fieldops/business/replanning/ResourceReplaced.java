@@ -1,6 +1,7 @@
 package ar.edu.itba.dps.fieldops.business.replanning;
 
 import ar.edu.itba.dps.fieldops.business.interfaces.replanning.ReplanReason;
+import ar.edu.itba.dps.fieldops.business.interfaces.replanning.ReplanReasonVisitor;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ReplannedActivity;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ResourceAssignment;
@@ -20,5 +21,10 @@ public record ResourceReplaced(ResourceId withdrawn, ResourceAssignment replacem
     public Optional<ReplannedActivity> replan(ItineraryItem affected) {
         return Optional.of(new ReplannedActivity(affected.getScheduledPeriod(),
                 candidate -> !candidate.getId().equals(withdrawn), List.of(replacement)));
+    }
+
+    @Override
+    public <T> T accept(ReplanReasonVisitor<T> visitor) {
+        return visitor.resourceReplaced(withdrawn, replacement);
     }
 }

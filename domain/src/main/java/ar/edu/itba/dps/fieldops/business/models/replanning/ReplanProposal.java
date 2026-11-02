@@ -35,6 +35,21 @@ public class ReplanProposal {
         this.options = DomainArguments.requireList(options, "options");
     }
 
+    public static ReplanProposal restore(ReplanProposalSnapshot snapshot) {
+        final var proposal = new ReplanProposal(snapshot.id(), snapshot.originalExpedition(), snapshot.incident(), snapshot.options());
+        proposal.status = snapshot.status();
+        proposal.decision = snapshot.decision().orElse(null);
+        proposal.chosenOption = snapshot.chosenOption().orElse(null);
+        proposal.alternative = snapshot.alternative().orElse(null);
+        proposal.supersededBy = snapshot.supersededBy().orElse(null);
+        return proposal;
+    }
+
+    public ReplanProposalSnapshot snapshot() {
+        return new ReplanProposalSnapshot(id, originalExpedition, incident, options, status, getDecision(),
+                getChosenOptionNumber(), getAlternative(), getSupersededBy());
+    }
+
     public ActivityId getAffectedActivity() {
         return incident.activity();
     }
@@ -95,5 +110,15 @@ public class ReplanProposal {
 
     public Optional<ReplanProposalId> getSupersededBy() {
         return Optional.ofNullable(supersededBy);
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        return other instanceof ReplanProposal that && id.equals(that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return id.hashCode();
     }
 }

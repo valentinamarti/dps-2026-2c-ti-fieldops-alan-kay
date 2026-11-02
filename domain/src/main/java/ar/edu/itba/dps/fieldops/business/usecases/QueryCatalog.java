@@ -1,10 +1,7 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
-import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
-import ar.edu.itba.dps.fieldops.business.models.resources.Instrument;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
-import ar.edu.itba.dps.fieldops.business.models.resources.Vehicle;
 import ar.edu.itba.dps.fieldops.business.models.responses.InstrumentView;
 import ar.edu.itba.dps.fieldops.business.models.responses.PersonView;
 import ar.edu.itba.dps.fieldops.business.models.responses.SupplyView;
@@ -33,7 +30,7 @@ public class QueryCatalog implements QueryCatalogPort {
 
     @Override
     public List<VehicleView> vehicles() {
-        return Lookups.onlyOf(catalog.allEquipment(), Vehicle.class).stream().map(VehicleView::of).toList();
+        return ResourceKinds.only(ResourceKinds.VEHICLES, catalog.allEquipment()).stream().map(VehicleView::of).toList();
     }
 
     @Override
@@ -43,7 +40,7 @@ public class QueryCatalog implements QueryCatalogPort {
 
     @Override
     public List<InstrumentView> instruments() {
-        return Lookups.onlyOf(catalog.allEquipment(), Instrument.class).stream().map(InstrumentView::of).toList();
+        return ResourceKinds.only(ResourceKinds.INSTRUMENTS, catalog.allEquipment()).stream().map(InstrumentView::of).toList();
     }
 
     @Override
@@ -53,7 +50,7 @@ public class QueryCatalog implements QueryCatalogPort {
 
     @Override
     public List<SupplyView> supplies() {
-        return Lookups.onlyOf(catalog.allSupplies(), Depletable.class).stream().map(SupplyView::of).toList();
+        return ResourceKinds.only(ResourceKinds.SUPPLIES, catalog.allSupplies()).stream().map(SupplyView::of).toList();
     }
 
     @Override

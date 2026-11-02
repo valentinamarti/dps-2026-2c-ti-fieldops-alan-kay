@@ -197,6 +197,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
 - **Caso aparte — `Depletable.getStock()`:** este sí se expone. `stock` es un campo mutable (se reasigna al consumir) pero el `Quantity` que devuelve es inmutable (D8), así que entrega una foto del estado actual y no una referencia con la que romper invariantes. El informe de expedición (D4) necesita leer el consumo real, y no hay forma de obtenerlo preguntando `hasStockFor`.
 - **Nota de build:** desde JDK 23 `javac` no corre los annotation processors que encuentra en el classpath. Lombok tiene que declararse explícitamente en el `<annotationProcessorPaths>` del `maven-compiler-plugin`; si falta, `@Getter` no genera nada y el proyecto no compila. El plugin ya activa el procesamiento por su cuenta al ver esa lista, así que no hace falta agregar `<proc>full</proc>`.
 - **Alternativas descartadas:** `equals`/`hashCode` por `id` en las entidades — dos instancias con el mismo `id` pero distinto estado (distintas reservas, distinto stock) se tratarían como la misma. Hacer `record` todas las clases — los recursos son mutables por definición (se reservan, se consumen) y `Activity` referencia otras `Activity`, donde la identidad es justamente lo que importa. El caso menos obvio es `Zone`, que es inmutable y técnicamente podría ser un `record`: se deja como entidad porque pertenece a un catálogo y las expediciones la referencian por identidad — dos zonas con el mismo nombre son dos zonas distintas, no la misma.
+- **Revisado en D65:** las entidades ahora se comparan por id. Con persistencia real, dos cargas de la misma entidad dan dos instancias, y la identidad de instancia dejó de coincidir con la identidad de negocio. `ItineraryItem` sigue por instancia.
 - **Revisado en D46 y D48:** suma la entidad `ReplanProposal` y los `record` `Incident`, `IncidentId`, `IncidentReport`, `IncidentRegistered`, `ReplanProposalId`, `ReplanOption`, `ReplanDecision` y `ResourceReplaced`. `ResourceAssignment` es un value object que no es `record` porque guarda la forma de asignar su recurso; compara por el recurso.
 
 
@@ -235,7 +236,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
 - **Dónde:** `ResourceCatalog` (`addStaff`, `addEquipment`, `addSupply`, `availableStaffFor`, `availableEquipmentFor`, `suppliesCovering`) y `DuplicateResourceException`.
 - **Por qué:**
   - El enunciado nombra los "recursos duplicados" como uno de los problemas a resolver. El catálogo rechaza un segundo recurso con un `ResourceId` ya registrado (D32), con un único espacio de ids para todos los tipos: una asignación o un informe que nombra un `id` nunca es ambiguo.
-  - Es lo que hace seguro comparar entidades por instancia (D15): con una sola instancia por `id`, la identidad de instancia coincide con la identidad de negocio y no puede haber dos calendarios para el mismo recurso real.
+  - **Revisado en D65:** las entidades se comparan por id, y el catálogo sigue garantizando un único recurso por id. Era lo que hacía seguro comparar entidades por instancia (D15): con una sola instancia por `id`, la identidad de instancia coincide con la identidad de negocio y no puede haber dos calendarios para el mismo recurso real.
   - Las consultas devuelven **candidatos**, no asignaciones: el catálogo responde "quién puede" (cumple el requisito y está libre, o tiene stock); "quién va" es trabajo de la asignación. Si cambia el criterio para elegir entre candidatos, el catálogo no cambia.
   - Mismo criterio que D14: registrar es un comando y falla con excepción; consultar devuelve una lista, posiblemente vacía.
 - **Alternativas descartadas:**
@@ -1269,6 +1270,26 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - Seguir devolviendo entidades — menos trabajo, pero no cumple lo que pide el esquema, y el adaptador podría mutar el dominio fuera de un caso de uso.
   - Interfaces de solo lectura implementadas por las entidades — evitan copiar, pero con la persistencia real expondrían objetos atados a una transacción ya cerrada.
 - **Consecuencia:** cada campo nuevo que se quiera exponer pasa por la vista y por el mapper. Los tests de los casos de uso buscan la entidad en el repositorio cuando necesitan seguir operando sobre ella. La distinción de equipo por tipo en `FindAssignmentCandidates` y `QueryCatalog` sigue filtrando por clase hasta que el equipo tenga su visitor.
+
+### D65 — El dominio se puede guardar y reconstruir (corrección de la Entrega 2, persistencia, revisa D15 y D53)
+
+- **Origen:** corrección de la Entrega 2, que pide persistencia real. Antes del adaptador había cuatro bloqueos en el dominio: las entidades se comparaban por instancia, el estado no se podía fijar desde afuera sin saltear reglas, las reglas de una actividad no se podían guardar y varios tipos solo se distinguían preguntando la clase.
+- **Patrón / principio:** Memento para guardar y restaurar sin abrir el encapsulamiento + Visitor con el criterio de D54 para variantes que hay que traducir.
+- **Dónde:** `equals` y `hashCode` por id en `ScheduledResource`, `Depletable`, `Zone`, `Activity`, `Expedition` y `ReplanProposal`; `ExpeditionSnapshot`, `NodeSnapshot`, `ItemSnapshot`, `BlockSnapshot`, `BlockKind`, `TrackingSnapshot`, `ReplacedPlan`, `ReplanProposalSnapshot` y `CalendarSnapshot`; `Expedition.snapshot/restore`, `ReplanProposal.snapshot/restore`, `Person`, `Vehicle` e `Instrument.restored`, `Depletable.restored` y `reservations`; `ActivityRules.definition`, `ActivityDefinition` y `ActivityTypeRegistry.rulesFor(definition)`; `ResourceVisitor`, `ReplanReasonVisitor` y `ResourceKinds`.
+- **Por qué:**
+  - **Identidad por id.** Al recargar de una base, `responsibles.contains`, `zones.contains`, `dependsOn` y `resource.equals` fallarían con instancias distintas del mismo recurso. La objeción de D15 (dos instancias con distinto estado se tratarían como la misma) se resuelve en la fase de persistencia: una sola instancia por id dentro de cada transacción.
+  - `ItineraryItem` sigue por instancia: no tiene id propio y solo se compara dentro del grafo de su expedición.
+  - **Snapshots con referencias a recursos.** El snapshot es inmutable y solo datos. Un adaptador lo traduce a tablas y de vuelta, sin que los constructores y los mutadores dejen de ser package-private. Referencia a los recursos porque la expedición los usa en memoria: el adaptador resuelve quién es cada uno.
+  - **La restauración no vuelve a aplicar las reglas de agendar:** lo guardado ya las pasó, y una dependencia que ya ocurrió no se puede volver a verificar. Sí se aplican las invariantes de los constructores (ventana, estimación, orden del secuencial).
+  - `Expedition.restore` tiene el único `switch` por tipo, sobre un `sealed` de datos: el compilador verifica que estén todos, y un snapshot no tiene comportamiento donde poner el polimorfismo.
+  - **`definition()` en las reglas, y no en el constructor de `Activity`.** Cada regla ya sabe su tipo y su parámetro, y `NightOperationRules` marca la variante: agregar un tipo sigue siendo agregar una clase (D1).
+  - `ResourceVisitor` abarca todos los recursos porque una opción de reemplazo guarda uno de cualquier tipo. También reemplaza los filtros por clase que quedaban en los casos de uso (D64).
+- **Alternativas descartadas:**
+  - Mantener la identidad por instancia con un mapa por transacción — los recursos seguirían comparándose bien solo dentro de una carga, y cualquier instancia armada por fuera rompería silenciosamente las reglas.
+  - Setters o constructores públicos para rearmar el estado — cualquiera podría saltearse las reglas.
+  - Anotar el dominio con JPA — lo prohíbe D36.
+  - Guardar las reglas serializadas — ataría la base a clases de Java y perdería las reglas nuevas de un tipo existente.
+- **Consecuencia:** un campo nuevo de una entidad hay que agregarlo también a su snapshot, y los tests de ida y vuelta lo detectan si se compara `snapshot()`. Todavía no hay base: esto es lo que el adaptador va a usar.
 
 ## Funcionalidades nuevas de la Entrega 2
 

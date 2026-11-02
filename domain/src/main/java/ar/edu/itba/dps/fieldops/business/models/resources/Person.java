@@ -1,6 +1,7 @@
 package ar.edu.itba.dps.fieldops.business.models.resources;
 
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.Certifiable;
+import ar.edu.itba.dps.fieldops.business.interfaces.resources.ResourceVisitor;
 import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
 import lombok.Getter;
 
@@ -16,6 +17,12 @@ public class Person extends ScheduledResource implements Certifiable {
     @Getter
     private final Certifications certifications;
 
+    public static Person restored(ResourceId id, String name, Set<Certification> certifications, CalendarSnapshot calendar) {
+        final var person = new Person(id, name, certifications);
+        person.restoreCalendar(calendar);
+        return person;
+    }
+
     public Person(ResourceId id, String name, Set<Certification> certifications) {
         this.id = Objects.requireNonNull(id, "id is required");
         this.name = DomainArguments.requireText(name, "name");
@@ -25,5 +32,10 @@ public class Person extends ScheduledResource implements Certifiable {
     @Override
     public boolean hasCertification(Certification certification) {
         return certifications.includes(certification);
+    }
+
+    @Override
+    public <T> T accept(ResourceVisitor<T> visitor) {
+        return visitor.person(this);
     }
 }

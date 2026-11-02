@@ -14,6 +14,15 @@ public class AvailabilityCalendar {
     private final List<Reservation> reservations = new ArrayList<>();
     private final List<Unavailability> unavailabilities = new ArrayList<>();
 
+    CalendarSnapshot snapshot() {
+        return new CalendarSnapshot(reservations, unavailabilities);
+    }
+
+    void restore(CalendarSnapshot snapshot) {
+        reservations.addAll(snapshot.reservations());
+        unavailabilities.addAll(snapshot.unavailabilities());
+    }
+
     public boolean isFreeDuring(TimePeriod period) {
         return isFreeDuring(period, Set.of());
     }

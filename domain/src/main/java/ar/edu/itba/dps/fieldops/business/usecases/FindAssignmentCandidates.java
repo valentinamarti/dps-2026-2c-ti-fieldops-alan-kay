@@ -4,10 +4,7 @@ import ar.edu.itba.dps.fieldops.business.interfaces.resources.Equipment;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.activities.ReusableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
-import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
-import ar.edu.itba.dps.fieldops.business.models.resources.Instrument;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
-import ar.edu.itba.dps.fieldops.business.models.resources.Vehicle;
 import ar.edu.itba.dps.fieldops.business.models.responses.AssignmentCandidates;
 import ar.edu.itba.dps.fieldops.business.models.responses.InstrumentView;
 import ar.edu.itba.dps.fieldops.business.models.responses.PersonView;
@@ -45,14 +42,14 @@ public class FindAssignmentCandidates implements FindAssignmentCandidatesPort {
                         .toList(),
                 activity.requiredSupplies().stream()
                         .map(requirement -> new AssignmentCandidates.ForSupplies(requirement,
-                                Lookups.onlyOf(catalog.suppliesCovering(requirement), Depletable.class).stream()
+                                ResourceKinds.only(ResourceKinds.SUPPLIES, catalog.suppliesCovering(requirement)).stream()
                                         .map(SupplyView::of).toList()))
                         .toList());
     }
 
     private AssignmentCandidates.ForEquipment equipmentFor(ReusableRequirement requirement, List<Equipment> available) {
         return new AssignmentCandidates.ForEquipment(requirement,
-                Lookups.onlyOf(available, Vehicle.class).stream().map(VehicleView::of).toList(),
-                Lookups.onlyOf(available, Instrument.class).stream().map(InstrumentView::of).toList());
+                ResourceKinds.only(ResourceKinds.VEHICLES, available).stream().map(VehicleView::of).toList(),
+                ResourceKinds.only(ResourceKinds.INSTRUMENTS, available).stream().map(InstrumentView::of).toList());
     }
 }

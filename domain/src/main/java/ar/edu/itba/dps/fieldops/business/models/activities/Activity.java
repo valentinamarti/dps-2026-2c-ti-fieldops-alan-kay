@@ -43,6 +43,10 @@ public class Activity {
         return dependencies.contains(other);
     }
 
+    public ActivityDefinition definition() {
+        return rules.definition();
+    }
+
     public Duration estimatedDuration() {
         return rules.estimatedDuration();
     }
@@ -79,5 +83,15 @@ public class Activity {
         return requiredPermits().stream()
                 .filter(permit -> !grantedPermits.contains(permit))
                 .collect(Collectors.toUnmodifiableSet());
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        return other instanceof Activity that && id.equals(that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return id.hashCode();
     }
 }

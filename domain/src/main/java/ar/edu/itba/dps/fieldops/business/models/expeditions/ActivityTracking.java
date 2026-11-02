@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 public class ActivityTracking {
 
@@ -22,6 +23,18 @@ public class ActivityTracking {
 
     ActivityTracking(LocalDateTime startedAt) {
         this.startedAt = Objects.requireNonNull(startedAt, "startedAt is required");
+    }
+
+    static ActivityTracking restored(TrackingSnapshot snapshot) {
+        final var tracking = new ActivityTracking(snapshot.startedAt());
+        tracking.finishedAt = snapshot.finishedAt().orElse(null);
+        tracking.result = snapshot.result().orElse(null);
+        tracking.observations.addAll(snapshot.observations());
+        return tracking;
+    }
+
+    TrackingSnapshot snapshot() {
+        return new TrackingSnapshot(startedAt, Optional.ofNullable(finishedAt), Optional.ofNullable(result), observations);
     }
 
     ActivityTracking copy() {

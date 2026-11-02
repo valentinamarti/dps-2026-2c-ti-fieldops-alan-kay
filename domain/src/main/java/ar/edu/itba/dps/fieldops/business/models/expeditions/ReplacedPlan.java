@@ -2,9 +2,9 @@ package ar.edu.itba.dps.fieldops.business.models.expeditions;
 
 import java.util.Objects;
 
-record ReplacedPlan(ExpeditionId expedition, int executionRevision) {
+public record ReplacedPlan(ExpeditionId expedition, int executionRevision) {
 
-    ReplacedPlan {
+    public ReplacedPlan {
         Objects.requireNonNull(expedition, "expedition is required");
     }
 

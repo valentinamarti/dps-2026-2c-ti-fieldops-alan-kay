@@ -3,6 +3,7 @@ package ar.edu.itba.dps.fieldops.business.rules;
 import ar.edu.itba.dps.fieldops.business.exceptions.UnknownActivityTypeException;
 import ar.edu.itba.dps.fieldops.business.interfaces.activities.ActivityRules;
 import ar.edu.itba.dps.fieldops.business.interfaces.activities.ActivityType;
+import ar.edu.itba.dps.fieldops.business.models.activities.ActivityDefinition;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityParameters;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityTypeName;
 import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
@@ -37,6 +38,10 @@ public class ActivityTypeRegistry {
     public ActivityRules rulesFor(String typeName, Map<String, Integer> parameters, boolean atNight) {
         final var rules = typeNamed(typeName).rulesWith(new ActivityParameters(parameters));
         return atNight ? new NightOperationRules(rules) : rules;
+    }
+
+    public ActivityRules rulesFor(ActivityDefinition definition) {
+        return rulesFor(definition.typeName(), definition.parameters(), definition.atNight());
     }
 
     private ActivityType typeNamed(String typeName) {

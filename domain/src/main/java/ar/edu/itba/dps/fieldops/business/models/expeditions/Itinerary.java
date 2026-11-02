@@ -66,6 +66,14 @@ public class Itinerary {
         return nodes.stream().flatMap(node -> node.planKeepingStructure(itemPlans).stream()).toList();
     }
 
+    List<ItineraryNode> roots() {
+        return List.copyOf(nodes);
+    }
+
+    void restore(ItineraryNode root) {
+        nodes.add(root);
+    }
+
     ItineraryItem add(Activity activity, TimePeriod scheduledPeriod) {
         return add(new ItineraryItem(activity, scheduledPeriod));
     }

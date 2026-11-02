@@ -2,6 +2,7 @@ package ar.edu.itba.dps.fieldops.business.models.resources;
 
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.Certifiable;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.Equipment;
+import ar.edu.itba.dps.fieldops.business.interfaces.resources.ResourceVisitor;
 import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
 import lombok.Getter;
 
@@ -21,6 +22,12 @@ public class Vehicle extends ScheduledResource implements Equipment, Certifiable
     @Getter
     private final Certifications certifications;
 
+    public static Vehicle restored(ResourceId id, String name, ResourceCategory category, String licensePlate, Set<Certification> certifications, CalendarSnapshot calendar) {
+        final var vehicle = new Vehicle(id, name, category, licensePlate, certifications);
+        vehicle.restoreCalendar(calendar);
+        return vehicle;
+    }
+
     public Vehicle(ResourceId id, String name, ResourceCategory category, String licensePlate, Set<Certification> certifications) {
         this.id = Objects.requireNonNull(id, "id is required");
         this.name = DomainArguments.requireText(name, "name");
@@ -37,5 +44,10 @@ public class Vehicle extends ScheduledResource implements Equipment, Certifiable
     @Override
     public boolean hasCertification(Certification certification) {
         return certifications.includes(certification);
+    }
+
+    @Override
+    public <T> T accept(ResourceVisitor<T> visitor) {
+        return visitor.vehicle(this);
     }
 }

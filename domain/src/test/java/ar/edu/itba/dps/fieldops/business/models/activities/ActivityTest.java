@@ -1,6 +1,7 @@
 package ar.edu.itba.dps.fieldops.business.models.activities;
 
 import ar.edu.itba.dps.fieldops.business.interfaces.activities.ActivityRules;
+import ar.edu.itba.dps.fieldops.business.models.activities.ActivityDefinition;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.resources.Certification;
@@ -13,6 +14,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
+import java.util.Map;
 
 import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.LITERS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -135,6 +137,11 @@ class ActivityTest {
     }
 
     private static class FixedRules implements ActivityRules {
+        @Override
+        public ActivityDefinition definition() {
+            return new ActivityDefinition("fixed", Map.of(), false);
+        }
+
         @Override
         public Duration estimatedDuration() {
             return Duration.ofHours(3);
