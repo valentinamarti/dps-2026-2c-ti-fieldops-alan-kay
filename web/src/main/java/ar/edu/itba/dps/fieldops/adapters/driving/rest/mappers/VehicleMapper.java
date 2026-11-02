@@ -5,7 +5,7 @@ import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.VehicleResponse;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.resources.Vehicle;
-import ar.edu.itba.dps.fieldops.business.usecases.RegisterVehicleCommand;
+import ar.edu.itba.dps.fieldops.business.models.commands.RegisterVehicleCommand;
 
 public final class VehicleMapper {
     private VehicleMapper() {

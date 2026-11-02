@@ -2,6 +2,7 @@ package ar.edu.itba.dps.fieldops.business.usecases;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.DuplicateZoneException;
 import ar.edu.itba.dps.fieldops.business.exceptions.NotFoundException;
+import ar.edu.itba.dps.fieldops.business.models.commands.RegisterZoneCommand;
 import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;

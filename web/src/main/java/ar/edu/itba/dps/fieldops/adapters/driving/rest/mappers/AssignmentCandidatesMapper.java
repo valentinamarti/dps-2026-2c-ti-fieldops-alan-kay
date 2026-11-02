@@ -13,7 +13,7 @@ import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
 import ar.edu.itba.dps.fieldops.business.models.resources.Instrument;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.resources.Vehicle;
-import ar.edu.itba.dps.fieldops.business.usecases.AssignmentCandidates;
+import ar.edu.itba.dps.fieldops.business.models.responses.AssignmentCandidates;
 
 public final class AssignmentCandidatesMapper {
     private AssignmentCandidatesMapper() {

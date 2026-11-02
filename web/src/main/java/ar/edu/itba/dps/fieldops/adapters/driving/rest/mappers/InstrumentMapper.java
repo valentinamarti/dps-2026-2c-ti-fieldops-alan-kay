@@ -5,7 +5,7 @@ import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.RegisterInstrumentReq
 import ar.edu.itba.dps.fieldops.business.models.resources.Instrument;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
-import ar.edu.itba.dps.fieldops.business.usecases.RegisterInstrumentCommand;
+import ar.edu.itba.dps.fieldops.business.models.commands.RegisterInstrumentCommand;
 
 public final class InstrumentMapper {
     private InstrumentMapper() {

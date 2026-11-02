@@ -5,6 +5,7 @@ import ar.edu.itba.dps.fieldops.business.exceptions.NotFoundException;
 import ar.edu.itba.dps.fieldops.business.exceptions.UnacceptedWarningException;
 import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
+import ar.edu.itba.dps.fieldops.business.models.commands.WarningAcceptance;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;

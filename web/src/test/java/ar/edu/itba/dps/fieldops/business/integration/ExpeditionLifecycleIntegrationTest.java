@@ -3,6 +3,7 @@ package ar.edu.itba.dps.fieldops.business.integration;
 import ar.edu.itba.dps.fieldops.business.exceptions.ExpeditionNotApprovableException;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
+import ar.edu.itba.dps.fieldops.business.models.commands.WarningAcceptance;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
@@ -20,11 +21,11 @@ import ar.edu.itba.dps.fieldops.business.models.validation.Severity;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
 import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
+import ar.edu.itba.dps.fieldops.business.ports.in.ApproveExpeditionPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.FinishExpeditionPort;
+import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.replanning.Delay;
 import ar.edu.itba.dps.fieldops.business.reports.ExpeditionReporter;
-import ar.edu.itba.dps.fieldops.business.usecases.ApproveExpedition;
-import ar.edu.itba.dps.fieldops.business.usecases.CreateExpedition;
-import ar.edu.itba.dps.fieldops.business.usecases.FinishExpedition;
 import ar.edu.itba.dps.fieldops.business.usecases.ReplanExpedition;
 import ar.edu.itba.dps.fieldops.business.validations.ApprovalPolicy;
 import org.junit.jupiter.api.Test;
@@ -62,10 +63,10 @@ class ExpeditionLifecycleIntegrationTest {
     private static final ResourceCategory FUEL = new ResourceCategory("Fuel");
     private static final ResourceCategory SAMPLE_CONTAINER = new ResourceCategory("Sample container");
 
-    private final CreateExpedition createExpedition;
-    private final ApproveExpedition approveExpedition;
+    private final ExpeditionRepository expeditions;
+    private final ApproveExpeditionPort approveExpedition;
     private final ReplanExpedition replanExpedition;
-    private final FinishExpedition finishExpedition;
+    private final FinishExpeditionPort finishExpedition;
     private final ExpeditionReporter reporter;
     private final ApprovalPolicy preview = new ApprovalPolicy(List.of());
 
@@ -73,7 +74,7 @@ class ExpeditionLifecycleIntegrationTest {
     private final Person leader = person("p-1", DIVING);
     private final Depletable fuel = supply("d-1", "Fuel", Quantity.of("100", LITERS));
     private final Depletable jars = supply("d-2", "Sample container", Quantity.of("20", UNITS));
-    private final ResourceCatalog catalog = new ResourceCatalog();
+    private final ResourceCatalog catalog;
 
     private final TimePeriod divePeriod = hours(9, 12);
     private final TimePeriod samplingPeriod = hours(13, 15);
@@ -81,12 +82,14 @@ class ExpeditionLifecycleIntegrationTest {
     private final Activity survey = sampling("a-2", reef, hours(8, 18));
 
     @Autowired
-    ExpeditionLifecycleIntegrationTest(CreateExpedition createExpedition,
-                                       ApproveExpedition approveExpedition,
+    ExpeditionLifecycleIntegrationTest(ExpeditionRepository expeditions,
+                                       ApproveExpeditionPort approveExpedition,
                                        ReplanExpedition replanExpedition,
-                                       FinishExpedition finishExpedition,
-                                       ExpeditionReporter reporter) {
-        this.createExpedition = createExpedition;
+                                       FinishExpeditionPort finishExpedition,
+                                       ExpeditionReporter reporter,
+                                       ResourceCatalog catalog) {
+        this.expeditions = expeditions;
+        this.catalog = catalog;
         this.approveExpedition = approveExpedition;
         this.replanExpedition = replanExpedition;
         this.finishExpedition = finishExpedition;
@@ -100,6 +103,16 @@ class ExpeditionLifecycleIntegrationTest {
         catalog.addEquipment(instrument("i-3", "Cooler"));
         catalog.addSupply(fuel);
         catalog.addSupply(jars);
+    }
+
+    private Expedition created(ExpeditionBuilder draft) {
+        final var expedition = draft.build(expeditions);
+        expeditions.add(expedition);
+        return expedition;
+    }
+
+    private WarningAcceptance acceptanceOf(ValidationResult warning) {
+        return new WarningAcceptance(warning.rule(), warning.subject(), leader.getId(), "Both divers are instructors");
     }
 
     private ExpeditionBuilder reefSurvey() {
@@ -127,12 +140,12 @@ class ExpeditionLifecycleIntegrationTest {
     }
 
     private Expedition approvedReefSurvey() {
-        final var expedition = createExpedition.create(reefSurvey());
+        final var expedition = created(reefSurvey());
         assignFromCatalog(expedition, expedition.schedule(dive, divePeriod));
         assignFromCatalog(expedition, expedition.schedule(survey, samplingPeriod));
         final var riskyDive = preview.validate(expedition).warnings().getFirst();
         expedition.submitForReview();
-        approveExpedition.approve(expedition, List.of(new AcceptedWarning(riskyDive, leader, "Both divers are instructors")));
+        approveExpedition.approve(expedition.getId(), List.of(acceptanceOf(riskyDive)));
         return expedition;
     }
 
@@ -142,7 +155,7 @@ class ExpeditionLifecycleIntegrationTest {
 
     @Test
     void planningApprovingAndExecutingAnExpeditionEndToEnd() {
-        final var expedition = createExpedition.create(reefSurvey());
+        final var expedition = created(reefSurvey());
         final var diveItem = expedition.schedule(dive, divePeriod);
         final var surveyItem = expedition.schedule(survey, samplingPeriod);
         assignFromCatalog(expedition, diveItem);
@@ -154,8 +167,8 @@ class ExpeditionLifecycleIntegrationTest {
         assertEquals(Severity.WARNING, result.warnings().getFirst().severity());
 
         expedition.submitForReview();
-        final var acceptance = new AcceptedWarning(result.warnings().getFirst(), leader, "Both divers are instructors");
-        approveExpedition.approve(expedition, List.of(acceptance));
+        final var riskyDive = result.warnings().getFirst();
+        approveExpedition.approve(expedition.getId(), List.of(acceptanceOf(riskyDive)));
         assertEquals(ExpeditionStatus.APPROVED, expedition.getStatus());
         assertFalse(leader.isAvailableDuring(divePeriod));
 
@@ -165,7 +178,7 @@ class ExpeditionLifecycleIntegrationTest {
         expedition.finishActivity(diveItem, LocalDateTime.of(2026, 10, 1, 12, 0), "Reef mapped");
         expedition.startActivity(surveyItem, LocalDateTime.of(2026, 10, 1, 13, 0));
         expedition.finishActivity(surveyItem, LocalDateTime.of(2026, 10, 1, 15, 0), "Six samples collected");
-        finishExpedition.finish(expedition);
+        finishExpedition.finish(expedition.getId());
 
         final var report = reporter.reportOf(expedition);
         assertEquals(ExpeditionStatus.FINISHED, report.status());
@@ -174,7 +187,7 @@ class ExpeditionLifecycleIntegrationTest {
         assertEquals(Map.of(FUEL, Quantity.of("20", LITERS), SAMPLE_CONTAINER, Quantity.of("3", UNITS)),
                 report.actualConsumption());
         assertEquals(1, report.incidents().size());
-        assertEquals(List.of(acceptance), report.acceptedWarnings());
+        assertEquals(List.of(new AcceptedWarning(riskyDive, leader, "Both divers are instructors")), report.acceptedWarnings());
         assertEquals(Quantity.of("80", LITERS), fuel.getStock());
         assertEquals(Quantity.of("17", UNITS), jars.getStock());
         assertTrue(leader.isAvailableDuring(divePeriod));
@@ -192,7 +205,7 @@ class ExpeditionLifecycleIntegrationTest {
         final var alternative = replanExpedition
                 .replan(original, itemOf(original, survey), new Delay(Duration.ofHours(1)));
         alternative.submitForReview();
-        approveExpedition.approve(alternative, List.of());
+        approveExpedition.approve(alternative.getId(), List.of());
 
         assertEquals(ExpeditionStatus.REPLACED, original.getStatus());
         assertEquals(Optional.of(alternative.getId()), original.getReplacement());
@@ -204,7 +217,7 @@ class ExpeditionLifecycleIntegrationTest {
         alternative.start();
         alternative.startActivity(delayedSurvey, LocalDateTime.of(2026, 10, 1, 14, 0));
         alternative.finishActivity(delayedSurvey, LocalDateTime.of(2026, 10, 1, 16, 0), "Six samples collected");
-        finishExpedition.finish(alternative);
+        finishExpedition.finish(alternative.getId());
 
         final var report = reporter.reportOf(alternative);
         assertEquals(ExpeditionStatus.FINISHED, report.status());
@@ -218,7 +231,7 @@ class ExpeditionLifecycleIntegrationTest {
 
     @Test
     void anExpeditionMissingPermitsAndResourcesCannotBeApproved() {
-        final var expedition = createExpedition.create(new ExpeditionBuilder()
+        final var expedition = created(new ExpeditionBuilder()
                 .withName("Unprepared dive")
                 .withPeriod(hours(0, 24))
                 .addObjective("Dive without a permit")
@@ -234,7 +247,7 @@ class ExpeditionLifecycleIntegrationTest {
         assertTrue(messages.stream().anyMatch(message -> message.contains("staff")), messages::toString);
         assertFalse(result.canBeApproved());
 
-        assertThrows(ExpeditionNotApprovableException.class, () -> approveExpedition.approve(expedition, List.of()));
+        assertThrows(ExpeditionNotApprovableException.class, () -> approveExpedition.approve(expedition.getId(), List.of()));
         assertEquals(ExpeditionStatus.IN_REVIEW, expedition.getStatus());
         assertTrue(leader.isAvailableDuring(divePeriod));
     }

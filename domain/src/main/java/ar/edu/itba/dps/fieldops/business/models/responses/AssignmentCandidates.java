@@ -1,4 +1,4 @@
-package ar.edu.itba.dps.fieldops.business.usecases;
+package ar.edu.itba.dps.fieldops.business.models.responses;
 
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.DepletableResource;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.Equipment;

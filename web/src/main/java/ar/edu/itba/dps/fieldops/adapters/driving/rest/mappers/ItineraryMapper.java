@@ -9,8 +9,8 @@ import ar.edu.itba.dps.fieldops.business.interfaces.itinerary.ItineraryNodeVisit
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
-import ar.edu.itba.dps.fieldops.business.usecases.PlannedNodeCommand;
-import ar.edu.itba.dps.fieldops.business.usecases.ScheduleBlockCommand;
+import ar.edu.itba.dps.fieldops.business.models.commands.PlannedNodeCommand;
+import ar.edu.itba.dps.fieldops.business.models.commands.ScheduleBlockCommand;
 
 import java.util.List;
 import java.util.Objects;

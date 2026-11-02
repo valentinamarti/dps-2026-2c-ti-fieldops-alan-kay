@@ -1,14 +1,16 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
+import ar.edu.itba.dps.fieldops.business.models.commands.RegisterIncidentCommand;
 import ar.edu.itba.dps.fieldops.business.models.events.IncidentRegistered;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposal;
+import ar.edu.itba.dps.fieldops.business.ports.in.RegisterIncidentPort;
 import ar.edu.itba.dps.fieldops.business.providers.EventPublisher;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ReplanProposalRepository;
 
 import java.util.Objects;
 
-public class RegisterIncident {
+public class RegisterIncident implements RegisterIncidentPort {
     private final ExpeditionRepository expeditions;
     private final EventPublisher publisher;
     private final ReplanProposalRepository proposals;
@@ -19,6 +21,7 @@ public class RegisterIncident {
         this.proposals = Objects.requireNonNull(proposals, "proposals are required");
     }
 
+    @Override
     public ReplanProposal register(RegisterIncidentCommand command) {
         final var expedition = Lookups.expedition(expeditions, command.expeditionId());
         final var incident = expedition.registerIncident(Lookups.item(expedition, command.activityId()), command.report());

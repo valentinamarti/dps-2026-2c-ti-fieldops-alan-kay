@@ -1,18 +1,20 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
+import ar.edu.itba.dps.fieldops.business.models.commands.ReplanDecisionCommand;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanDecision;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposal;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposalId;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.ports.in.DecideReplanProposalPort;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ReplanProposalRepository;
 import ar.edu.itba.dps.fieldops.business.replanning.ExpeditionReplanner;
 
 import java.util.Objects;
 
-public class DecideReplanProposal {
+public class DecideReplanProposal implements DecideReplanProposalPort {
     private final ReplanProposalRepository proposals;
     private final ExpeditionRepository expeditions;
     private final ExpeditionReplanner replanner;
@@ -28,6 +30,7 @@ public class DecideReplanProposal {
         this.catalog = Objects.requireNonNull(catalog, "catalog is required");
     }
 
+    @Override
     public Expedition accept(ReplanProposalId proposalId, int optionNumber, ReplanDecisionCommand command) {
         final var proposal = Lookups.proposal(proposals, proposalId);
         proposal.requirePending();
@@ -47,6 +50,7 @@ public class DecideReplanProposal {
         return alternative;
     }
 
+    @Override
     public void reject(ReplanProposalId proposalId, ReplanDecisionCommand command) {
         final var proposal = Lookups.proposal(proposals, proposalId);
         proposal.requirePending();

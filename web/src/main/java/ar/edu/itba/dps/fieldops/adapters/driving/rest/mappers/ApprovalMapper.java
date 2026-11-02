@@ -4,7 +4,7 @@ import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.ApprovalRequest;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.WarningAcceptanceRequest;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.validation.RuleId;
-import ar.edu.itba.dps.fieldops.business.usecases.WarningAcceptance;
+import ar.edu.itba.dps.fieldops.business.models.commands.WarningAcceptance;
 
 import java.util.List;
 import java.util.Objects;

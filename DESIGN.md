@@ -522,7 +522,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
 - **Alternativas descartadas:**
   - Clean Architecture — sumaría anillos (entidades, casos de uso, adaptadores, frameworks) que para este tamaño de dominio no se distinguen del hexágono; ver la tabla de patrones no aplicados.
   - DDD táctico completo (agregados, eventos, módulos por contexto) — el dominio es un solo contexto y los conceptos que sirven ya están (entidades, value objects, servicios); ver la tabla de patrones no aplicados.
-  - Separar la interfaz de cada caso de uso (puerto de entrada) de su implementación — en este PR los casos de uso siguen siendo clases concretas en `domain`. Una interfaz por caso de uso con una sola implementación no agrega nada hoy; el adaptador REST depende de la clase.
+  - **Revisado en D63, ya no se descarta:** Separar la interfaz de cada caso de uso (puerto de entrada) de su implementación — en este PR los casos de uso siguen siendo clases concretas en `domain`. Una interfaz por caso de uso con una sola implementación no agrega nada hoy; el adaptador REST depende de la clase.
 - **Consecuencia:** si aparece un segundo adaptador driving que necesite sustituir un caso de uso (por ejemplo para mockearlo), la salida es extraer la interfaz de ese caso de uso y mover la implementación a `app`.
 
 ### D36 — Multi-módulo Maven para que el compilador haga cumplir la dependencia (Entrega 2)
@@ -581,6 +581,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - Los tests del repositorio se podrán reutilizar contra el adaptador JPA cuando exista.
 - **Ampliado en D52:** el alta del catálogo y de las zonas, que no tenía caso de uso, lo tiene con el mismo esquema (`RegisterResources`, `QueryCatalog`, `MarkResourceUnavailable`, `RegisterZone`, `QueryZones`). `Lookups` resuelve además la zona por id, el equipo por tipo y el consumible.
 - **Revisado en D53:** el comando de agendar una actividad pasa a recibir ids, tipo y parámetros, que es el pendiente que esta entrada tenía anotado. La variante que recibe la `Activity` armada se conserva, como las de esta misma decisión.
+- **Revisado en D63:** los comandos pasaron a `business.models.commands`, los casos de uso se exponen por interfaces de `business.ports.in`, y las variantes que reciben objetos pasaron a ser package-private.
 
 ### D39 — El itinerario es un árbol de actividades y bloques (Composite) (Entrega 2, F2)
 
@@ -1234,6 +1235,25 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - Rechazar en `Expedition.schedule` — no cubriría los ítems que se arman desde un `PlannedNode`.
 - **Consecuencia:** quien agenda se entera en el momento si el horario no alcanza. Si la operación real se va a hacer más rápido, hay que cambiar los parámetros de la actividad, porque la estimación es lo que declara cuánto tarda. El seed y `demo.http` ya cumplían la regla y no cambiaron. Los tests cuyo punto no es la duración usan `oneHourSampling`, un fixture con una estimación de 1 h, porque ninguna regla real baja de ese tiempo con la asignación que esos tests necesitan.
 
+### D63 — Los casos de uso se exponen por puertos de entrada (corrección de la Entrega 2, revisa D35 y D38)
+
+- **Origen:** corrección de la Entrega 2. Respecto del esquema hexagonal visto en clase faltaban los puertos de entrada: los controllers dependían de las clases de `business.usecases`, y los comandos estaban junto a los casos de uso y no en el modelo. D35 había descartado separar la interfaz porque tenía una sola implementación.
+- **Patrón / principio:** puertos de entrada (Clase 7) + Dependency Inversion: el adaptador driving y la implementación dependen de una interfaz del dominio. Interface Segregation por caso de uso.
+- **Dónde:** interfaces `*Port` en `business.ports.in`, una por cada uno de los 22 casos de uso que un adaptador invoca; implementaciones en `business.usecases`; comandos y `WarningAcceptance` en `business.models.commands`; `AssignmentCandidates` en `business.models.responses`; `FieldOpsConfig`, `ReplanningConfig` y `DemoDataConfig` exponen e inyectan los puertos; `HexagonalArchitectureTest`.
+- **Por qué:**
+  - El adaptador REST y el cargador de la demo conocen solo lo que pueden pedir, y no cómo se implementa. ArchUnit lo hace cumplir, porque el compilador no puede: `web` necesita ver las implementaciones para armarlas en la configuración.
+  - Hay un motivo concreto que D35 no tenía: la transacción. El dominio no puede tener `@Transactional`, y con una interfaz se puede envolver cada caso de uso desde la configuración sin tocarlo.
+  - Una interfaz por clase actual, sin partir las que agrupan operaciones cohesivas (`TransitionExpedition`, `RegisterResources`), con el criterio de D52.
+  - Las implementaciones conservan su nombre, y las interfaces llevan el sufijo `Port`, así los tests de los casos de uso siguen nombrando lo que prueban.
+  - Las variantes que reciben objetos (`approve(Expedition, ...)`, `create(ExpeditionBuilder)`, `finish(Expedition)` y las de `ScheduleActivity` y `ScheduleBlock`) no forman parte de los puertos y pasan a ser package-private.
+  - `PlannedNodeCommand` deja de conocer a `PlannedActivities`, que es interna de los casos de uso: recibe la función que traduce una actividad planificada.
+  - `ReplanExpedition` y `ProposeReplan` no tienen puerto: ningún adaptador driving los invoca. Los usan `DecideReplanProposal` y el publicador de eventos.
+- **Alternativas descartadas:**
+  - Mover las implementaciones a `app`, como anticipaba D35 — el informe las ubica en `business.usecases`, y moverlas no agrega ninguna garantía que no dé ArchUnit.
+  - Una interfaz por operación — unas 60 interfaces para los mismos 22 conceptos.
+  - Renombrar las implementaciones (`ApproveExpeditionUseCase`) y dejarles el nombre a las interfaces — mismo resultado con todos los tests renombrados.
+- **Consecuencia:** los tests de integración de `web` entran por los puertos y por ids, igual que un adaptador. Los puertos todavía devuelven entidades: las respuestas propias en el modelo llegan en D64.
+
 ## Funcionalidades nuevas de la Entrega 2
 
 ### F1 — Actividades nocturnas
@@ -1318,7 +1338,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - `business.models.expeditions.ParallelBlock` — bloque cuyas ramas pueden correr a la vez; su duración es el máximo.
   - `business.models.expeditions.PlannedNode` — declaración de lo que se agenda: actividad con horario, bloque o ítem terminado.
   - `business.usecases.ScheduleBlock` y `ScheduleBlockCommand` — agendar un bloque por id de expedición.
-  - `business.usecases.PlannedActivityCommand` y `PlannedNodeCommand` — la descripción de una hoja y del árbol que trae el comando de alta de bloque, por ids, tipo y parámetros (D55).
+  - `business.models.commands.PlannedActivityCommand` y `PlannedNodeCommand` — la descripción de una hoja y del árbol que trae el comando de alta de bloque, por ids, tipo y parámetros (D55).
   - `business.usecases.PlannedActivities` — el resolver de zona, dependencias y reglas, compartido entre `ScheduleActivity` y `ScheduleBlock` (D55).
   - `adapters.driving.rest.ItineraryController` (módulo `web`) — `POST /api/expeditions/{id}/blocks` y `GET /api/expeditions/{id}/itinerary`.
   - `adapters.driving.rest.ExpeditionPlanController` (módulo `web`) — `GET /api/expeditions/{id}/validation` y `/estimate`.

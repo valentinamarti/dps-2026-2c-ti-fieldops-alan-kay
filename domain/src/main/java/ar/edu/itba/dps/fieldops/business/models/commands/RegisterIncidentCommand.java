@@ -1,4 +1,4 @@
-package ar.edu.itba.dps.fieldops.business.usecases;
+package ar.edu.itba.dps.fieldops.business.models.commands;
 
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;

@@ -3,6 +3,8 @@ package ar.edu.itba.dps.fieldops.business.usecases;
 import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.fixtures.SequentialReplanProposalRepository;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
+import ar.edu.itba.dps.fieldops.business.models.commands.RegisterIncidentCommand;
+import ar.edu.itba.dps.fieldops.business.models.commands.ReplanDecisionCommand;
 import ar.edu.itba.dps.fieldops.business.models.events.IncidentRegistered;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.IncidentReport;

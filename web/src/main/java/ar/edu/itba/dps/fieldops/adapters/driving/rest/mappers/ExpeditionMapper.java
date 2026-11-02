@@ -9,7 +9,7 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionRestrictio
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
-import ar.edu.itba.dps.fieldops.business.usecases.CreateExpeditionCommand;
+import ar.edu.itba.dps.fieldops.business.models.commands.CreateExpeditionCommand;
 
 import java.util.List;
 import java.util.Objects;

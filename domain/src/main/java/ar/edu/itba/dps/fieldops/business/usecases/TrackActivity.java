@@ -3,12 +3,13 @@ package ar.edu.itba.dps.fieldops.business.usecases;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Observation;
+import ar.edu.itba.dps.fieldops.business.ports.in.TrackActivityPort;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
 
-public class TrackActivity {
+public class TrackActivity implements TrackActivityPort {
 
     private final ExpeditionRepository repository;
 
@@ -16,16 +17,19 @@ public class TrackActivity {
         this.repository = Objects.requireNonNull(repository, "repository is required");
     }
 
+    @Override
     public void start(ExpeditionId expeditionId, ActivityId activityId, LocalDateTime at) {
         final var expedition = Lookups.expedition(repository, expeditionId);
         expedition.startActivity(Lookups.item(expedition, activityId), at);
     }
 
+    @Override
     public void finish(ExpeditionId expeditionId, ActivityId activityId, LocalDateTime at, String result) {
         final var expedition = Lookups.expedition(repository, expeditionId);
         expedition.finishActivity(Lookups.item(expedition, activityId), at, result);
     }
 
+    @Override
     public void observe(ExpeditionId expeditionId, ActivityId activityId, Observation observation) {
         final var expedition = Lookups.expedition(repository, expeditionId);
         expedition.recordObservation(Lookups.item(expedition, activityId), observation);

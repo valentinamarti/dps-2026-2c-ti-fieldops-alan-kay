@@ -5,8 +5,8 @@ import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.ValidationResponse;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.mappers.EstimateMapper;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.mappers.ValidationMapper;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
-import ar.edu.itba.dps.fieldops.business.usecases.EstimateExpedition;
-import ar.edu.itba.dps.fieldops.business.usecases.ValidateExpedition;
+import ar.edu.itba.dps.fieldops.business.ports.in.EstimateExpeditionPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.ValidateExpeditionPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -21,10 +21,10 @@ import java.util.Objects;
 @RequestMapping("/api/expeditions/{expeditionId}")
 @Tag(name = "Validation and estimation", description = "Validating and estimating an expedition without approving it")
 public class ExpeditionPlanController {
-    private final ValidateExpedition validateExpedition;
-    private final EstimateExpedition estimateExpedition;
+    private final ValidateExpeditionPort validateExpedition;
+    private final EstimateExpeditionPort estimateExpedition;
 
-    public ExpeditionPlanController(ValidateExpedition validateExpedition, EstimateExpedition estimateExpedition) {
+    public ExpeditionPlanController(ValidateExpeditionPort validateExpedition, EstimateExpeditionPort estimateExpedition) {
         this.validateExpedition = Objects.requireNonNull(validateExpedition, "validateExpedition is required");
         this.estimateExpedition = Objects.requireNonNull(estimateExpedition, "estimateExpedition is required");
     }

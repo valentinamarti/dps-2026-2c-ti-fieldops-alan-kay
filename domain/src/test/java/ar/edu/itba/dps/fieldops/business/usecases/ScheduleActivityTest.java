@@ -7,6 +7,8 @@ import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.activities.ReusableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
+import ar.edu.itba.dps.fieldops.business.models.commands.PlannedActivityCommand;
+import ar.edu.itba.dps.fieldops.business.models.commands.ScheduleActivityCommand;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;

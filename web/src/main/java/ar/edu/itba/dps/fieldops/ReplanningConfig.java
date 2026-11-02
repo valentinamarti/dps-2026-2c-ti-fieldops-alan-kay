@@ -4,6 +4,9 @@ import ar.edu.itba.dps.fieldops.adapters.driven.InMemoryEventPublisher;
 import ar.edu.itba.dps.fieldops.adapters.driven.InMemoryReplanProposalRepository;
 import ar.edu.itba.dps.fieldops.business.interfaces.events.EventSubscriber;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.ports.in.DecideReplanProposalPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.QueryReplanProposalsPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.RegisterIncidentPort;
 import ar.edu.itba.dps.fieldops.business.providers.EventPublisher;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ReplanProposalRepository;
@@ -41,19 +44,19 @@ public class ReplanningConfig {
     }
 
     @Bean
-    RegisterIncident registerIncident(ExpeditionRepository expeditions, EventPublisher publisher, ReplanProposalRepository proposals) {
+    RegisterIncidentPort registerIncident(ExpeditionRepository expeditions, EventPublisher publisher, ReplanProposalRepository proposals) {
         return new RegisterIncident(expeditions, publisher, proposals);
     }
 
     @Bean
-    DecideReplanProposal decideReplanProposal(ReplanProposalRepository proposals, ExpeditionRepository expeditions,
+    DecideReplanProposalPort decideReplanProposal(ReplanProposalRepository proposals, ExpeditionRepository expeditions,
                                               ExpeditionReplanner replanner, ReplanExpedition replanExpedition,
                                               ResourceCatalog catalog) {
         return new DecideReplanProposal(proposals, expeditions, replanner, replanExpedition, catalog);
     }
 
     @Bean
-    QueryReplanProposals queryReplanProposals(ReplanProposalRepository proposals, ExpeditionRepository expeditions) {
+    QueryReplanProposalsPort queryReplanProposals(ReplanProposalRepository proposals, ExpeditionRepository expeditions) {
         return new QueryReplanProposals(proposals, expeditions);
     }
 }

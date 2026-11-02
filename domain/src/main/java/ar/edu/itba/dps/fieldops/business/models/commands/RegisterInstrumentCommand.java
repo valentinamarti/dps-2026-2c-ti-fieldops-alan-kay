@@ -1,4 +1,4 @@
-package ar.edu.itba.dps.fieldops.business.usecases;
+package ar.edu.itba.dps.fieldops.business.models.commands;
 
 import ar.edu.itba.dps.fieldops.business.models.resources.Certification;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
@@ -6,6 +6,6 @@ import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 
 import java.util.Set;
 
-public record RegisterVehicleCommand(ResourceId id, String name, ResourceCategory category, String licensePlate,
-                                     Set<Certification> certifications) {
+public record RegisterInstrumentCommand(ResourceId id, String name, ResourceCategory category,
+                                        Set<Certification> certifications) {
 }

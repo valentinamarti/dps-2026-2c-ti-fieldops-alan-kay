@@ -6,9 +6,9 @@ import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.UnavailabilityDto;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.mappers.StaffMapper;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.mappers.UnavailabilityMapper;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
-import ar.edu.itba.dps.fieldops.business.usecases.MarkResourceUnavailable;
-import ar.edu.itba.dps.fieldops.business.usecases.QueryCatalog;
-import ar.edu.itba.dps.fieldops.business.usecases.RegisterResources;
+import ar.edu.itba.dps.fieldops.business.ports.in.MarkResourceUnavailablePort;
+import ar.edu.itba.dps.fieldops.business.ports.in.QueryCatalogPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.RegisterResourcesPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,12 +30,12 @@ import java.util.Objects;
 @RequestMapping("/api/staff")
 @Tag(name = "Staff", description = "The people of the catalog and their unavailabilities")
 public class StaffController {
-    private final RegisterResources registerResources;
-    private final QueryCatalog queryCatalog;
-    private final MarkResourceUnavailable markResourceUnavailable;
+    private final RegisterResourcesPort registerResources;
+    private final QueryCatalogPort queryCatalog;
+    private final MarkResourceUnavailablePort markResourceUnavailable;
 
-    public StaffController(RegisterResources registerResources, QueryCatalog queryCatalog,
-                           MarkResourceUnavailable markResourceUnavailable) {
+    public StaffController(RegisterResourcesPort registerResources, QueryCatalogPort queryCatalog,
+                           MarkResourceUnavailablePort markResourceUnavailable) {
         this.registerResources = Objects.requireNonNull(registerResources, "registerResources is required");
         this.queryCatalog = Objects.requireNonNull(queryCatalog, "queryCatalog is required");
         this.markResourceUnavailable = Objects.requireNonNull(markResourceUnavailable, "markResourceUnavailable is required");

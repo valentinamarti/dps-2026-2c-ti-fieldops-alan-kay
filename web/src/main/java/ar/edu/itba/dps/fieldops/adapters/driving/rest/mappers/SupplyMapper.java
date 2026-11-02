@@ -5,7 +5,7 @@ import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.SupplyResponse;
 import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
-import ar.edu.itba.dps.fieldops.business.usecases.RegisterSupplyCommand;
+import ar.edu.itba.dps.fieldops.business.models.commands.RegisterSupplyCommand;
 
 public final class SupplyMapper {
     private SupplyMapper() {

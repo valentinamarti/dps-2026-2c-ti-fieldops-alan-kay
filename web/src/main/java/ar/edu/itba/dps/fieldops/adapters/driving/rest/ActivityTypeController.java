@@ -2,7 +2,7 @@ package ar.edu.itba.dps.fieldops.adapters.driving.rest;
 
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.ActivityTypeResponse;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.mappers.ActivityTypeMapper;
-import ar.edu.itba.dps.fieldops.business.usecases.QueryActivityTypes;
+import ar.edu.itba.dps.fieldops.business.ports.in.QueryActivityTypesPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -17,9 +17,9 @@ import java.util.Objects;
 @RequestMapping("/api/activity-types")
 @Tag(name = "Activity types", description = "The types of activity an activity can be scheduled as")
 public class ActivityTypeController {
-    private final QueryActivityTypes queryActivityTypes;
+    private final QueryActivityTypesPort queryActivityTypes;
 
-    public ActivityTypeController(QueryActivityTypes queryActivityTypes) {
+    public ActivityTypeController(QueryActivityTypesPort queryActivityTypes) {
         this.queryActivityTypes = Objects.requireNonNull(queryActivityTypes, "queryActivityTypes is required");
     }
 

@@ -3,6 +3,7 @@ package ar.edu.itba.dps.fieldops.business.usecases;
 import ar.edu.itba.dps.fieldops.business.exceptions.NotFoundException;
 import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
+import ar.edu.itba.dps.fieldops.business.models.commands.CreateExpeditionCommand;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionRestrictions;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;

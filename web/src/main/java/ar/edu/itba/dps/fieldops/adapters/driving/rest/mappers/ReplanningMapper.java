@@ -16,8 +16,8 @@ import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanOption;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposal;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposalId;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
-import ar.edu.itba.dps.fieldops.business.usecases.RegisterIncidentCommand;
-import ar.edu.itba.dps.fieldops.business.usecases.ReplanDecisionCommand;
+import ar.edu.itba.dps.fieldops.business.models.commands.RegisterIncidentCommand;
+import ar.edu.itba.dps.fieldops.business.models.commands.ReplanDecisionCommand;
 
 import java.time.Duration;
 import java.util.List;

@@ -1,6 +1,7 @@
-package ar.edu.itba.dps.fieldops.business.usecases;
+package ar.edu.itba.dps.fieldops.business.models.commands;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
+import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.PlannedNode;
 
@@ -18,16 +19,16 @@ public final class PlannedNodeCommand {
             SEQUENTIAL, PlannedNode::sequential,
             PARALLEL, PlannedNode::parallel);
 
-    private final Function<PlannedActivities, PlannedNode> planning;
+    private final Function<Function<PlannedActivityCommand, Activity>, PlannedNode> planning;
 
-    private PlannedNodeCommand(Function<PlannedActivities, PlannedNode> planning) {
+    private PlannedNodeCommand(Function<Function<PlannedActivityCommand, Activity>, PlannedNode> planning) {
         this.planning = planning;
     }
 
     public static PlannedNodeCommand activity(PlannedActivityCommand activity) {
         Objects.requireNonNull(activity, "activity is required");
         return new PlannedNodeCommand(activities ->
-                PlannedNode.activity(activities.of(activity), activity.scheduledPeriod()));
+                PlannedNode.activity(activities.apply(activity), activity.scheduledPeriod()));
     }
 
     public static PlannedNodeCommand sequential(PlannedNodeCommand... children) {
@@ -53,7 +54,7 @@ public final class PlannedNodeCommand {
                 assembler.apply(plans.stream().map(plan -> plan.plan(activities)).toList()));
     }
 
-    PlannedNode plan(PlannedActivities activities) {
+    public PlannedNode plan(Function<PlannedActivityCommand, Activity> activities) {
         return planning.apply(activities);
     }
 

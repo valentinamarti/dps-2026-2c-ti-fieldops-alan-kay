@@ -4,7 +4,7 @@ import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.RegisterStaffRequest;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.StaffResponse;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
-import ar.edu.itba.dps.fieldops.business.usecases.RegisterPersonCommand;
+import ar.edu.itba.dps.fieldops.business.models.commands.RegisterPersonCommand;
 
 public final class StaffMapper {
     private StaffMapper() {

@@ -4,7 +4,7 @@ import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.RegisterZoneRequest;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.ZoneResponse;
 import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
-import ar.edu.itba.dps.fieldops.business.usecases.RegisterZoneCommand;
+import ar.edu.itba.dps.fieldops.business.models.commands.RegisterZoneCommand;
 
 public final class ZoneMapper {
     private ZoneMapper() {

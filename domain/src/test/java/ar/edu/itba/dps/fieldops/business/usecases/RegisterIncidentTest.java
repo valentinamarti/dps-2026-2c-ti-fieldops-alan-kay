@@ -2,6 +2,7 @@ package ar.edu.itba.dps.fieldops.business.usecases;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidTrackingException;
 import ar.edu.itba.dps.fieldops.business.exceptions.NotFoundException;
+import ar.edu.itba.dps.fieldops.business.models.commands.RegisterIncidentCommand;
 import ar.edu.itba.dps.fieldops.business.models.events.IncidentRegistered;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.IncidentReport;

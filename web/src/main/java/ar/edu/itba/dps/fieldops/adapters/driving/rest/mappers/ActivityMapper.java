@@ -14,8 +14,8 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.resources.Certification;
 import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
-import ar.edu.itba.dps.fieldops.business.usecases.PlannedActivityCommand;
-import ar.edu.itba.dps.fieldops.business.usecases.ScheduleActivityCommand;
+import ar.edu.itba.dps.fieldops.business.models.commands.PlannedActivityCommand;
+import ar.edu.itba.dps.fieldops.business.models.commands.ScheduleActivityCommand;
 
 import java.util.List;
 import java.util.Map;

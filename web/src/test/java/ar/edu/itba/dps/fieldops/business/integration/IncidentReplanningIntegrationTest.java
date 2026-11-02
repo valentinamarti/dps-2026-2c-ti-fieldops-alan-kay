@@ -10,15 +10,15 @@ import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposalStatus;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
+import ar.edu.itba.dps.fieldops.business.ports.in.ApproveExpeditionPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.DecideReplanProposalPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.QueryExpeditionsPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.QueryReplanProposalsPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.RegisterIncidentPort;
+import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.replanning.ResourceReplaced;
-import ar.edu.itba.dps.fieldops.business.usecases.ApproveExpedition;
-import ar.edu.itba.dps.fieldops.business.usecases.CreateExpedition;
-import ar.edu.itba.dps.fieldops.business.usecases.DecideReplanProposal;
-import ar.edu.itba.dps.fieldops.business.usecases.QueryExpeditions;
-import ar.edu.itba.dps.fieldops.business.usecases.QueryReplanProposals;
-import ar.edu.itba.dps.fieldops.business.usecases.RegisterIncident;
-import ar.edu.itba.dps.fieldops.business.usecases.RegisterIncidentCommand;
-import ar.edu.itba.dps.fieldops.business.usecases.ReplanDecisionCommand;
+import ar.edu.itba.dps.fieldops.business.models.commands.RegisterIncidentCommand;
+import ar.edu.itba.dps.fieldops.business.models.commands.ReplanDecisionCommand;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -46,17 +46,17 @@ class IncidentReplanningIntegrationTest {
     private static final LocalDateTime TEN = LocalDateTime.of(2026, 10, 1, 10, 0);
 
     @Autowired
-    private CreateExpedition createExpedition;
+    private ExpeditionRepository expeditions;
     @Autowired
-    private ApproveExpedition approveExpedition;
+    private ApproveExpeditionPort approveExpedition;
     @Autowired
-    private RegisterIncident registerIncident;
+    private RegisterIncidentPort registerIncident;
     @Autowired
-    private DecideReplanProposal decideReplanProposal;
+    private DecideReplanProposalPort decideReplanProposal;
     @Autowired
-    private QueryReplanProposals queryReplanProposals;
+    private QueryReplanProposalsPort queryReplanProposals;
     @Autowired
-    private QueryExpeditions queryExpeditions;
+    private QueryExpeditionsPort queryExpeditions;
     @Autowired
     private ResourceCatalog catalog;
 
@@ -68,13 +68,14 @@ class IncidentReplanningIntegrationTest {
 
     private Expedition approvedAndRunning() {
         List.of(leader, sick, spare).forEach(catalog::addStaff);
-        final var expedition = createExpedition.create(expeditionIn(coast, leader));
+        final var expedition = expeditionIn(coast, leader).build(expeditions);
+        expeditions.add(expedition);
         final var item = expedition.schedule(sampling, hours(13, 15));
         expedition.assignStaff(item, sick);
         expedition.assignEquipment(item, instrument("c-1", "Cooler"));
         expedition.assignSupply(item, supply("j-1", "Sample container", of("10", UNITS)));
         expedition.submitForReview();
-        approveExpedition.approve(expedition, List.of());
+        approveExpedition.approve(expedition.getId(), List.of());
         expedition.start();
         return expedition;
     }
@@ -93,7 +94,7 @@ class IncidentReplanningIntegrationTest {
         final var alternative = decideReplanProposal.accept(proposal.getId(), 2,
                 new ReplanDecisionCommand(leader.getId(), "p-3 knows the site", TEN.plusMinutes(15)));
         alternative.submitForReview();
-        approveExpedition.approve(alternative, List.of());
+        approveExpedition.approve(alternative.getId(), List.of());
 
         final var audited = queryReplanProposals.get(proposal.getId());
         assertEquals(ReplanProposalStatus.ACCEPTED, audited.getStatus());

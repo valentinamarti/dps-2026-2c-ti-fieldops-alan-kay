@@ -4,6 +4,25 @@ import ar.edu.itba.dps.fieldops.adapters.driven.InMemoryExpeditionRepository;
 import ar.edu.itba.dps.fieldops.adapters.driven.InMemoryZoneRepository;
 import ar.edu.itba.dps.fieldops.business.estimations.ExpeditionEstimator;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.ports.in.ApproveExpeditionPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.AssignResourcesPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.CreateExpeditionPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.EstimateExpeditionPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.FindAssignmentCandidatesPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.FinishExpeditionPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.MarkResourceUnavailablePort;
+import ar.edu.itba.dps.fieldops.business.ports.in.QueryActivityTypesPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.QueryCatalogPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.QueryExpeditionsPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.QueryZonesPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.RegisterResourcesPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.RegisterZonePort;
+import ar.edu.itba.dps.fieldops.business.ports.in.ReportExpeditionPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.ScheduleActivityPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.ScheduleBlockPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.TrackActivityPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.TransitionExpeditionPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.ValidateExpeditionPort;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionIdProvider;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
@@ -60,12 +79,12 @@ public class FieldOpsConfig {
     }
 
     @Bean
-    CreateExpedition createExpedition(ExpeditionRepository repository, ZoneRepository zones, ResourceCatalog catalog) {
+    CreateExpeditionPort createExpedition(ExpeditionRepository repository, ZoneRepository zones, ResourceCatalog catalog) {
         return new CreateExpedition(repository, zones, catalog);
     }
 
     @Bean
-    ApproveExpedition approveExpedition(ResourceReservations reservations, ExpeditionRepository repository,
+    ApproveExpeditionPort approveExpedition(ResourceReservations reservations, ExpeditionRepository repository,
                                         ResourceCatalog catalog) {
         return new ApproveExpedition(List.of(), reservations, repository, catalog);
     }
@@ -81,83 +100,83 @@ public class FieldOpsConfig {
     }
 
     @Bean
-    FinishExpedition finishExpedition(ResourceReservations reservations, ExpeditionRepository repository) {
+    FinishExpeditionPort finishExpedition(ResourceReservations reservations, ExpeditionRepository repository) {
         return new FinishExpedition(reservations, repository);
     }
 
     @Bean
-    ScheduleActivity scheduleActivity(ExpeditionRepository repository, ZoneRepository zones,
+    ScheduleActivityPort scheduleActivity(ExpeditionRepository repository, ZoneRepository zones,
                                       ActivityTypeRegistry types) {
         return new ScheduleActivity(repository, zones, types);
     }
 
     @Bean
-    ScheduleBlock scheduleBlock(ExpeditionRepository repository, ZoneRepository zones, ActivityTypeRegistry types) {
+    ScheduleBlockPort scheduleBlock(ExpeditionRepository repository, ZoneRepository zones, ActivityTypeRegistry types) {
         return new ScheduleBlock(repository, zones, types);
     }
 
     @Bean
-    AssignResources assignResources(ExpeditionRepository repository, ResourceCatalog catalog) {
+    AssignResourcesPort assignResources(ExpeditionRepository repository, ResourceCatalog catalog) {
         return new AssignResources(repository, catalog);
     }
 
     @Bean
-    TransitionExpedition transitionExpedition(ExpeditionRepository repository) {
+    TransitionExpeditionPort transitionExpedition(ExpeditionRepository repository) {
         return new TransitionExpedition(repository);
     }
 
     @Bean
-    TrackActivity trackActivity(ExpeditionRepository repository) {
+    TrackActivityPort trackActivity(ExpeditionRepository repository) {
         return new TrackActivity(repository);
     }
 
     @Bean
-    QueryExpeditions queryExpeditions(ExpeditionRepository repository) {
+    QueryExpeditionsPort queryExpeditions(ExpeditionRepository repository) {
         return new QueryExpeditions(repository);
     }
 
     @Bean
-    RegisterResources registerResources(ResourceCatalog catalog) {
+    RegisterResourcesPort registerResources(ResourceCatalog catalog) {
         return new RegisterResources(catalog);
     }
 
     @Bean
-    MarkResourceUnavailable markResourceUnavailable(ResourceCatalog catalog) {
+    MarkResourceUnavailablePort markResourceUnavailable(ResourceCatalog catalog) {
         return new MarkResourceUnavailable(catalog);
     }
 
     @Bean
-    QueryCatalog queryCatalog(ResourceCatalog catalog) {
+    QueryCatalogPort queryCatalog(ResourceCatalog catalog) {
         return new QueryCatalog(catalog);
     }
 
     @Bean
-    RegisterZone registerZone(ZoneRepository zones) {
+    RegisterZonePort registerZone(ZoneRepository zones) {
         return new RegisterZone(zones);
     }
 
     @Bean
-    QueryZones queryZones(ZoneRepository zones) {
+    QueryZonesPort queryZones(ZoneRepository zones) {
         return new QueryZones(zones);
     }
 
     @Bean
-    ValidateExpedition validateExpedition(ExpeditionRepository repository) {
+    ValidateExpeditionPort validateExpedition(ExpeditionRepository repository) {
         return new ValidateExpedition(repository, List.of());
     }
 
     @Bean
-    EstimateExpedition estimateExpedition(ExpeditionRepository repository, ExpeditionEstimator estimator) {
+    EstimateExpeditionPort estimateExpedition(ExpeditionRepository repository, ExpeditionEstimator estimator) {
         return new EstimateExpedition(repository, estimator);
     }
 
     @Bean
-    ReportExpedition reportExpedition(ExpeditionRepository repository, ExpeditionReporter reporter) {
+    ReportExpeditionPort reportExpedition(ExpeditionRepository repository, ExpeditionReporter reporter) {
         return new ReportExpedition(repository, reporter);
     }
 
     @Bean
-    FindAssignmentCandidates findAssignmentCandidates(ExpeditionRepository repository, ResourceCatalog catalog) {
+    FindAssignmentCandidatesPort findAssignmentCandidates(ExpeditionRepository repository, ResourceCatalog catalog) {
         return new FindAssignmentCandidates(repository, catalog);
     }
 
@@ -167,7 +186,7 @@ public class FieldOpsConfig {
     }
 
     @Bean
-    QueryActivityTypes queryActivityTypes(ActivityTypeRegistry registry) {
+    QueryActivityTypesPort queryActivityTypes(ActivityTypeRegistry registry) {
         return new QueryActivityTypes(registry);
     }
 

@@ -1,6 +1,10 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.DuplicateResourceException;
+import ar.edu.itba.dps.fieldops.business.models.commands.RegisterInstrumentCommand;
+import ar.edu.itba.dps.fieldops.business.models.commands.RegisterPersonCommand;
+import ar.edu.itba.dps.fieldops.business.models.commands.RegisterSupplyCommand;
+import ar.edu.itba.dps.fieldops.business.models.commands.RegisterVehicleCommand;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.resources.Certification;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;

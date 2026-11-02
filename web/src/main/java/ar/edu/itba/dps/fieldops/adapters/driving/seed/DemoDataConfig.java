@@ -1,13 +1,13 @@
 package ar.edu.itba.dps.fieldops.adapters.driving.seed;
 
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
-import ar.edu.itba.dps.fieldops.business.usecases.AssignResources;
-import ar.edu.itba.dps.fieldops.business.usecases.CreateExpedition;
-import ar.edu.itba.dps.fieldops.business.usecases.MarkResourceUnavailable;
-import ar.edu.itba.dps.fieldops.business.usecases.RegisterResources;
-import ar.edu.itba.dps.fieldops.business.usecases.RegisterZone;
-import ar.edu.itba.dps.fieldops.business.usecases.ScheduleActivity;
-import ar.edu.itba.dps.fieldops.business.usecases.ScheduleBlock;
+import ar.edu.itba.dps.fieldops.business.ports.in.AssignResourcesPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.CreateExpeditionPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.MarkResourceUnavailablePort;
+import ar.edu.itba.dps.fieldops.business.ports.in.RegisterResourcesPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.RegisterZonePort;
+import ar.edu.itba.dps.fieldops.business.ports.in.ScheduleActivityPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.ScheduleBlockPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,10 +26,10 @@ public class DemoDataConfig {
     private static final Logger LOG = LoggerFactory.getLogger(DemoDataConfig.class);
 
     @Bean
-    DemoDataLoader demoDataLoader(RegisterZone registerZone, RegisterResources registerResources,
-                                  MarkResourceUnavailable markResourceUnavailable, CreateExpedition createExpedition,
-                                  ScheduleActivity scheduleActivity, ScheduleBlock scheduleBlock,
-                                  AssignResources assignResources, ObjectMapper json) {
+    DemoDataLoader demoDataLoader(RegisterZonePort registerZone, RegisterResourcesPort registerResources,
+                                  MarkResourceUnavailablePort markResourceUnavailable, CreateExpeditionPort createExpedition,
+                                  ScheduleActivityPort scheduleActivity, ScheduleBlockPort scheduleBlock,
+                                  AssignResourcesPort assignResources, ObjectMapper json) {
         return new DemoDataLoader(registerZone, registerResources, markResourceUnavailable, createExpedition,
                 scheduleActivity, scheduleBlock, assignResources, json);
     }

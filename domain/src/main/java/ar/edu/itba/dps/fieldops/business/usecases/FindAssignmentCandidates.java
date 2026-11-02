@@ -3,11 +3,13 @@ package ar.edu.itba.dps.fieldops.business.usecases;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.models.responses.AssignmentCandidates;
+import ar.edu.itba.dps.fieldops.business.ports.in.FindAssignmentCandidatesPort;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 
 import java.util.Objects;
 
-public class FindAssignmentCandidates {
+public class FindAssignmentCandidates implements FindAssignmentCandidatesPort {
 
     private final ExpeditionRepository repository;
     private final ResourceCatalog catalog;
@@ -17,6 +19,7 @@ public class FindAssignmentCandidates {
         this.catalog = Objects.requireNonNull(catalog, "catalog is required");
     }
 
+    @Override
     public AssignmentCandidates candidatesFor(ExpeditionId expeditionId, ActivityId activityId) {
         final var item = Lookups.item(Lookups.expedition(repository, expeditionId), activityId);
         final var activity = item.getActivity();
