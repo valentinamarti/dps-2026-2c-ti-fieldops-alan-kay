@@ -1,8 +1,8 @@
 package ar.edu.itba.dps.fieldops.adapters.driving.seed;
 
-import ar.edu.itba.dps.fieldops.adapters.driven.InMemoryExpeditionRepository;
-import ar.edu.itba.dps.fieldops.adapters.driven.InMemoryResourceCatalog;
-import ar.edu.itba.dps.fieldops.adapters.driven.InMemoryZoneRepository;
+import ar.edu.itba.dps.fieldops.business.fixtures.FakeResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.fixtures.FakeZoneRepository;
+import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.activities.ReusableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
@@ -21,6 +21,7 @@ import ar.edu.itba.dps.fieldops.business.rules.ActivityTypeRegistry;
 import ar.edu.itba.dps.fieldops.business.usecases.AssignResources;
 import ar.edu.itba.dps.fieldops.business.usecases.CreateExpedition;
 import ar.edu.itba.dps.fieldops.business.usecases.MarkResourceUnavailable;
+import ar.edu.itba.dps.fieldops.business.usecases.QueryZones;
 import ar.edu.itba.dps.fieldops.business.usecases.RegisterResources;
 import ar.edu.itba.dps.fieldops.business.usecases.RegisterZone;
 import ar.edu.itba.dps.fieldops.business.usecases.ScheduleActivity;
@@ -60,13 +61,14 @@ class DemoDataLoaderTest {
     private DemoDataLoader loader;
 
     @BeforeEach
-    void wireTheHexagonWithTheInMemoryAdapters() {
-        expeditions = new InMemoryExpeditionRepository();
-        catalog = new InMemoryResourceCatalog();
-        zones = new InMemoryZoneRepository();
+    void wireTheHexagonWithTheTestDoubles() {
+        expeditions = new SequentialExpeditionRepository();
+        catalog = new FakeResourceCatalog();
+        zones = new FakeZoneRepository();
         validate = new ValidateExpedition(expeditions, List.of());
         final var types = ActivityTypeRegistry.withStandardTypes();
         loader = new DemoDataLoader(
+                new QueryZones(zones),
                 new RegisterZone(zones),
                 new RegisterResources(catalog),
                 new MarkResourceUnavailable(catalog),
@@ -75,6 +77,16 @@ class DemoDataLoaderTest {
                 new ScheduleBlock(expeditions, zones, types),
                 new AssignResources(expeditions, catalog),
                 JsonMapper.builder().build());
+    }
+
+    @Test
+    void doesNotLoadTheDemoAgainWhenTheDataIsAlreadyThere() throws Exception {
+        loadTheDemo();
+
+        final var loadedAgain = loader.loadIfEmpty(document("demo/catalog.json"), document("demo/expedition.json"));
+
+        assertThat(loadedAgain).isEmpty();
+        assertThat(expeditions.findAll()).hasSize(1);
     }
 
     @Test

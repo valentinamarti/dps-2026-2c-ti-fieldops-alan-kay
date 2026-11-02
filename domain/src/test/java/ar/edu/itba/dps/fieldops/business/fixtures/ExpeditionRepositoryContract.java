@@ -74,6 +74,16 @@ public abstract class ExpeditionRepositoryContract {
     }
 
     @Test
+    void doesNotKeepAChangeThatWasNotSaved() {
+        final var expedition = expeditionIn(coast, leader).build(repository);
+        repository.add(expedition);
+
+        expedition.submitForReview();
+
+        assertEquals(ExpeditionStatus.DRAFT, repository.findById(expedition.getId()).orElseThrow().getStatus());
+    }
+
+    @Test
     void findsNothingForAnUnknownId() {
         assertEquals(Optional.empty(), repository.findById(repository.nextId()));
     }

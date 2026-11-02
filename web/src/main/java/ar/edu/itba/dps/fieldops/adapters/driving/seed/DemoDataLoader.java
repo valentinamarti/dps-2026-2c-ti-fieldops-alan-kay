@@ -25,6 +25,7 @@ import ar.edu.itba.dps.fieldops.business.models.resources.Unavailability;
 import ar.edu.itba.dps.fieldops.business.ports.in.AssignResourcesPort;
 import ar.edu.itba.dps.fieldops.business.ports.in.CreateExpeditionPort;
 import ar.edu.itba.dps.fieldops.business.ports.in.MarkResourceUnavailablePort;
+import ar.edu.itba.dps.fieldops.business.ports.in.QueryZonesPort;
 import ar.edu.itba.dps.fieldops.business.ports.in.RegisterResourcesPort;
 import ar.edu.itba.dps.fieldops.business.ports.in.RegisterZonePort;
 import ar.edu.itba.dps.fieldops.business.ports.in.ScheduleActivityPort;
@@ -39,6 +40,7 @@ import java.util.Objects;
 import java.util.function.BiConsumer;
 
 public class DemoDataLoader {
+    private final QueryZonesPort queryZones;
     private final RegisterZonePort registerZone;
     private final RegisterResourcesPort registerResources;
     private final MarkResourceUnavailablePort markResourceUnavailable;
@@ -48,10 +50,11 @@ public class DemoDataLoader {
     private final AssignResourcesPort assignResources;
     private final ObjectMapper json;
 
-    public DemoDataLoader(RegisterZonePort registerZone, RegisterResourcesPort registerResources,
+    public DemoDataLoader(QueryZonesPort queryZones, RegisterZonePort registerZone, RegisterResourcesPort registerResources,
                           MarkResourceUnavailablePort markResourceUnavailable, CreateExpeditionPort createExpedition,
                           ScheduleActivityPort scheduleActivity, ScheduleBlockPort scheduleBlock,
                           AssignResourcesPort assignResources, ObjectMapper json) {
+        this.queryZones = Objects.requireNonNull(queryZones, "queryZones is required");
         this.registerZone = Objects.requireNonNull(registerZone, "registerZone is required");
         this.registerResources = Objects.requireNonNull(registerResources, "registerResources is required");
         this.markResourceUnavailable =
@@ -61,6 +64,10 @@ public class DemoDataLoader {
         this.scheduleBlock = Objects.requireNonNull(scheduleBlock, "scheduleBlock is required");
         this.assignResources = Objects.requireNonNull(assignResources, "assignResources is required");
         this.json = Objects.requireNonNull(json, "json is required");
+    }
+
+    public List<ExpeditionId> loadIfEmpty(InputStream catalog, InputStream expeditions) {
+        return queryZones.list().isEmpty() ? load(catalog, expeditions) : List.of();
     }
 
     public List<ExpeditionId> load(InputStream catalog, InputStream expeditions) {

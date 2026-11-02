@@ -2,6 +2,7 @@ package ar.edu.itba.dps.fieldops.adapters.driving.rest;
 
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.mappers.ValidationMapper;
 import ar.edu.itba.dps.fieldops.business.exceptions.ActivitiesInProgressException;
+import ar.edu.itba.dps.fieldops.business.exceptions.ConcurrentUpdateException;
 import ar.edu.itba.dps.fieldops.business.exceptions.DuplicateExpeditionException;
 import ar.edu.itba.dps.fieldops.business.exceptions.DuplicateReplanProposalException;
 import ar.edu.itba.dps.fieldops.business.exceptions.DuplicateResourceException;
@@ -55,6 +56,7 @@ public class DomainExceptionHandler extends ResponseEntityExceptionHandler {
             entry(DuplicateReplanProposalException.class, HttpStatus.CONFLICT),
             entry(ProposalAlreadyDecidedException.class, HttpStatus.CONFLICT),
             entry(StaleAlternativeException.class, HttpStatus.CONFLICT),
+            entry(ConcurrentUpdateException.class, HttpStatus.CONFLICT),
 
             entry(ExpeditionNotApprovableException.class, HttpStatus.UNPROCESSABLE_ENTITY),
             entry(UnacceptedWarningException.class, HttpStatus.UNPROCESSABLE_ENTITY),

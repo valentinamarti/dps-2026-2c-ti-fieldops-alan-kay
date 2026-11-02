@@ -928,6 +928,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - **Mocks como prueba de persistencia** — es exactamente lo que la consigna descarta. Un repositorio mockeado prueba que el caso de uso lo llama, no que el repositorio cumpla su contrato.
   - **Un repositorio por entidad, con el catálogo incluido** — `ResourceCatalog` quedó como clase del modelo y no como puerto, que es la deuda que D52 ya tiene anotada y la primera cosa a resolver cuando aparezca la persistencia real.
   - **Guardar el estado en un archivo entre arranques** — daría una falsa sensación de persistencia sin ninguna de sus propiedades (transacciones, concurrencia, consultas) y escondería el problema real.
+- **Resuelto en D67 y D68:** la persistencia ya es real, sobre PostgreSQL. Lo que sigue describe cómo quedó esta entrada al momento de la entrega.
 - **Consecuencia:**
   - **Queda registrado como deuda técnica de la entrega.** Nada de lo que la aplicación guarda sobrevive a un reinicio, no hay transacciones y no hay concurrencia: dos pedidos simultáneos sobre la misma expedición se pisan, porque los adaptadores usan `LinkedHashMap` sin sincronizar y las entidades se mutan en el lugar. Alcanza para la entrega y para la demostración, que son de un solo usuario y de un solo proceso.
   - **Qué habría que hacer:** un adaptador JPA por puerto en un módulo propio (o en `app`), entidades de persistencia separadas del modelo con sus mappers para no anotar `domain` (D36), un `ResourceRepository` que le dé puerto al catálogo (D52), decidir si el puerto gana un `save`, y las subclases de los tres contratos corriendo contra la base real. El escenario de `demo/` pasa a ser una migración (D50).
@@ -1329,6 +1330,24 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - Una entidad JPA por nodo con relaciones — más clases y más cascadas para un árbol que siempre se lee y se escribe entero.
   - H2 para los tests — otra base distinta de la de producción, con otras diferencias.
 - **Consecuencia:** en esta fase los adaptadores existen y pasan los contratos, pero la aplicación todavía arranca en memoria, y las dependencias de JPA son opcionales en `app` para no activarse en `web`. Correr los tests de `app` requiere Docker.
+
+### D68 — La aplicación corre sobre la base, con la transacción en el borde del caso de uso (corrección de la Entrega 2, persistencia, cierra D51, revisa D37, D45 y D50)
+
+- **Origen:** corrección de la Entrega 2. La aplicación seguía en memoria, y D51 anotaba que no había transacciones ni concurrencia.
+- **Patrón / principio:** Decorator con un proxy sobre cada puerto de entrada + composition root (D37): el dominio sigue sin anotaciones de Spring.
+- **Dónde:** `TransactionalUseCases` en `web`; `FieldOpsConfig` y `ReplanningConfig`; `ConcurrentUpdateException`; `application.yml`; `DemoDataLoader.loadIfEmpty`. Se eliminan los repositorios en memoria; queda `InMemoryEventPublisher`.
+- **Por qué:**
+  - Cada caso de uso es una transacción: todo lo que guarda se confirma junto o no se guarda. El proxy se apoya en los puertos de D63, y distingue escrituras de consultas.
+  - **`ProposeReplan` corre en la misma transacción que el incidente**, por la entrega síncrona de D45: si falla, el incidente se deshace. Revisa la consecuencia de D45, que decía que no había transacción.
+  - **Concurrencia:** `@Version` detecta dos escrituras en conflicto. El proxy traduce el error a `ConcurrentUpdateException`, que la API responde con 409: el dominio no conoce la excepción de Spring.
+  - **El seed solo carga si no hay zonas.** Antes se cargaba en cada arranque, y con datos que sobreviven fallaría por duplicados. Para repetir la demo se borra el volumen con `docker compose down -v`. Revisa D50: el escenario sigue en JSON y no pasa a ser una migración, para no ensuciar una base sin el perfil `demo`.
+  - **Los tests de API limpian la base antes de cada test** con `@Sql`, en vez de levantar un contexto nuevo con `@DirtiesContext`. Comparten un solo contenedor y un solo contexto.
+- **Alternativas descartadas:**
+  - `@Transactional` en los casos de uso — metería Spring en el dominio, y el enforcer lo prohíbe.
+  - Una clase decoradora por puerto — 22 clases iguales.
+  - `@Transactional` en los controllers — la transacción quedaría atada a HTTP, y el cargador de la demo no la tendría.
+  - Mantener los adaptadores en memoria para los tests de dominio — los tests usan dobles propios, y el código de producción no debe tener una segunda implementación sin uso.
+- **Consecuencia:** correr la aplicación y los tests de `web` y `app` requiere Docker. La deuda de D51 queda resuelta.
 
 ## Funcionalidades nuevas de la Entrega 2
 

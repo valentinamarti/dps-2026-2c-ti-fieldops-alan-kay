@@ -2,12 +2,14 @@ package ar.edu.itba.dps.fieldops.adapters.driving.seed;
 
 import com.jayway.jsonpath.JsonPath;
 import org.hamcrest.Matchers;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
-import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -20,7 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("demo")
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
+@Sql("/clean-database.sql")
 class DemoScriptApiTest {
     private static final String NIGHT_DIVE = """
             {
@@ -51,6 +53,16 @@ class DemoScriptApiTest {
 
     @Autowired
     private MockMvc api;
+    @Autowired
+    private DemoDataLoader loader;
+
+    @BeforeEach
+    void loadTheDemo() throws Exception {
+        try (var catalog = new ClassPathResource("demo/catalog.json").getInputStream();
+             var expeditions = new ClassPathResource("demo/expedition.json").getInputStream()) {
+            loader.load(catalog, expeditions);
+        }
+    }
 
     @Test
     void theSeedLeavesTheCatalogTheZonesAndOneExpeditionInDraft() throws Exception {

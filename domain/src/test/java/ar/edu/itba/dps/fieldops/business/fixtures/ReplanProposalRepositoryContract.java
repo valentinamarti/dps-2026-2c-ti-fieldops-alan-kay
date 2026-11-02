@@ -85,6 +85,16 @@ public abstract class ReplanProposalRepositoryContract {
     }
 
     @Test
+    void doesNotKeepAChangeThatWasNotSaved() {
+        final var proposal = proposalFor(expedition, 1);
+        repository.add(proposal);
+
+        proposal.supersedeBy(repository.nextId());
+
+        assertEquals(ReplanProposalStatus.PENDING, repository.findById(proposal.getId()).orElseThrow().getStatus());
+    }
+
+    @Test
     void findsNothingForAnUnknownId() {
         assertEquals(Optional.empty(), repository.findById(repository.nextId()));
     }

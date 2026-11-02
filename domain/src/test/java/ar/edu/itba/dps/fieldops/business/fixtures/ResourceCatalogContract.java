@@ -150,6 +150,16 @@ public abstract class ResourceCatalogContract {
     }
 
     @Test
+    void doesNotKeepAChangeThatWasNotSaved() {
+        final var diver = new Person(new ResourceId("p-1"), "Ana", Set.of());
+        catalog.addStaff(diver);
+
+        diver.reserve(new Reservation(ANOTHER_EXPEDITION, MORNING));
+
+        assertTrue(catalog.findStaff(new ResourceId("p-1")).orElseThrow().isAvailableDuring(MORNING));
+    }
+
+    @Test
     void keepsTheCalendarOfAResourceThatWasSaved() {
         final var diver = new Person(new ResourceId("p-1"), "Ana", Set.of());
         catalog.addStaff(diver);

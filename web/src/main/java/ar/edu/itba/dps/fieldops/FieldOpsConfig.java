@@ -1,8 +1,12 @@
 package ar.edu.itba.dps.fieldops;
 
-import ar.edu.itba.dps.fieldops.adapters.driven.InMemoryExpeditionRepository;
-import ar.edu.itba.dps.fieldops.adapters.driven.InMemoryResourceCatalog;
-import ar.edu.itba.dps.fieldops.adapters.driven.InMemoryZoneRepository;
+import ar.edu.itba.dps.fieldops.adapters.driven.persistence.ExpeditionJpaRepository;
+import ar.edu.itba.dps.fieldops.adapters.driven.persistence.JpaExpeditionRepository;
+import ar.edu.itba.dps.fieldops.adapters.driven.persistence.JpaResourceCatalog;
+import ar.edu.itba.dps.fieldops.adapters.driven.persistence.JpaZoneRepository;
+import ar.edu.itba.dps.fieldops.adapters.driven.persistence.LoadedAggregates;
+import ar.edu.itba.dps.fieldops.adapters.driven.persistence.ResourceJpaRepository;
+import ar.edu.itba.dps.fieldops.adapters.driven.persistence.ZoneJpaRepository;
 import ar.edu.itba.dps.fieldops.business.estimations.ExpeditionEstimator;
 import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.ports.in.ApproveExpeditionPort;
@@ -53,6 +57,7 @@ import ar.edu.itba.dps.fieldops.business.usecases.TransitionExpedition;
 import ar.edu.itba.dps.fieldops.business.usecases.ValidateExpedition;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import java.util.List;
 
@@ -60,18 +65,29 @@ import java.util.List;
 public class FieldOpsConfig {
 
     @Bean
-    ExpeditionRepository expeditionRepository() {
-        return new InMemoryExpeditionRepository();
+    TransactionalUseCases transactionalUseCases(PlatformTransactionManager transactions) {
+        return new TransactionalUseCases(transactions);
     }
 
     @Bean
-    ZoneRepository zoneRepository() {
-        return new InMemoryZoneRepository();
+    LoadedAggregates loadedAggregates() {
+        return new LoadedAggregates();
     }
 
     @Bean
-    ResourceCatalog resourceCatalog() {
-        return new InMemoryResourceCatalog();
+    ExpeditionRepository expeditionRepository(ExpeditionJpaRepository expeditions, ZoneRepository zones, ResourceCatalog catalog,
+                                              ActivityTypeRegistry types, LoadedAggregates loaded) {
+        return new JpaExpeditionRepository(expeditions, zones, catalog, types, loaded);
+    }
+
+    @Bean
+    ZoneRepository zoneRepository(ZoneJpaRepository zones) {
+        return new JpaZoneRepository(zones);
+    }
+
+    @Bean
+    ResourceCatalog resourceCatalog(ResourceJpaRepository resources, LoadedAggregates loaded) {
+        return new JpaResourceCatalog(resources, loaded);
     }
 
     @Bean
@@ -80,14 +96,14 @@ public class FieldOpsConfig {
     }
 
     @Bean
-    CreateExpeditionPort createExpedition(ExpeditionRepository repository, ZoneRepository zones, ResourceCatalog catalog) {
-        return new CreateExpedition(repository, zones, catalog);
+    CreateExpeditionPort createExpedition(ExpeditionRepository repository, ZoneRepository zones, ResourceCatalog catalog, TransactionalUseCases transactional) {
+        return transactional.writing(CreateExpeditionPort.class, new CreateExpedition(repository, zones, catalog));
     }
 
     @Bean
     ApproveExpeditionPort approveExpedition(ResourceReservations reservations, ExpeditionRepository repository,
-                                        ResourceCatalog catalog) {
-        return new ApproveExpedition(List.of(), reservations, repository, catalog);
+                                        ResourceCatalog catalog, TransactionalUseCases transactional) {
+        return transactional.writing(ApproveExpeditionPort.class, new ApproveExpedition(List.of(), reservations, repository, catalog));
     }
 
     @Bean
@@ -102,84 +118,84 @@ public class FieldOpsConfig {
 
     @Bean
     FinishExpeditionPort finishExpedition(ResourceReservations reservations, ExpeditionRepository repository,
-                                          ResourceCatalog catalog) {
-        return new FinishExpedition(reservations, repository, catalog);
+                                          ResourceCatalog catalog, TransactionalUseCases transactional) {
+        return transactional.writing(FinishExpeditionPort.class, new FinishExpedition(reservations, repository, catalog));
     }
 
     @Bean
     ScheduleActivityPort scheduleActivity(ExpeditionRepository repository, ZoneRepository zones,
-                                      ActivityTypeRegistry types) {
-        return new ScheduleActivity(repository, zones, types);
+                                      ActivityTypeRegistry types, TransactionalUseCases transactional) {
+        return transactional.writing(ScheduleActivityPort.class, new ScheduleActivity(repository, zones, types));
     }
 
     @Bean
-    ScheduleBlockPort scheduleBlock(ExpeditionRepository repository, ZoneRepository zones, ActivityTypeRegistry types) {
-        return new ScheduleBlock(repository, zones, types);
+    ScheduleBlockPort scheduleBlock(ExpeditionRepository repository, ZoneRepository zones, ActivityTypeRegistry types, TransactionalUseCases transactional) {
+        return transactional.writing(ScheduleBlockPort.class, new ScheduleBlock(repository, zones, types));
     }
 
     @Bean
-    AssignResourcesPort assignResources(ExpeditionRepository repository, ResourceCatalog catalog) {
-        return new AssignResources(repository, catalog);
+    AssignResourcesPort assignResources(ExpeditionRepository repository, ResourceCatalog catalog, TransactionalUseCases transactional) {
+        return transactional.writing(AssignResourcesPort.class, new AssignResources(repository, catalog));
     }
 
     @Bean
-    TransitionExpeditionPort transitionExpedition(ExpeditionRepository repository) {
-        return new TransitionExpedition(repository);
+    TransitionExpeditionPort transitionExpedition(ExpeditionRepository repository, TransactionalUseCases transactional) {
+        return transactional.writing(TransitionExpeditionPort.class, new TransitionExpedition(repository));
     }
 
     @Bean
-    TrackActivityPort trackActivity(ExpeditionRepository repository, ResourceCatalog catalog) {
-        return new TrackActivity(repository, catalog);
+    TrackActivityPort trackActivity(ExpeditionRepository repository, ResourceCatalog catalog, TransactionalUseCases transactional) {
+        return transactional.writing(TrackActivityPort.class, new TrackActivity(repository, catalog));
     }
 
     @Bean
-    QueryExpeditionsPort queryExpeditions(ExpeditionRepository repository) {
-        return new QueryExpeditions(repository);
+    QueryExpeditionsPort queryExpeditions(ExpeditionRepository repository, TransactionalUseCases transactional) {
+        return transactional.reading(QueryExpeditionsPort.class, new QueryExpeditions(repository));
     }
 
     @Bean
-    RegisterResourcesPort registerResources(ResourceCatalog catalog) {
-        return new RegisterResources(catalog);
+    RegisterResourcesPort registerResources(ResourceCatalog catalog, TransactionalUseCases transactional) {
+        return transactional.writing(RegisterResourcesPort.class, new RegisterResources(catalog));
     }
 
     @Bean
-    MarkResourceUnavailablePort markResourceUnavailable(ResourceCatalog catalog) {
-        return new MarkResourceUnavailable(catalog);
+    MarkResourceUnavailablePort markResourceUnavailable(ResourceCatalog catalog, TransactionalUseCases transactional) {
+        return transactional.writing(MarkResourceUnavailablePort.class, new MarkResourceUnavailable(catalog));
     }
 
     @Bean
-    QueryCatalogPort queryCatalog(ResourceCatalog catalog) {
-        return new QueryCatalog(catalog);
+    QueryCatalogPort queryCatalog(ResourceCatalog catalog, TransactionalUseCases transactional) {
+        return transactional.reading(QueryCatalogPort.class, new QueryCatalog(catalog));
     }
 
     @Bean
-    RegisterZonePort registerZone(ZoneRepository zones) {
-        return new RegisterZone(zones);
+    RegisterZonePort registerZone(ZoneRepository zones, TransactionalUseCases transactional) {
+        return transactional.writing(RegisterZonePort.class, new RegisterZone(zones));
     }
 
     @Bean
-    QueryZonesPort queryZones(ZoneRepository zones) {
-        return new QueryZones(zones);
+    QueryZonesPort queryZones(ZoneRepository zones, TransactionalUseCases transactional) {
+        return transactional.reading(QueryZonesPort.class, new QueryZones(zones));
     }
 
     @Bean
-    ValidateExpeditionPort validateExpedition(ExpeditionRepository repository) {
-        return new ValidateExpedition(repository, List.of());
+    ValidateExpeditionPort validateExpedition(ExpeditionRepository repository, TransactionalUseCases transactional) {
+        return transactional.reading(ValidateExpeditionPort.class, new ValidateExpedition(repository, List.of()));
     }
 
     @Bean
-    EstimateExpeditionPort estimateExpedition(ExpeditionRepository repository, ExpeditionEstimator estimator) {
-        return new EstimateExpedition(repository, estimator);
+    EstimateExpeditionPort estimateExpedition(ExpeditionRepository repository, ExpeditionEstimator estimator, TransactionalUseCases transactional) {
+        return transactional.reading(EstimateExpeditionPort.class, new EstimateExpedition(repository, estimator));
     }
 
     @Bean
-    ReportExpeditionPort reportExpedition(ExpeditionRepository repository, ExpeditionReporter reporter) {
-        return new ReportExpedition(repository, reporter);
+    ReportExpeditionPort reportExpedition(ExpeditionRepository repository, ExpeditionReporter reporter, TransactionalUseCases transactional) {
+        return transactional.reading(ReportExpeditionPort.class, new ReportExpedition(repository, reporter));
     }
 
     @Bean
-    FindAssignmentCandidatesPort findAssignmentCandidates(ExpeditionRepository repository, ResourceCatalog catalog) {
-        return new FindAssignmentCandidates(repository, catalog);
+    FindAssignmentCandidatesPort findAssignmentCandidates(ExpeditionRepository repository, ResourceCatalog catalog, TransactionalUseCases transactional) {
+        return transactional.reading(FindAssignmentCandidatesPort.class, new FindAssignmentCandidates(repository, catalog));
     }
 
     @Bean
@@ -188,8 +204,8 @@ public class FieldOpsConfig {
     }
 
     @Bean
-    QueryActivityTypesPort queryActivityTypes(ActivityTypeRegistry registry) {
-        return new QueryActivityTypes(registry);
+    QueryActivityTypesPort queryActivityTypes(ActivityTypeRegistry registry, TransactionalUseCases transactional) {
+        return transactional.reading(QueryActivityTypesPort.class, new QueryActivityTypes(registry));
     }
 
     @Bean

@@ -155,16 +155,6 @@ class PersistedStateRoundTripTest {
     }
 
     @Test
-    void aChangeThatWasNotSavedIsNotPersisted() {
-        final var expedition = expeditionIn(coast, leader).build(expeditions);
-        expeditions.add(expedition);
-
-        expedition.submitForReview();
-
-        assertEquals(ExpeditionStatus.DRAFT, expeditions.findById(expedition.getId()).orElseThrow().getStatus());
-    }
-
-    @Test
     void aProposalComesBackWithEveryKindOfReasonAndItsDecision() {
         final var incident = new Incident(new IncidentId(OWNER, 1), new ActivityId("a-1"), "Storm", at(9), Optional.of(worker.getId()), Optional.of(Duration.ofMinutes(90)));
         final var proposal = new ReplanProposal(proposals.nextId(), OWNER, incident, List.of(
