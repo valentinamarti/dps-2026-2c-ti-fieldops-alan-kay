@@ -8,6 +8,7 @@ import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 public class SequentialExpeditionRepository implements ExpeditionRepository {
@@ -25,6 +26,12 @@ public class SequentialExpeditionRepository implements ExpeditionRepository {
         if (expeditions.putIfAbsent(expedition.getId(), expedition) != null) {
             throw new DuplicateExpeditionException(expedition.getId());
         }
+    }
+
+    @Override
+    public void save(Expedition expedition) {
+        Objects.requireNonNull(expedition, "expedition is required");
+        expeditions.put(expedition.getId(), expedition);
     }
 
     @Override

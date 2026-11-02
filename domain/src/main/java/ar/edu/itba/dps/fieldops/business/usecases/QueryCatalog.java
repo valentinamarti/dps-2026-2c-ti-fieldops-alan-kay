@@ -1,6 +1,6 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
-import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.responses.InstrumentView;
 import ar.edu.itba.dps.fieldops.business.models.responses.PersonView;

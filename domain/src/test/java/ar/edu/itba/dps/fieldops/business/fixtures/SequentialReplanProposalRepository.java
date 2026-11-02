@@ -10,6 +10,7 @@ import ar.edu.itba.dps.fieldops.business.providers.ReplanProposalRepository;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 public class SequentialReplanProposalRepository implements ReplanProposalRepository {
@@ -27,6 +28,12 @@ public class SequentialReplanProposalRepository implements ReplanProposalReposit
         if (proposals.putIfAbsent(proposal.getId(), proposal) != null) {
             throw new DuplicateReplanProposalException(proposal.getId());
         }
+    }
+
+    @Override
+    public void save(ReplanProposal proposal) {
+        Objects.requireNonNull(proposal, "proposal is required");
+        proposals.put(proposal.getId(), proposal);
     }
 
     @Override

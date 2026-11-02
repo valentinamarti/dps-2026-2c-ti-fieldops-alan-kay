@@ -5,7 +5,7 @@ import ar.edu.itba.dps.fieldops.business.models.commands.WarningAcceptance;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.exceptions.NotFoundException;
-import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.validation.AcceptedWarning;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
 import ar.edu.itba.dps.fieldops.business.ports.in.ApproveExpeditionPort;
@@ -54,6 +54,13 @@ public class ApproveExpedition implements ApproveExpeditionPort {
         replaced.ifPresent(reservations::releaseFor);
         reservations.reserveFor(expedition);
         replaced.ifPresent(original -> original.markReplacedBy(expedition.getId()));
+        saveWithItsResources(expedition);
+        replaced.ifPresent(this::saveWithItsResources);
+    }
+
+    private void saveWithItsResources(Expedition expedition) {
+        repository.save(expedition);
+        expedition.assignedResources().forEach(catalog::save);
     }
 
     private Expedition findReplaced(ExpeditionId id) {

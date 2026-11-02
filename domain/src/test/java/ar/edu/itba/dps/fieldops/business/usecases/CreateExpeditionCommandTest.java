@@ -1,12 +1,13 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.NotFoundException;
+import ar.edu.itba.dps.fieldops.business.fixtures.FakeResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
 import ar.edu.itba.dps.fieldops.business.models.commands.CreateExpeditionCommand;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionRestrictions;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
-import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.responses.ExpeditionView;
 import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
@@ -35,7 +36,7 @@ class CreateExpeditionCommandTest {
 
     private final ExpeditionRepository repository = spy(new SequentialExpeditionRepository());
     private final ZoneRepository zones = mock(ZoneRepository.class);
-    private final ResourceCatalog catalog = new ResourceCatalog();
+    private final ResourceCatalog catalog = new FakeResourceCatalog();
     private final CreateExpedition createExpedition = new CreateExpedition(repository, zones, catalog);
     private final Zone coast = zone("z-1");
 

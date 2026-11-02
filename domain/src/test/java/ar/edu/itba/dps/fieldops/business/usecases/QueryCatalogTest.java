@@ -1,7 +1,8 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.NotFoundException;
-import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.fixtures.FakeResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.responses.InstrumentView;
 import ar.edu.itba.dps.fieldops.business.models.responses.PersonView;
@@ -22,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class QueryCatalogTest {
-    private final ResourceCatalog catalog = new ResourceCatalog();
+    private final ResourceCatalog catalog = new FakeResourceCatalog();
     private final QueryCatalog query = new QueryCatalog(catalog);
 
     @Test

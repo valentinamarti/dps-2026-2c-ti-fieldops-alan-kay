@@ -1291,6 +1291,24 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - Guardar las reglas serializadas — ataría la base a clases de Java y perdería las reglas nuevas de un tipo existente.
 - **Consecuencia:** un campo nuevo de una entidad hay que agregarlo también a su snapshot, y los tests de ida y vuelta lo detectan si se compara `snapshot()`. Todavía no hay base: esto es lo que el adaptador va a usar.
 
+### D66 — Los casos de uso guardan lo que cambian y el catálogo es un puerto (corrección de la Entrega 2, persistencia, revisa D38, D45, D51 y D52)
+
+- **Origen:** corrección de la Entrega 2. `ExpeditionRepository` no tenía `save` y los casos de uso mutaban la instancia que devolvía `findById`, el contrato exigía la misma instancia con `assertSame` (algo que un adaptador sobre una base no puede cumplir) y el catálogo no tenía puerto.
+- **Patrón / principio:** repositorio como puerto de salida (D35) + Dependency Inversion: el catálogo pasa a ser una interfaz del dominio.
+- **Dónde:** `ExpeditionRepository.save`, `ReplanProposalRepository.save`; interfaz `ResourceCatalog` en `business.providers` con `save(Resource)`; `InMemoryResourceCatalog` en `app`; `FakeResourceCatalog` y `ResourceCatalogContract` en los fixtures; `Expedition.assignedResources`; los casos de uso que mutan; `UseCasesSaveTheirChangesTest`.
+- **Por qué:**
+  - Cada caso de uso que cambia algo lo guarda: el comportamiento deja de depender de que los datos estén en memoria.
+  - **Los recursos se guardan explícitamente.** Aprobar, finalizar y consumir mutan recursos a través de la expedición, y el caso de uso sabe qué tocó. Que `save(expedition)` los guardara por detrás escondería una escritura sobre otro agregado.
+  - **`RegisterIncident` guarda antes de publicar el evento,** porque `ProposeReplan` vuelve a buscar la expedición y tiene que encontrar el incidente.
+  - `ZoneRepository` no tiene `save`: `Zone` es inmutable.
+  - Las consultas por requisito del catálogo son métodos `default` del puerto: son reglas de dominio (quién califica y está libre) sobre los recursos que el adaptador trae, y no se repiten en cada adaptador.
+  - Los contratos comparan por id y estado (`snapshot()`), y `ResourceCatalogContract` es un cuarto contrato, con los tests que antes eran de la clase.
+- **Alternativas descartadas:**
+  - Que el adaptador detecte los cambios (dirty checking) y el puerto no tenga `save` — ataría los casos de uso a una sesión abierta, y el informe pide agregar `save`.
+  - Filtrar los requisitos en la base — duplicaría en SQL reglas que el dominio ya tiene.
+  - Pasar el catálogo a `TrackActivity` y `FinishExpedition` por otro servicio — son los casos de uso los que cambian los consumibles, así que reciben el puerto.
+- **Consecuencia:** `TrackActivity` y `FinishExpedition` reciben el catálogo. `save` guarda el último estado, también si no existía: `add` es quien rechaza los duplicados. Mientras los datos sigan en memoria, olvidar un `save` no se notaría al ejecutar; por eso cada `save` tiene su test con Mockito.
+
 ## Funcionalidades nuevas de la Entrega 2
 
 ### F1 — Actividades nocturnas

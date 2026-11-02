@@ -1,9 +1,10 @@
 package ar.edu.itba.dps.fieldops;
 
 import ar.edu.itba.dps.fieldops.adapters.driven.InMemoryExpeditionRepository;
+import ar.edu.itba.dps.fieldops.adapters.driven.InMemoryResourceCatalog;
 import ar.edu.itba.dps.fieldops.adapters.driven.InMemoryZoneRepository;
 import ar.edu.itba.dps.fieldops.business.estimations.ExpeditionEstimator;
-import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.ports.in.ApproveExpeditionPort;
 import ar.edu.itba.dps.fieldops.business.ports.in.AssignResourcesPort;
 import ar.edu.itba.dps.fieldops.business.ports.in.CreateExpeditionPort;
@@ -70,7 +71,7 @@ public class FieldOpsConfig {
 
     @Bean
     ResourceCatalog resourceCatalog() {
-        return new ResourceCatalog();
+        return new InMemoryResourceCatalog();
     }
 
     @Bean
@@ -100,8 +101,9 @@ public class FieldOpsConfig {
     }
 
     @Bean
-    FinishExpeditionPort finishExpedition(ResourceReservations reservations, ExpeditionRepository repository) {
-        return new FinishExpedition(reservations, repository);
+    FinishExpeditionPort finishExpedition(ResourceReservations reservations, ExpeditionRepository repository,
+                                          ResourceCatalog catalog) {
+        return new FinishExpedition(reservations, repository, catalog);
     }
 
     @Bean
@@ -126,8 +128,8 @@ public class FieldOpsConfig {
     }
 
     @Bean
-    TrackActivityPort trackActivity(ExpeditionRepository repository) {
-        return new TrackActivity(repository);
+    TrackActivityPort trackActivity(ExpeditionRepository repository, ResourceCatalog catalog) {
+        return new TrackActivity(repository, catalog);
     }
 
     @Bean

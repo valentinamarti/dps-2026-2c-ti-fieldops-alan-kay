@@ -25,6 +25,7 @@ public class RegisterIncident implements RegisterIncidentPort {
     public ReplanProposalView register(RegisterIncidentCommand command) {
         final var expedition = Lookups.expedition(expeditions, command.expeditionId());
         final var incident = expedition.registerIncident(Lookups.item(expedition, command.activityId()), command.report());
+        expeditions.save(expedition);
         publisher.publish(new IncidentRegistered(expedition.getId(), incident));
         return proposals.findByIncident(incident.id()).map(ReplanProposalView::of).orElseThrow(() ->
                 new IllegalStateException("no replan proposal was made for the incident %s".formatted(incident.id())));

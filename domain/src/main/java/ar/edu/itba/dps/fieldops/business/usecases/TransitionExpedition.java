@@ -41,6 +41,8 @@ public class TransitionExpedition implements TransitionExpeditionPort {
     }
 
     private void apply(ExpeditionId id, Consumer<Expedition> transition) {
-        transition.accept(Lookups.expedition(repository, id));
+        final var expedition = Lookups.expedition(repository, id);
+        transition.accept(expedition);
+        repository.save(expedition);
     }
 }

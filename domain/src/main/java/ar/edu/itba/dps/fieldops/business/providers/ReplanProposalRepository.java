@@ -13,6 +13,8 @@ public interface ReplanProposalRepository {
 
     void add(ReplanProposal proposal);
 
+    void save(ReplanProposal proposal);
+
     Optional<ReplanProposal> findById(ReplanProposalId id);
 
     Optional<ReplanProposal> findByIncident(IncidentId incident);

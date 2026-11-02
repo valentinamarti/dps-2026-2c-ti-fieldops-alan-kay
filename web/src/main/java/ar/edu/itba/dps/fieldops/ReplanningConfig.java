@@ -3,7 +3,7 @@ package ar.edu.itba.dps.fieldops;
 import ar.edu.itba.dps.fieldops.adapters.driven.InMemoryEventPublisher;
 import ar.edu.itba.dps.fieldops.adapters.driven.InMemoryReplanProposalRepository;
 import ar.edu.itba.dps.fieldops.business.interfaces.events.EventSubscriber;
-import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.ports.in.DecideReplanProposalPort;
 import ar.edu.itba.dps.fieldops.business.ports.in.QueryReplanProposalsPort;
 import ar.edu.itba.dps.fieldops.business.ports.in.RegisterIncidentPort;

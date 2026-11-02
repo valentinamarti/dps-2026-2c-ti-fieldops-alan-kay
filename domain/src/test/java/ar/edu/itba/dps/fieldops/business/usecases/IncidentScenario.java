@@ -1,5 +1,6 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
+import ar.edu.itba.dps.fieldops.business.fixtures.FakeResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.fixtures.SequentialReplanProposalRepository;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
@@ -12,7 +13,7 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposal;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposalId;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
-import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.providers.EventPublisher;
 import ar.edu.itba.dps.fieldops.business.replanning.CancellationOptions;
@@ -24,6 +25,7 @@ import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.mockito.Mockito.spy;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.completeAssignments;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.createExpeditionOn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
@@ -36,9 +38,9 @@ import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone
 final class IncidentScenario {
     static final LocalDateTime TEN = LocalDateTime.of(2026, 10, 1, 10, 0);
 
-    final SequentialExpeditionRepository expeditions = new SequentialExpeditionRepository();
-    final SequentialReplanProposalRepository proposals = new SequentialReplanProposalRepository();
-    final ResourceCatalog catalog = new ResourceCatalog();
+    final SequentialExpeditionRepository expeditions = spy(new SequentialExpeditionRepository());
+    final SequentialReplanProposalRepository proposals = spy(new SequentialReplanProposalRepository());
+    final ResourceCatalog catalog = spy(new FakeResourceCatalog());
     final ResourceReservations reservations = new ResourceReservations();
     final ExpeditionReplanner replanner = new ExpeditionReplanner(expeditions);
     final ReplanExpedition replanExpedition = new ReplanExpedition(expeditions, replanner);

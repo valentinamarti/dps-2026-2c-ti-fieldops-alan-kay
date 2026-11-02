@@ -29,7 +29,9 @@ public class ScheduleActivity implements ScheduleActivityPort {
         final var expedition = Lookups.expedition(repository, command.expeditionId());
         final var planned = command.activity();
         final var activity = new PlannedActivities(expedition, zones, types).of(planned);
-        return ScheduledActivityView.of(expedition.schedule(activity, planned.scheduledPeriod()));
+        final var item = expedition.schedule(activity, planned.scheduledPeriod());
+        repository.save(expedition);
+        return ScheduledActivityView.of(item);
     }
 
     ItineraryItem schedule(ExpeditionId expeditionId, Activity activity, TimePeriod scheduledPeriod) {

@@ -3,6 +3,7 @@ package ar.edu.itba.dps.fieldops.business.usecases;
 import ar.edu.itba.dps.fieldops.business.estimations.ExpeditionEstimator;
 import ar.edu.itba.dps.fieldops.business.exceptions.NotFoundException;
 import ar.edu.itba.dps.fieldops.business.exceptions.UnacceptedWarningException;
+import ar.edu.itba.dps.fieldops.business.fixtures.FakeResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.commands.WarningAcceptance;
@@ -10,7 +11,7 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Observation;
-import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.responses.ExpeditionReportView;
@@ -49,7 +50,7 @@ class ExpeditionByIdTest {
 
     private final SequentialExpeditionRepository stored = new SequentialExpeditionRepository();
     private final ExpeditionRepository repository = mock(ExpeditionRepository.class);
-    private final ResourceCatalog catalog = new ResourceCatalog();
+    private final ResourceCatalog catalog = new FakeResourceCatalog();
     private final ResourceReservations reservations = new ResourceReservations();
     private final Zone coast = zone("z-1");
     private final Person leader = person("p-1");
@@ -141,7 +142,7 @@ class ExpeditionByIdTest {
         readyToApprove();
         new ApproveExpedition(List.of(), reservations, repository, catalog).approve(expedition.getId(), List.of());
         expedition.start();
-        final var tracking = new TrackActivity(repository);
+        final var tracking = new TrackActivity(repository, new FakeResourceCatalog());
         final var activity = new ActivityId("a-1");
         final var item = expedition.getItinerary().itemFor(activity).orElseThrow();
         final var at = LocalDateTime.of(2026, 10, 1, 9, 30);
@@ -161,7 +162,7 @@ class ExpeditionByIdTest {
         readyToApprove();
         new ApproveExpedition(List.of(), reservations, repository, catalog).approve(expedition.getId(), List.of());
         expedition.start();
-        final var finish = new FinishExpedition(reservations, repository);
+        final var finish = new FinishExpedition(reservations, repository, new FakeResourceCatalog());
 
         finish.finish(expedition.getId());
 

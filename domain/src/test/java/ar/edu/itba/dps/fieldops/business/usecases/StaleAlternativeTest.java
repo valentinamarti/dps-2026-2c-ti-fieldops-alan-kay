@@ -1,6 +1,7 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.StaleAlternativeException;
+import ar.edu.itba.dps.fieldops.business.fixtures.FakeResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.DepletableResource;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
@@ -58,7 +59,7 @@ class StaleAlternativeTest {
     void anActivityFinishedAfterResumingMakesTheAlternativeStaleAndItsSuppliesAreNotReservedAgain() {
         final var alternative = alternativeForAStormOnTheAfternoon();
         final var transitions = new TransitionExpedition(scenario.expeditions);
-        final var tracking = new TrackActivity(scenario.expeditions);
+        final var tracking = new TrackActivity(scenario.expeditions, new FakeResourceCatalog());
         final DepletableResource jars = scenario.itemOf(scenario.expedition, scenario.morning)
                 .getAssignedSupplies().iterator().next();
 

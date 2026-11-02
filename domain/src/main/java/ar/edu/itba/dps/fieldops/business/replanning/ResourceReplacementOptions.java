@@ -6,7 +6,7 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.Incident;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ResourceAssignment;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanOption;
-import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 
 import java.util.List;

@@ -1,4 +1,4 @@
-package ar.edu.itba.dps.fieldops.business.models.resources;
+package ar.edu.itba.dps.fieldops.business.fixtures;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.DuplicateResourceException;
 import ar.edu.itba.dps.fieldops.business.models.activities.DepletableRequirement;
@@ -7,6 +7,16 @@ import ar.edu.itba.dps.fieldops.business.models.activities.StaffRequirement;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
+import ar.edu.itba.dps.fieldops.business.models.resources.Certification;
+import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
+import ar.edu.itba.dps.fieldops.business.models.resources.Instrument;
+import ar.edu.itba.dps.fieldops.business.models.resources.Person;
+import ar.edu.itba.dps.fieldops.business.models.resources.Reservation;
+import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
+import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
+import ar.edu.itba.dps.fieldops.business.models.resources.Vehicle;
+import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -15,11 +25,11 @@ import java.util.Set;
 
 import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.LITERS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class ResourceCatalogTest {
+public abstract class ResourceCatalogContract {
 
     private static final Certification DIVING = new Certification("Diving");
     private static final ResourceCategory BOAT = new ResourceCategory("Boat");
@@ -29,7 +39,14 @@ class ResourceCatalogTest {
     private static final ExpeditionId ANOTHER_EXPEDITION = new ExpeditionId("e-2");
     private static final TimePeriod MORNING = hours(8, 12);
 
-    private final ResourceCatalog catalog = new ResourceCatalog();
+    protected ResourceCatalog catalog;
+
+    protected abstract ResourceCatalog createCatalog();
+
+    @BeforeEach
+    void setUpCatalog() {
+        catalog = createCatalog();
+    }
 
     private static TimePeriod hours(int fromHour, int toHour) {
         final var day = LocalDateTime.of(2026, 10, 1, 0, 0);
@@ -104,9 +121,9 @@ class ResourceCatalogTest {
         catalog.addEquipment(boat);
         catalog.addSupply(tank);
 
-        assertSame(diver, catalog.findStaff(new ResourceId("p-1")).orElseThrow());
-        assertSame(boat, catalog.findEquipment(new ResourceId("v-1")).orElseThrow());
-        assertSame(tank, catalog.findSupply(new ResourceId("d-1")).orElseThrow());
+        assertEquals(diver, catalog.findStaff(new ResourceId("p-1")).orElseThrow());
+        assertEquals(boat, catalog.findEquipment(new ResourceId("v-1")).orElseThrow());
+        assertEquals(tank, catalog.findSupply(new ResourceId("d-1")).orElseThrow());
     }
 
     @Test
@@ -130,5 +147,26 @@ class ResourceCatalogTest {
         assertEquals(List.of(diver), catalog.allStaff());
         assertEquals(List.of(boat), catalog.allEquipment());
         assertEquals(List.of(tank), catalog.allSupplies());
+    }
+
+    @Test
+    void keepsTheCalendarOfAResourceThatWasSaved() {
+        final var diver = new Person(new ResourceId("p-1"), "Ana", Set.of());
+        catalog.addStaff(diver);
+        diver.reserve(new Reservation(ANOTHER_EXPEDITION, MORNING));
+        catalog.save(diver);
+
+        assertFalse(catalog.findStaff(new ResourceId("p-1")).orElseThrow().isAvailableDuring(MORNING));
+    }
+
+    @Test
+    void keepsTheStockOfASupplyThatWasSaved() {
+        final var tank = new Depletable(new ResourceId("d-1"), "Diesel", FUEL, Quantity.of("50", LITERS));
+        catalog.addSupply(tank);
+        tank.consume(ANOTHER_EXPEDITION, Quantity.of("20", LITERS));
+        catalog.save(tank);
+
+        assertTrue(catalog.findSupply(new ResourceId("d-1")).orElseThrow().hasStockFor(Quantity.of("30", LITERS)));
+        assertFalse(catalog.findSupply(new ResourceId("d-1")).orElseThrow().hasStockFor(Quantity.of("31", LITERS)));
     }
 }

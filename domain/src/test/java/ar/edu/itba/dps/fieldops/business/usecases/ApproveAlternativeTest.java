@@ -1,7 +1,8 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
 import ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures;
-import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.fixtures.FakeResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
@@ -34,7 +35,7 @@ class ApproveAlternativeTest {
 
     private final SequentialExpeditionRepository repository = new SequentialExpeditionRepository();
     private final ApproveExpedition approveExpedition =
-            new ApproveExpedition(List.of(), new ResourceReservations(), repository, new ResourceCatalog());
+            new ApproveExpedition(List.of(), new ResourceReservations(), repository, new FakeResourceCatalog());
     private final ReplanExpedition replanExpedition = new ReplanExpedition(repository, new ExpeditionReplanner(repository));
     private final Zone coast = zone("z-1");
     private final Person keptWorker = person("p-a-1");

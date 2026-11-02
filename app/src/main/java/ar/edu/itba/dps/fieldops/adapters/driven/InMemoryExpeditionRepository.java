@@ -30,6 +30,12 @@ public class InMemoryExpeditionRepository implements ExpeditionRepository {
     }
 
     @Override
+    public void save(Expedition expedition) {
+        Objects.requireNonNull(expedition, "expedition is required");
+        expeditions.put(expedition.getId(), expedition);
+    }
+
+    @Override
     public Optional<Expedition> findById(ExpeditionId id) {
         return Optional.ofNullable(expeditions.get(id));
     }

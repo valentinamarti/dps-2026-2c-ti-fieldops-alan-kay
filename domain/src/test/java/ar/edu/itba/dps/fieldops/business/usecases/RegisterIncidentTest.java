@@ -20,6 +20,7 @@ import static ar.edu.itba.dps.fieldops.business.usecases.IncidentScenario.TEN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -43,6 +44,17 @@ class RegisterIncidentTest {
         verify(publisher).publish(new IncidentRegistered(scenario.expedition.getId(), incident));
         verify(proposals).findByIncident(incident.id());
         assertEquals(ReplanProposalView.of(expected), proposal);
+    }
+
+    @Test
+    void savesTheExpeditionBeforePublishingTheEvent() {
+        when(proposals.findByIncident(any())).thenReturn(Optional.of(mock(ReplanProposal.class)));
+
+        registerIncident.register(scenario.incidentOn(scenario.afternoon, IncidentReport.of("Storm forecast", TEN)));
+
+        final var order = inOrder(scenario.expeditions, publisher);
+        order.verify(scenario.expeditions).save(scenario.expedition);
+        order.verify(publisher).publish(any());
     }
 
     @Test

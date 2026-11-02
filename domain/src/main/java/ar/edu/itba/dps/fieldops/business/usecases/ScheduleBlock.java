@@ -27,7 +27,9 @@ public class ScheduleBlock implements ScheduleBlockPort {
     public ItineraryNodeView schedule(ScheduleBlockCommand command) {
         final var expedition = Lookups.expedition(repository, command.expeditionId());
         final var block = Objects.requireNonNull(command.block(), "block is required");
-        return ItineraryNodeView.of(expedition.schedule(block.plan(new PlannedActivities(expedition, zones, types)::of)));
+        final var node = expedition.schedule(block.plan(new PlannedActivities(expedition, zones, types)::of));
+        repository.save(expedition);
+        return ItineraryNodeView.of(node);
     }
 
     ItineraryNode schedule(ExpeditionId expeditionId, PlannedNode block) {

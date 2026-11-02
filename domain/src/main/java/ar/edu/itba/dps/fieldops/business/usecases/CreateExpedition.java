@@ -3,7 +3,7 @@ package ar.edu.itba.dps.fieldops.business.usecases;
 import ar.edu.itba.dps.fieldops.business.models.commands.CreateExpeditionCommand;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionBuilder;
-import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.responses.ExpeditionView;
 import ar.edu.itba.dps.fieldops.business.ports.in.CreateExpeditionPort;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;

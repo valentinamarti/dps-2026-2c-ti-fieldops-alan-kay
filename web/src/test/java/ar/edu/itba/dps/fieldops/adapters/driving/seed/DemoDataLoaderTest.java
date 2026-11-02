@@ -1,6 +1,7 @@
 package ar.edu.itba.dps.fieldops.adapters.driving.seed;
 
 import ar.edu.itba.dps.fieldops.adapters.driven.InMemoryExpeditionRepository;
+import ar.edu.itba.dps.fieldops.adapters.driven.InMemoryResourceCatalog;
 import ar.edu.itba.dps.fieldops.adapters.driven.InMemoryZoneRepository;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.activities.ReusableRequirement;
@@ -10,7 +11,7 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.resources.Certification;
-import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
@@ -61,7 +62,7 @@ class DemoDataLoaderTest {
     @BeforeEach
     void wireTheHexagonWithTheInMemoryAdapters() {
         expeditions = new InMemoryExpeditionRepository();
-        catalog = new ResourceCatalog();
+        catalog = new InMemoryResourceCatalog();
         zones = new InMemoryZoneRepository();
         validate = new ValidateExpedition(expeditions, List.of());
         final var types = ActivityTypeRegistry.withStandardTypes();

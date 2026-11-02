@@ -10,6 +10,8 @@ public interface ExpeditionRepository extends ExpeditionIdProvider {
 
     void add(Expedition expedition);
 
+    void save(Expedition expedition);
+
     Optional<Expedition> findById(ExpeditionId id);
 
     List<Expedition> findAll();

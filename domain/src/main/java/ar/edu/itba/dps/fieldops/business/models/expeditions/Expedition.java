@@ -15,6 +15,7 @@ import ar.edu.itba.dps.fieldops.business.interfaces.itinerary.ItineraryNodeVisit
 import ar.edu.itba.dps.fieldops.business.interfaces.replanning.ReplanReason;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.DepletableResource;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.Equipment;
+import ar.edu.itba.dps.fieldops.business.interfaces.resources.Resource;
 import ar.edu.itba.dps.fieldops.business.interfaces.validation.ValidationRule;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
@@ -153,6 +154,12 @@ public class Expedition {
     public Set<Person> participants() {
         return itinerary.getItems().stream()
                 .flatMap(item -> item.getAssignedStaff().stream())
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
+    public Set<Resource> assignedResources() {
+        return itinerary.getItems().stream()
+                .<Resource>flatMap(item -> Stream.concat(item.getAssignedReusableResources().stream(), item.getAssignedSupplies().stream()))
                 .collect(Collectors.toUnmodifiableSet());
     }
 

@@ -14,7 +14,7 @@ import ar.edu.itba.dps.fieldops.business.models.resources.Certification;
 import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
 import ar.edu.itba.dps.fieldops.business.models.resources.Instrument;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
-import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.resources.Vehicle;
@@ -121,7 +121,7 @@ public final class ExpeditionFixtures {
     }
 
     public static CreateExpedition createExpeditionOn(ExpeditionRepository repository) {
-        return new CreateExpedition(repository, Mockito.mock(ZoneRepository.class), new ResourceCatalog());
+        return new CreateExpedition(repository, Mockito.mock(ZoneRepository.class), new FakeResourceCatalog());
     }
 
     public static ExpeditionBuilder expeditionIn(Zone zone, Person responsible) {

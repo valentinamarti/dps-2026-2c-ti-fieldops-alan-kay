@@ -32,6 +32,12 @@ public class InMemoryReplanProposalRepository implements ReplanProposalRepositor
     }
 
     @Override
+    public void save(ReplanProposal proposal) {
+        Objects.requireNonNull(proposal, "proposal is required");
+        proposals.put(proposal.getId(), proposal);
+    }
+
+    @Override
     public Optional<ReplanProposal> findById(ReplanProposalId id) {
         return Optional.ofNullable(proposals.get(id));
     }

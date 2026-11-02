@@ -6,7 +6,7 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanDecision;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposal;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposalId;
-import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.responses.ExpeditionView;
 import ar.edu.itba.dps.fieldops.business.ports.in.DecideReplanProposalPort;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
@@ -43,11 +43,16 @@ public class DecideReplanProposal implements DecideReplanProposalPort {
             throw new InvalidScheduleException("the option %d of the proposal %s can no longer be planned".formatted(optionNumber, proposalId));
         }
         original.suspendToReplan();
+        expeditions.save(original);
         final var alternative = replanExpedition.replan(original, affected, option.reason());
         proposal.accept(optionNumber, decision, alternative.getId());
+        proposals.save(proposal);
         proposals.findByExpedition(original.getId()).stream()
                 .filter(ReplanProposal::isPending)
-                .forEach(other -> other.supersedeBy(proposal.getId()));
+                .forEach(other -> {
+                    other.supersedeBy(proposal.getId());
+                    proposals.save(other);
+                });
         return ExpeditionView.of(alternative);
     }
 
@@ -56,6 +61,7 @@ public class DecideReplanProposal implements DecideReplanProposalPort {
         final var proposal = Lookups.proposal(proposals, proposalId);
         proposal.requirePending();
         proposal.reject(decisionOf(Lookups.expedition(expeditions, proposal.getOriginalExpedition()), command));
+        proposals.save(proposal);
     }
 
     private ReplanDecision decisionOf(Expedition original, ReplanDecisionCommand command) {

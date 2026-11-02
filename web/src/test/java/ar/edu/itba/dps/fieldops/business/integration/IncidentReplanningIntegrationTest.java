@@ -8,7 +8,7 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.ResourceAssignment;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanOption;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposalStatus;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
-import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.responses.ReplanProposalView;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.ports.in.ApproveExpeditionPort;

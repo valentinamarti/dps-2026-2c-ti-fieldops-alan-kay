@@ -1,5 +1,6 @@
 package ar.edu.itba.dps.fieldops.business.replanning;
 
+import ar.edu.itba.dps.fieldops.business.fixtures.FakeResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
@@ -8,7 +9,7 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ResourceAssignment;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanOption;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
-import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.resources.Unavailability;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,7 +36,7 @@ class ReplanOptionGeneratorsTest {
     private static final LocalDateTime TEN = LocalDateTime.of(2026, 10, 1, 10, 0);
 
     private final Zone coast = zone("z-1");
-    private final ResourceCatalog catalog = new ResourceCatalog();
+    private final ResourceCatalog catalog = new FakeResourceCatalog();
     private final Person sick = person("p-2");
     private final Expedition expedition = expeditionIn(coast, person("p-1")).build(new SequentialExpeditionRepository());
     private final Activity affectedActivity = sampling("a-1", coast, hours(0, 24));
