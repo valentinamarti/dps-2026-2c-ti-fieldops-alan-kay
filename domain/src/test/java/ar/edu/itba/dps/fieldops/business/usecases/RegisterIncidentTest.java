@@ -8,6 +8,7 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.IncidentReport;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposal;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposalId;
+import ar.edu.itba.dps.fieldops.business.models.responses.ReplanProposalView;
 import ar.edu.itba.dps.fieldops.business.providers.EventPublisher;
 import ar.edu.itba.dps.fieldops.business.providers.ReplanProposalRepository;
 import org.junit.jupiter.api.Test;
@@ -17,7 +18,6 @@ import java.util.Optional;
 
 import static ar.edu.itba.dps.fieldops.business.usecases.IncidentScenario.TEN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -42,7 +42,7 @@ class RegisterIncidentTest {
         final var incident = scenario.expedition.getIncidents().getFirst();
         verify(publisher).publish(new IncidentRegistered(scenario.expedition.getId(), incident));
         verify(proposals).findByIncident(incident.id());
-        assertSame(expected, proposal);
+        assertEquals(ReplanProposalView.of(expected), proposal);
     }
 
     @Test

@@ -37,7 +37,7 @@ public class IncidentController {
     public ResponseEntity<ReplanProposalResponse> register(@PathVariable String expeditionId,
                                                            @RequestBody RegisterIncidentRequest request) {
         final var proposal = registerIncident.register(ReplanningMapper.toCommand(expeditionId, request));
-        return ResponseEntity.created(Locations.replanProposal(proposal.getId().value()))
+        return ResponseEntity.created(Locations.replanProposal(proposal.id().value()))
                 .body(ReplanningMapper.toResponse(proposal));
     }
 }

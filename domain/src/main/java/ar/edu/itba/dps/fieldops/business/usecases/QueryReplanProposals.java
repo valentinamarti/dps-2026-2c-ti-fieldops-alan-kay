@@ -1,8 +1,8 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
-import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposal;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposalId;
+import ar.edu.itba.dps.fieldops.business.models.responses.ReplanProposalView;
 import ar.edu.itba.dps.fieldops.business.ports.in.QueryReplanProposalsPort;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ReplanProposalRepository;
@@ -20,12 +20,14 @@ public class QueryReplanProposals implements QueryReplanProposalsPort {
     }
 
     @Override
-    public ReplanProposal get(ReplanProposalId id) {
-        return Lookups.proposal(proposals, id);
+    public ReplanProposalView get(ReplanProposalId id) {
+        return ReplanProposalView.of(Lookups.proposal(proposals, id));
     }
 
     @Override
-    public List<ReplanProposal> ofExpedition(ExpeditionId expeditionId) {
-        return proposals.findByExpedition(Lookups.expedition(expeditions, expeditionId).getId());
+    public List<ReplanProposalView> ofExpedition(ExpeditionId expeditionId) {
+        return proposals.findByExpedition(Lookups.expedition(expeditions, expeditionId).getId()).stream()
+                .map(ReplanProposalView::of)
+                .toList();
     }
 }

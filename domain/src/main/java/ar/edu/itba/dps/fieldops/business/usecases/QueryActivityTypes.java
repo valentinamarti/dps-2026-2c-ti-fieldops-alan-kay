@@ -1,6 +1,6 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
-import ar.edu.itba.dps.fieldops.business.interfaces.activities.ActivityType;
+import ar.edu.itba.dps.fieldops.business.models.responses.ActivityTypeView;
 import ar.edu.itba.dps.fieldops.business.ports.in.QueryActivityTypesPort;
 import ar.edu.itba.dps.fieldops.business.rules.ActivityTypeRegistry;
 
@@ -16,7 +16,7 @@ public class QueryActivityTypes implements QueryActivityTypesPort {
     }
 
     @Override
-    public List<ActivityType> list() {
-        return registry.types();
+    public List<ActivityTypeView> list() {
+        return registry.types().stream().map(ActivityTypeView::of).toList();
     }
 }

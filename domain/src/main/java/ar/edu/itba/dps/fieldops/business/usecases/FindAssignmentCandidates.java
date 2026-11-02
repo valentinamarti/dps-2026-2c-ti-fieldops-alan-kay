@@ -1,12 +1,22 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
+import ar.edu.itba.dps.fieldops.business.interfaces.resources.Equipment;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
+import ar.edu.itba.dps.fieldops.business.models.activities.ReusableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
+import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
+import ar.edu.itba.dps.fieldops.business.models.resources.Instrument;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.models.resources.Vehicle;
 import ar.edu.itba.dps.fieldops.business.models.responses.AssignmentCandidates;
+import ar.edu.itba.dps.fieldops.business.models.responses.InstrumentView;
+import ar.edu.itba.dps.fieldops.business.models.responses.PersonView;
+import ar.edu.itba.dps.fieldops.business.models.responses.SupplyView;
+import ar.edu.itba.dps.fieldops.business.models.responses.VehicleView;
 import ar.edu.itba.dps.fieldops.business.ports.in.FindAssignmentCandidatesPort;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 
+import java.util.List;
 import java.util.Objects;
 
 public class FindAssignmentCandidates implements FindAssignmentCandidatesPort {
@@ -26,14 +36,23 @@ public class FindAssignmentCandidates implements FindAssignmentCandidatesPort {
         final var period = item.getScheduledPeriod();
         return new AssignmentCandidates(
                 activity.requiredStaff().stream()
-                        .map(requirement -> new AssignmentCandidates.For<>(requirement,
-                                catalog.availableStaffFor(requirement, period).stream().filter(activity::admits).toList()))
+                        .map(requirement -> new AssignmentCandidates.ForStaff(requirement,
+                                catalog.availableStaffFor(requirement, period).stream()
+                                        .filter(activity::admits).map(PersonView::of).toList()))
                         .toList(),
                 activity.requiredEquipment().stream()
-                        .map(requirement -> new AssignmentCandidates.For<>(requirement, catalog.availableEquipmentFor(requirement, period)))
+                        .map(requirement -> equipmentFor(requirement, catalog.availableEquipmentFor(requirement, period)))
                         .toList(),
                 activity.requiredSupplies().stream()
-                        .map(requirement -> new AssignmentCandidates.For<>(requirement, catalog.suppliesCovering(requirement)))
+                        .map(requirement -> new AssignmentCandidates.ForSupplies(requirement,
+                                Lookups.onlyOf(catalog.suppliesCovering(requirement), Depletable.class).stream()
+                                        .map(SupplyView::of).toList()))
                         .toList());
+    }
+
+    private AssignmentCandidates.ForEquipment equipmentFor(ReusableRequirement requirement, List<Equipment> available) {
+        return new AssignmentCandidates.ForEquipment(requirement,
+                Lookups.onlyOf(available, Vehicle.class).stream().map(VehicleView::of).toList(),
+                Lookups.onlyOf(available, Instrument.class).stream().map(InstrumentView::of).toList());
     }
 }

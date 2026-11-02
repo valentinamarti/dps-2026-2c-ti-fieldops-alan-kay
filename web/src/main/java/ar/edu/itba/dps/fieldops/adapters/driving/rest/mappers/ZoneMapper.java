@@ -2,8 +2,8 @@ package ar.edu.itba.dps.fieldops.adapters.driving.rest.mappers;
 
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.RegisterZoneRequest;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.ZoneResponse;
+import ar.edu.itba.dps.fieldops.business.models.responses.ZoneView;
 import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
-import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.models.commands.RegisterZoneCommand;
 
 public final class ZoneMapper {
@@ -17,10 +17,10 @@ public final class ZoneMapper {
                 Mappings.mapped(request.requiredPermits(), Permit::new));
     }
 
-    public static ZoneResponse toResponse(Zone zone) {
+    public static ZoneResponse toResponse(ZoneView zone) {
         return new ZoneResponse(
-                zone.getId(),
-                zone.getName(),
-                Mappings.sorted(zone.getRequiredPermits().stream().map(Permit::name)));
+                zone.id(),
+                zone.name(),
+                Mappings.sorted(zone.requiredPermits().stream().map(Permit::name)));
     }
 }

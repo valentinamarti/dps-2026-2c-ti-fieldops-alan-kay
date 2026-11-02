@@ -13,6 +13,8 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.Observation;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
+import ar.edu.itba.dps.fieldops.business.models.responses.ExpeditionReportView;
+import ar.edu.itba.dps.fieldops.business.models.responses.ExpeditionView;
 import ar.edu.itba.dps.fieldops.business.models.validation.RuleId;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
@@ -36,7 +38,6 @@ import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.samp
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -71,8 +72,8 @@ class ExpeditionByIdTest {
     void getsAnExpeditionByIdAndListsThemAll() {
         final var queries = new QueryExpeditions(repository);
 
-        assertSame(expedition, queries.get(expedition.getId()));
-        assertEquals(List.of(expedition), queries.list());
+        assertEquals(ExpeditionView.of(expedition), queries.get(expedition.getId()));
+        assertEquals(List.of(ExpeditionView.of(expedition)), queries.list());
         assertThrows(NotFoundException.class, () -> queries.get(unknown));
     }
 
@@ -97,7 +98,7 @@ class ExpeditionByIdTest {
         final var reports = new ReportExpedition(repository, new ExpeditionReporter(estimator));
 
         assertEquals(estimator.estimate(expedition), estimates.estimate(expedition.getId()));
-        assertEquals(new ExpeditionReporter(estimator).reportOf(expedition), reports.report(expedition.getId()));
+        assertEquals(ExpeditionReportView.of(new ExpeditionReporter(estimator).reportOf(expedition)), reports.report(expedition.getId()));
         assertThrows(NotFoundException.class, () -> estimates.estimate(unknown));
         assertThrows(NotFoundException.class, () -> reports.report(unknown));
     }

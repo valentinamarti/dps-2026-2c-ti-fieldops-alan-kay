@@ -10,6 +10,7 @@ import ar.edu.itba.dps.fieldops.business.models.resources.Certification;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
+import ar.edu.itba.dps.fieldops.business.models.responses.PersonView;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -18,8 +19,8 @@ import java.util.Set;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.DIVING;
 import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.UNITS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RegisterResourcesTest {
     private final ResourceCatalog catalog = new ResourceCatalog();
@@ -29,9 +30,9 @@ class RegisterResourcesTest {
     void registersAPersonWithTheCertificationsItWasGiven() {
         final var ada = register.registerPerson(new RegisterPersonCommand(new ResourceId("p-1"), "Ada", Set.of(DIVING)));
 
-        assertSame(ada, catalog.findStaff(new ResourceId("p-1")).orElseThrow());
-        assertEquals("Ada", ada.getName());
-        assertEquals(Set.of(DIVING), ada.getCertifications().values());
+        assertEquals(PersonView.of(catalog.findStaff(new ResourceId("p-1")).orElseThrow()), ada);
+        assertEquals("Ada", ada.name());
+        assertEquals(Set.of(DIVING), ada.certifications().values());
     }
 
     @Test
@@ -39,9 +40,9 @@ class RegisterResourcesTest {
         final var zodiac = register.registerVehicle(new RegisterVehicleCommand(new ResourceId("v-1"), "Zodiac",
                 new ResourceCategory("Boat"), "AA 123 BB", Set.of()));
 
-        assertSame(zodiac, catalog.findEquipment(new ResourceId("v-1")).orElseThrow());
-        assertEquals("AA 123 BB", zodiac.getLicensePlate());
-        assertEquals(new ResourceCategory("boat"), zodiac.getCategory());
+        assertTrue(catalog.findEquipment(new ResourceId("v-1")).isPresent());
+        assertEquals("AA 123 BB", zodiac.licensePlate());
+        assertEquals(new ResourceCategory("boat"), zodiac.category());
     }
 
     @Test
@@ -49,7 +50,7 @@ class RegisterResourcesTest {
         final var cooler = register.registerInstrument(new RegisterInstrumentCommand(new ResourceId("i-1"), "Cooler",
                 new ResourceCategory("Cooler"), Set.of()));
 
-        assertEquals(List.of(cooler), catalog.allEquipment());
+        assertEquals(List.of(cooler.id()), catalog.allEquipment().stream().map(equipment -> equipment.getId()).toList());
     }
 
     @Test
@@ -57,8 +58,8 @@ class RegisterResourcesTest {
         final var jars = register.registerSupply(new RegisterSupplyCommand(new ResourceId("s-1"), "Sample containers",
                 new ResourceCategory("Sample container"), Quantity.of("10", UNITS)));
 
-        assertSame(jars, catalog.findSupply(new ResourceId("s-1")).orElseThrow());
-        assertEquals(Quantity.of("10", UNITS), jars.getStock());
+        assertTrue(catalog.findSupply(new ResourceId("s-1")).isPresent());
+        assertEquals(Quantity.of("10", UNITS), jars.stock());
     }
 
     @Test
@@ -66,8 +67,8 @@ class RegisterResourcesTest {
         final var cooler = register.registerInstrument(new RegisterInstrumentCommand(new ResourceId("i-1"), "Cooler",
                 new ResourceCategory(" Cooler "), Set.of(new Certification("Diving"))));
 
-        assertEquals("cooler", cooler.getCategory().name());
-        assertEquals(Set.of(new Certification("diving")), cooler.getCertifications().values());
+        assertEquals("cooler", cooler.category().name());
+        assertEquals(Set.of(new Certification("diving")), cooler.certifications().values());
     }
 
     @Test

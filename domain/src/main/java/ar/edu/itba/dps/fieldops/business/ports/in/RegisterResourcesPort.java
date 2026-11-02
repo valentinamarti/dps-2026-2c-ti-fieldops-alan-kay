@@ -4,17 +4,17 @@ import ar.edu.itba.dps.fieldops.business.models.commands.RegisterInstrumentComma
 import ar.edu.itba.dps.fieldops.business.models.commands.RegisterPersonCommand;
 import ar.edu.itba.dps.fieldops.business.models.commands.RegisterSupplyCommand;
 import ar.edu.itba.dps.fieldops.business.models.commands.RegisterVehicleCommand;
-import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
-import ar.edu.itba.dps.fieldops.business.models.resources.Instrument;
-import ar.edu.itba.dps.fieldops.business.models.resources.Person;
-import ar.edu.itba.dps.fieldops.business.models.resources.Vehicle;
+import ar.edu.itba.dps.fieldops.business.models.responses.InstrumentView;
+import ar.edu.itba.dps.fieldops.business.models.responses.PersonView;
+import ar.edu.itba.dps.fieldops.business.models.responses.SupplyView;
+import ar.edu.itba.dps.fieldops.business.models.responses.VehicleView;
 
 public interface RegisterResourcesPort {
-    Person registerPerson(RegisterPersonCommand command);
+    PersonView registerPerson(RegisterPersonCommand command);
 
-    Vehicle registerVehicle(RegisterVehicleCommand command);
+    VehicleView registerVehicle(RegisterVehicleCommand command);
 
-    Instrument registerInstrument(RegisterInstrumentCommand command);
+    InstrumentView registerInstrument(RegisterInstrumentCommand command);
 
-    Depletable registerSupply(RegisterSupplyCommand command);
+    SupplyView registerSupply(RegisterSupplyCommand command);
 }

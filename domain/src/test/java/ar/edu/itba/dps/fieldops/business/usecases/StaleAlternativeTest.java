@@ -32,9 +32,9 @@ class StaleAlternativeTest {
     }
 
     private Expedition alternativeForAStormOnTheAfternoon() {
-        final var proposal = scenario.registerIncident.register(scenario.incidentOn(scenario.afternoon,
+        final var proposal = scenario.registered(scenario.incidentOn(scenario.afternoon,
                 IncidentReport.of("Storm forecast", at(8)).delayingBy(Duration.ofHours(1))));
-        return scenario.decide.accept(proposal.getId(), 1, scenario.decisionBy(scenario.leader, "We wait one hour"));
+        return scenario.accepted(proposal.getId(), 1, scenario.decisionBy(scenario.leader, "We wait one hour"));
     }
 
     private void run(Activity activity, int fromHour, int toHour) {
@@ -99,9 +99,9 @@ class StaleAlternativeTest {
     void aSecondIncidentMakesTheFirstAlternativeStaleAndLeavesTheSecondOneApprovable() {
         final var first = alternativeForAStormOnTheAfternoon();
         scenario.expedition.resume();
-        final var second = scenario.registerIncident.register(scenario.incidentOn(scenario.morning,
+        final var second = scenario.registered(scenario.incidentOn(scenario.morning,
                 IncidentReport.of("Boat engine failed", at(8)).delayingBy(Duration.ofMinutes(30))));
-        final var secondAlternative = scenario.decide.accept(second.getId(), 1,
+        final var secondAlternative = scenario.accepted(second.getId(), 1,
                 scenario.decisionBy(scenario.leader, "The mechanic is on site"));
 
         assertCannotBeApproved(first);
@@ -144,13 +144,13 @@ class StaleAlternativeTest {
     void theQueryTellsWhetherAnExpeditionIsAStaleAlternative() {
         final var alternative = alternativeForAStormOnTheAfternoon();
 
-        assertFalse(queryExpeditions.isStaleAlternative(scenario.expedition));
-        assertFalse(queryExpeditions.isStaleAlternative(alternative));
+        assertFalse(queryExpeditions.get(scenario.expedition.getId()).staleAlternative());
+        assertFalse(queryExpeditions.get(alternative.getId()).staleAlternative());
 
         scenario.expedition.resume();
         run(scenario.morning, 9, 11);
 
-        assertFalse(queryExpeditions.isStaleAlternative(scenario.expedition));
-        assertTrue(queryExpeditions.isStaleAlternative(alternative));
+        assertFalse(queryExpeditions.get(scenario.expedition.getId()).staleAlternative());
+        assertTrue(queryExpeditions.get(alternative.getId()).staleAlternative());
     }
 }

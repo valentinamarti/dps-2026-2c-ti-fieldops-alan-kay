@@ -1,11 +1,11 @@
 package ar.edu.itba.dps.fieldops.business.ports.in;
 
-import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
+import ar.edu.itba.dps.fieldops.business.models.responses.ZoneView;
 
 import java.util.List;
 
 public interface QueryZonesPort {
-    Zone get(String id);
+    ZoneView get(String id);
 
-    List<Zone> list();
+    List<ZoneView> list();
 }

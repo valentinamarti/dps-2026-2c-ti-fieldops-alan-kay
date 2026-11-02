@@ -9,6 +9,8 @@ import ar.edu.itba.dps.fieldops.business.models.events.IncidentRegistered;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.IncidentReport;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
+import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposal;
+import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposalId;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
@@ -67,6 +69,14 @@ final class IncidentScenario {
         expedition.submitForReview();
         approveExpedition.approve(expedition, List.of());
         expedition.start();
+    }
+
+    ReplanProposal registered(RegisterIncidentCommand command) {
+        return proposals.findById(registerIncident.register(command).id()).orElseThrow();
+    }
+
+    Expedition accepted(ReplanProposalId proposal, int optionNumber, ReplanDecisionCommand command) {
+        return expeditions.findById(decide.accept(proposal, optionNumber, command).id()).orElseThrow();
     }
 
     ItineraryItem itemOf(Expedition of, Activity activity) {

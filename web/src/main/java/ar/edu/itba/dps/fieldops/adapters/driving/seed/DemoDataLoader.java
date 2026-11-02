@@ -81,7 +81,7 @@ public class DemoDataLoader {
     }
 
     private ExpeditionId load(PlannedExpedition planned) {
-        final var id = createExpedition.create(ExpeditionMapper.toCommand(planned.expedition())).getId();
+        final var id = createExpedition.create(ExpeditionMapper.toCommand(planned.expedition())).id();
         planned.itinerary().forEach(node -> schedule(id, node));
         planned.assignments().forEach(assignment -> assign(id, assignment));
         return id;

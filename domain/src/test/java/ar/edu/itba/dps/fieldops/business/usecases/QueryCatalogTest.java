@@ -3,6 +3,10 @@ package ar.edu.itba.dps.fieldops.business.usecases;
 import ar.edu.itba.dps.fieldops.business.exceptions.NotFoundException;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
+import ar.edu.itba.dps.fieldops.business.models.responses.InstrumentView;
+import ar.edu.itba.dps.fieldops.business.models.responses.PersonView;
+import ar.edu.itba.dps.fieldops.business.models.responses.SupplyView;
+import ar.edu.itba.dps.fieldops.business.models.responses.VehicleView;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -14,7 +18,6 @@ import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.vehi
 import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.UNITS;
 import static ar.edu.itba.dps.fieldops.business.models.common.Quantity.of;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -37,7 +40,7 @@ class QueryCatalogTest {
         catalog.addStaff(ada);
         catalog.addStaff(grace);
 
-        assertEquals(List.of(ada, grace), query.staff());
+        assertEquals(List.of(PersonView.of(ada), PersonView.of(grace)), query.staff());
     }
 
     @Test
@@ -47,8 +50,8 @@ class QueryCatalogTest {
         catalog.addEquipment(zodiac);
         catalog.addEquipment(cooler);
 
-        assertEquals(List.of(zodiac), query.vehicles());
-        assertEquals(List.of(cooler), query.instruments());
+        assertEquals(List.of(VehicleView.of(zodiac)), query.vehicles());
+        assertEquals(List.of(InstrumentView.of(cooler)), query.instruments());
     }
 
     @Test
@@ -62,10 +65,10 @@ class QueryCatalogTest {
         catalog.addEquipment(cooler);
         catalog.addSupply(jars);
 
-        assertSame(ada, query.person(new ResourceId("p-1")));
-        assertSame(zodiac, query.vehicle(new ResourceId("v-1")));
-        assertSame(cooler, query.instrument(new ResourceId("i-1")));
-        assertSame(jars, query.supply(new ResourceId("s-1")));
+        assertEquals(PersonView.of(ada), query.person(new ResourceId("p-1")));
+        assertEquals(VehicleView.of(zodiac), query.vehicle(new ResourceId("v-1")));
+        assertEquals(InstrumentView.of(cooler), query.instrument(new ResourceId("i-1")));
+        assertEquals(SupplyView.of(jars), query.supply(new ResourceId("s-1")));
     }
 
     @Test

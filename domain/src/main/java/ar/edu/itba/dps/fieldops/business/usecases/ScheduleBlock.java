@@ -4,6 +4,7 @@ import ar.edu.itba.dps.fieldops.business.interfaces.itinerary.ItineraryNode;
 import ar.edu.itba.dps.fieldops.business.models.commands.ScheduleBlockCommand;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.PlannedNode;
+import ar.edu.itba.dps.fieldops.business.models.responses.ItineraryNodeView;
 import ar.edu.itba.dps.fieldops.business.ports.in.ScheduleBlockPort;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
@@ -23,10 +24,10 @@ public class ScheduleBlock implements ScheduleBlockPort {
     }
 
     @Override
-    public ItineraryNode schedule(ScheduleBlockCommand command) {
+    public ItineraryNodeView schedule(ScheduleBlockCommand command) {
         final var expedition = Lookups.expedition(repository, command.expeditionId());
         final var block = Objects.requireNonNull(command.block(), "block is required");
-        return expedition.schedule(block.plan(new PlannedActivities(expedition, zones, types)::of));
+        return ItineraryNodeView.of(expedition.schedule(block.plan(new PlannedActivities(expedition, zones, types)::of)));
     }
 
     ItineraryNode schedule(ExpeditionId expeditionId, PlannedNode block) {

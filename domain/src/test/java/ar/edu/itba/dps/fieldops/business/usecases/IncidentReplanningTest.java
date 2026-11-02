@@ -22,7 +22,7 @@ class IncidentReplanningTest {
 
     @Test
     void registeringAnIncidentOnAnExpeditionInExecutionGeneratesAReplanProposal() {
-        final var proposal = scenario.registerIncident.register(scenario.incidentOn(scenario.afternoon,
+        final var proposal = scenario.registered(scenario.incidentOn(scenario.afternoon,
                 IncidentReport.of("Boat engine failed", TEN).delayingBy(Duration.ofHours(1))));
 
         assertEquals(ReplanProposalStatus.PENDING, proposal.getStatus());
@@ -36,10 +36,10 @@ class IncidentReplanningTest {
 
     @Test
     void theResponsibleCanAcceptAnOptionAndGetsTheAlternativeAsADraft() {
-        final var proposal = scenario.registerIncident.register(scenario.incidentOn(scenario.afternoon,
+        final var proposal = scenario.registered(scenario.incidentOn(scenario.afternoon,
                 IncidentReport.of("Boat engine failed", TEN).delayingBy(Duration.ofHours(1))));
 
-        final var alternative = scenario.decide.accept(proposal.getId(), 1,
+        final var alternative = scenario.accepted(proposal.getId(), 1,
                 scenario.decisionBy(scenario.leader, "The mechanic arrives in an hour"));
 
         assertEquals(ReplanProposalStatus.ACCEPTED, proposal.getStatus());
@@ -52,7 +52,7 @@ class IncidentReplanningTest {
 
     @Test
     void theResponsibleCanRejectTheProposalAndTheExpeditionKeepsRunningAsItWas() {
-        final var proposal = scenario.registerIncident.register(scenario.incidentOn(scenario.afternoon,
+        final var proposal = scenario.registered(scenario.incidentOn(scenario.afternoon,
                 IncidentReport.of("Light rain", TEN)));
 
         scenario.decide.reject(proposal.getId(), scenario.decisionBy(scenario.leader, "Rain does not stop sampling"));
@@ -64,15 +64,15 @@ class IncidentReplanningTest {
 
     @Test
     void theOriginalPlanTheIncidentAndTheDecisionStayAuditedAndQueryable() {
-        final var proposal = scenario.registerIncident.register(scenario.incidentOn(scenario.afternoon,
+        final var proposal = scenario.registered(scenario.incidentOn(scenario.afternoon,
                 IncidentReport.of("Storm forecast", TEN)));
-        final var alternative = scenario.decide.accept(proposal.getId(), 1,
+        final var alternative = scenario.accepted(proposal.getId(), 1,
                 scenario.decisionBy(scenario.leader, "No safe window this afternoon"));
         alternative.submitForReview();
         scenario.approveExpedition.approve(alternative, List.of());
 
-        final var audited = scenario.queryProposals.ofExpedition(scenario.expedition.getId()).getFirst();
-        final var original = new QueryExpeditions(scenario.expeditions).get(audited.getOriginalExpedition());
+        final var audited = scenario.proposals.findByExpedition(scenario.expedition.getId()).getFirst();
+        final var original = scenario.expeditions.findById(audited.getOriginalExpedition()).orElseThrow();
         assertEquals(ExpeditionStatus.REPLACED, original.getStatus());
         assertEquals(Optional.of(alternative.getId()), original.getReplacement());
         assertEquals(3, original.getItinerary().getItems().size());

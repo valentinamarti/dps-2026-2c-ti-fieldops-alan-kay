@@ -1,12 +1,14 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
-import ar.edu.itba.dps.fieldops.business.exceptions.NotFoundException;
 import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
 import ar.edu.itba.dps.fieldops.business.models.resources.Instrument;
-import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.resources.Vehicle;
+import ar.edu.itba.dps.fieldops.business.models.responses.InstrumentView;
+import ar.edu.itba.dps.fieldops.business.models.responses.PersonView;
+import ar.edu.itba.dps.fieldops.business.models.responses.SupplyView;
+import ar.edu.itba.dps.fieldops.business.models.responses.VehicleView;
 import ar.edu.itba.dps.fieldops.business.ports.in.QueryCatalogPort;
 
 import java.util.List;
@@ -20,46 +22,42 @@ public class QueryCatalog implements QueryCatalogPort {
     }
 
     @Override
-    public List<Person> staff() {
-        return catalog.allStaff();
+    public List<PersonView> staff() {
+        return catalog.allStaff().stream().map(PersonView::of).toList();
     }
 
     @Override
-    public Person person(ResourceId id) {
-        return Lookups.staff(catalog, id);
+    public PersonView person(ResourceId id) {
+        return PersonView.of(Lookups.staff(catalog, id));
     }
 
     @Override
-    public List<Vehicle> vehicles() {
-        return onlyOf(catalog.allEquipment(), Vehicle.class);
+    public List<VehicleView> vehicles() {
+        return Lookups.onlyOf(catalog.allEquipment(), Vehicle.class).stream().map(VehicleView::of).toList();
     }
 
     @Override
-    public Vehicle vehicle(ResourceId id) {
-        return Lookups.vehicle(catalog, id);
+    public VehicleView vehicle(ResourceId id) {
+        return VehicleView.of(Lookups.vehicle(catalog, id));
     }
 
     @Override
-    public List<Instrument> instruments() {
-        return onlyOf(catalog.allEquipment(), Instrument.class);
+    public List<InstrumentView> instruments() {
+        return Lookups.onlyOf(catalog.allEquipment(), Instrument.class).stream().map(InstrumentView::of).toList();
     }
 
     @Override
-    public Instrument instrument(ResourceId id) {
-        return Lookups.instrument(catalog, id);
+    public InstrumentView instrument(ResourceId id) {
+        return InstrumentView.of(Lookups.instrument(catalog, id));
     }
 
     @Override
-    public List<Depletable> supplies() {
-        return onlyOf(catalog.allSupplies(), Depletable.class);
+    public List<SupplyView> supplies() {
+        return Lookups.onlyOf(catalog.allSupplies(), Depletable.class).stream().map(SupplyView::of).toList();
     }
 
     @Override
-    public Depletable supply(ResourceId id) {
-        return Lookups.depletable(catalog, id);
-    }
-
-    private static <T> List<T> onlyOf(List<?> resources, Class<T> kind) {
-        return resources.stream().filter(kind::isInstance).map(kind::cast).toList();
+    public SupplyView supply(ResourceId id) {
+        return SupplyView.of(Lookups.depletable(catalog, id));
     }
 }

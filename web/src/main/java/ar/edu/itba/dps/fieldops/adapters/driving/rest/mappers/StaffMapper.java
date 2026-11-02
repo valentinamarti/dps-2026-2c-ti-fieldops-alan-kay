@@ -2,9 +2,9 @@ package ar.edu.itba.dps.fieldops.adapters.driving.rest.mappers;
 
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.RegisterStaffRequest;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.StaffResponse;
-import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.commands.RegisterPersonCommand;
+import ar.edu.itba.dps.fieldops.business.models.responses.PersonView;
 
 public final class StaffMapper {
     private StaffMapper() {
@@ -17,10 +17,10 @@ public final class StaffMapper {
                 Mappings.toCertifications(request.certifications()));
     }
 
-    public static StaffResponse toResponse(Person person) {
+    public static StaffResponse toResponse(PersonView person) {
         return new StaffResponse(
-                person.getId().value(),
-                person.getName(),
-                Mappings.certificationNames(person.getCertifications()));
+                person.id().value(),
+                person.name(),
+                Mappings.certificationNames(person.certifications()));
     }
 }

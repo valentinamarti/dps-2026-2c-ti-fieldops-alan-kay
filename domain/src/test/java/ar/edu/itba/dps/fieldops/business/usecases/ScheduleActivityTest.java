@@ -12,7 +12,9 @@ import ar.edu.itba.dps.fieldops.business.models.commands.ScheduleActivityCommand
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
+import ar.edu.itba.dps.fieldops.business.models.responses.ScheduledActivityView;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
@@ -60,7 +62,7 @@ class ScheduleActivityTest {
 
     @Test
     void resolvesTheZoneAndBuildsTheRulesOfTheTypeTheCommandAsksFor() {
-        final var item = scheduleActivity.schedule(sampleCollection("a-1", 3).build());
+        final var item = scheduled(sampleCollection("a-1", 3).build());
 
         assertSame(item, expedition.getItinerary().itemFor(new ActivityId("a-1")).orElseThrow());
         assertEquals(hours(9, 11), item.getScheduledPeriod());
@@ -71,8 +73,20 @@ class ScheduleActivityTest {
     }
 
     @Test
+    void answersWithAViewOfWhatItScheduled() {
+        final var view = scheduleActivity.schedule(sampleCollection("a-1", 3).build());
+
+        assertEquals(ScheduledActivityView.of(expedition.getItinerary().itemFor(new ActivityId("a-1")).orElseThrow()), view);
+    }
+
+    private ItineraryItem scheduled(ScheduleActivityCommand command) {
+        scheduleActivity.schedule(command);
+        return expedition.getItinerary().itemFor(command.activity().id()).orElseThrow();
+    }
+
+    @Test
     void anotherTypeOfTheRegistryIsAskedForByItsNameWithItsOwnParameter() {
-        final var diving = scheduleActivity.schedule(command("a-1")
+        final var diving = scheduled(command("a-1")
                 .typeName("Diving")
                 .parameters(Map.of("maxDepthMeters", 40))
                 .scheduledPeriod(hours(9, 12))
@@ -84,9 +98,9 @@ class ScheduleActivityTest {
 
     @Test
     void resolvesTheDependenciesAmongTheActivitiesAlreadyScheduledInTheSameExpedition() {
-        final var first = scheduleActivity.schedule(sampleCollection("a-1", 3).build());
+        final var first = scheduled(sampleCollection("a-1", 3).build());
 
-        final var second = scheduleActivity.schedule(sampleCollection("a-2", 3)
+        final var second = scheduled(sampleCollection("a-2", 3)
                 .scheduledPeriod(hours(11, 13))
                 .dependencyIds(List.of(new ActivityId("a-1")))
                 .build());
@@ -98,7 +112,7 @@ class ScheduleActivityTest {
 
     @Test
     void theNightIndicatorWrapsTheRulesOfTheTypeWithWhatANightOperationDemands() {
-        final var night = scheduleActivity.schedule(sampleCollection("a-1", 3)
+        final var night = scheduled(sampleCollection("a-1", 3)
                 .scheduledPeriod(hours(20, 22))
                 .atNight(true)
                 .build()).getActivity();
@@ -112,7 +126,7 @@ class ScheduleActivityTest {
 
     @Test
     void theSameActivityWithoutTheNightIndicatorDemandsNothingOfANightOperation() {
-        final var day = scheduleActivity.schedule(sampleCollection("a-1", 3).build()).getActivity();
+        final var day = scheduled(sampleCollection("a-1", 3).build()).getActivity();
 
         assertTrue(day.requiredCertificationsForAllStaff().isEmpty());
         assertTrue(day.requiredPermits().isEmpty());

@@ -55,6 +55,6 @@ public class ItineraryController {
     }
 
     private ItineraryResponse itinerary(String expeditionId) {
-        return ItineraryMapper.toResponse(queryExpeditions.get(new ExpeditionId(expeditionId)));
+        return ItineraryMapper.toResponse(queryExpeditions.itinerary(new ExpeditionId(expeditionId)));
     }
 }

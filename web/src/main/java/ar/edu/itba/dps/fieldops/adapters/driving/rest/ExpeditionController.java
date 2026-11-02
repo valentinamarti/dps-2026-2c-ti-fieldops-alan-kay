@@ -3,7 +3,6 @@ package ar.edu.itba.dps.fieldops.adapters.driving.rest;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.CreateExpeditionRequest;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.ExpeditionResponse;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.mappers.ExpeditionMapper;
-import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.ports.in.CreateExpeditionPort;
 import ar.edu.itba.dps.fieldops.business.ports.in.QueryExpeditionsPort;
@@ -47,7 +46,7 @@ public class ExpeditionController {
     @Operation(summary = "Lists every expedition, in the order they were created")
     @ApiResponse(responseCode = "200", description = "The expeditions, without their itineraries")
     public List<ExpeditionResponse> list() {
-        return queryExpeditions.list().stream().map(this::toResponse).toList();
+        return queryExpeditions.list().stream().map(ExpeditionMapper::toResponse).toList();
     }
 
     @GetMapping("/{id}")
@@ -55,10 +54,6 @@ public class ExpeditionController {
     @ApiResponse(responseCode = "200", description = "The expedition, without its itinerary")
     @ApiResponse(responseCode = "404", description = "There is no expedition with that id")
     public ExpeditionResponse get(@PathVariable String id) {
-        return toResponse(queryExpeditions.get(new ExpeditionId(id)));
-    }
-
-    private ExpeditionResponse toResponse(Expedition expedition) {
-        return ExpeditionMapper.toResponse(expedition, queryExpeditions.isStaleAlternative(expedition));
+        return ExpeditionMapper.toResponse(queryExpeditions.get(new ExpeditionId(id)));
     }
 }

@@ -1,7 +1,7 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
-import ar.edu.itba.dps.fieldops.business.exceptions.DuplicateZoneException;
 import ar.edu.itba.dps.fieldops.business.models.commands.RegisterZoneCommand;
+import ar.edu.itba.dps.fieldops.business.models.responses.ZoneView;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.ports.in.RegisterZonePort;
 import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
@@ -16,9 +16,9 @@ public class RegisterZone implements RegisterZonePort {
     }
 
     @Override
-    public Zone register(RegisterZoneCommand command) {
+    public ZoneView register(RegisterZoneCommand command) {
         final var zone = new Zone(command.id(), command.name(), command.requiredPermits());
         zones.add(zone);
-        return zone;
+        return ZoneView.of(zone);
     }
 }

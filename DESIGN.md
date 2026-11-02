@@ -1254,6 +1254,22 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - Renombrar las implementaciones (`ApproveExpeditionUseCase`) y dejarles el nombre a las interfaces — mismo resultado con todos los tests renombrados.
 - **Consecuencia:** los tests de integración de `web` entran por los puertos y por ids, igual que un adaptador. Los puertos todavía devuelven entidades: las respuestas propias en el modelo llegan en D64.
 
+### D64 — Los puertos de entrada devuelven respuestas propias y no entidades (corrección de la Entrega 2, revisa D49, D54 y D63)
+
+- **Origen:** corrección de la Entrega 2: el esquema visto en clase pide una interfaz por caso de uso con su comando y su respuesta en el modelo. Los puertos devolvían entidades mutables, que el adaptador REST podía modificar y que atan a `web` a la forma interna del dominio.
+- **Patrón / principio:** `Response` del esquema hexagonal (Clase 7) + Encapsulation: lo que sale del hexágono es un dato de solo lectura, inmutable.
+- **Dónde:** `record` en `business.models.responses`: `ExpeditionView`, `ItineraryView`, `ItineraryNodeView`, `ScheduledActivityView`, `ReplanProposalView`, `ReplanOptionView`, `ReplanDecisionView`, `PersonView`, `VehicleView`, `InstrumentView`, `SupplyView`, `ZoneView`, `ActivityTypeView`, `ExpeditionReportView`, `AcceptedWarningView` y `AssignmentCandidates`; `QueryExpeditionsPort.itinerary`; los mappers de `web`; `HexagonalArchitectureTest`.
+- **Por qué:**
+  - Se llaman `View` para no chocar con los `*Response` de `web`, que siguen siendo el contrato HTTP. El mapper traduce `View` a DTO, y el JSON no cambió: los tests de API siguen igual.
+  - `ExpeditionEstimate` y `ApprovalResult` se devuelven tal cual: ya son `record` sin entidades adentro. `ExpeditionReport` tenía una `Person` en cada advertencia aceptada, y por eso tiene su vista.
+  - El visitor que arma el árbol (D54) pasó del mapper al dominio, en `ItineraryNodeView`, porque `web` ya no conoce `ItineraryNode`.
+  - `staleAlternative` lo calcula la consulta al armar la vista, y deja de ser un método aparte del puerto.
+  - ArchUnit ahora también prohíbe que los adaptadores driving conozcan las entidades.
+- **Alternativas descartadas:**
+  - Seguir devolviendo entidades — menos trabajo, pero no cumple lo que pide el esquema, y el adaptador podría mutar el dominio fuera de un caso de uso.
+  - Interfaces de solo lectura implementadas por las entidades — evitan copiar, pero con la persistencia real expondrían objetos atados a una transacción ya cerrada.
+- **Consecuencia:** cada campo nuevo que se quiera exponer pasa por la vista y por el mapper. Los tests de los casos de uso buscan la entidad en el repositorio cuando necesitan seguir operando sobre ella. La distinción de equipo por tipo en `FindAssignmentCandidates` y `QueryCatalog` sigue filtrando por clase hasta que el equipo tenga su visitor.
+
 ## Funcionalidades nuevas de la Entrega 2
 
 ### F1 — Actividades nocturnas

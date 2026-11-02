@@ -1,7 +1,7 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
-import ar.edu.itba.dps.fieldops.business.models.report.ExpeditionReport;
+import ar.edu.itba.dps.fieldops.business.models.responses.ExpeditionReportView;
 import ar.edu.itba.dps.fieldops.business.ports.in.ReportExpeditionPort;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.reports.ExpeditionReporter;
@@ -19,7 +19,7 @@ public class ReportExpedition implements ReportExpeditionPort {
     }
 
     @Override
-    public ExpeditionReport report(ExpeditionId id) {
-        return reporter.reportOf(Lookups.expedition(repository, id));
+    public ExpeditionReportView report(ExpeditionId id) {
+        return ExpeditionReportView.of(reporter.reportOf(Lookups.expedition(repository, id)));
     }
 }

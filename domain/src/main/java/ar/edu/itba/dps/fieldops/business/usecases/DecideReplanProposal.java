@@ -7,6 +7,7 @@ import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanDecision;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposal;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposalId;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.models.responses.ExpeditionView;
 import ar.edu.itba.dps.fieldops.business.ports.in.DecideReplanProposalPort;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ReplanProposalRepository;
@@ -31,7 +32,7 @@ public class DecideReplanProposal implements DecideReplanProposalPort {
     }
 
     @Override
-    public Expedition accept(ReplanProposalId proposalId, int optionNumber, ReplanDecisionCommand command) {
+    public ExpeditionView accept(ReplanProposalId proposalId, int optionNumber, ReplanDecisionCommand command) {
         final var proposal = Lookups.proposal(proposals, proposalId);
         proposal.requirePending();
         final var option = proposal.option(optionNumber);
@@ -47,7 +48,7 @@ public class DecideReplanProposal implements DecideReplanProposalPort {
         proposals.findByExpedition(original.getId()).stream()
                 .filter(ReplanProposal::isPending)
                 .forEach(other -> other.supersedeBy(proposal.getId()));
-        return alternative;
+        return ExpeditionView.of(alternative);
     }
 
     @Override

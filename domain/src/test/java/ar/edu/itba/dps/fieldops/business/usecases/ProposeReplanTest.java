@@ -62,7 +62,7 @@ class ProposeReplanTest {
         final var scenario = new IncidentScenario();
         prepareCatalog(scenario, freeStaffInCatalog);
 
-        final var proposal = scenario.registerIncident.register(
+        final var proposal = scenario.registered(
                 scenario.incidentOn(affected.apply(scenario), details.apply(IncidentReport.of("Something went wrong", TEN))));
 
         assertEquals(kinds, proposal.getOptions().stream().map(ReplanOption::summary).map(summary -> summary.split(" ")[0]).toList());
@@ -76,7 +76,7 @@ class ProposeReplanTest {
         final var scenario = new IncidentScenario();
         prepareCatalog(scenario, freeStaffInCatalog);
         final var activity = affected.apply(scenario);
-        final var proposal = scenario.registerIncident.register(
+        final var proposal = scenario.registered(
                 scenario.incidentOn(activity, details.apply(IncidentReport.of("Something went wrong", TEN))));
         final var item = scenario.itemOf(scenario.expedition, activity);
 

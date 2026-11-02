@@ -9,6 +9,9 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
+import ar.edu.itba.dps.fieldops.business.models.responses.InstrumentView;
+import ar.edu.itba.dps.fieldops.business.models.responses.PersonView;
+import ar.edu.itba.dps.fieldops.business.models.responses.SupplyView;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
@@ -149,10 +152,10 @@ class ItineraryUseCasesTest {
 
         final var offer = candidates.candidatesFor(expedition.getId(), SAMPLING);
 
-        assertTrue(offer.staff().stream().allMatch(entry -> entry.candidates().contains(worker)));
-        assertTrue(offer.equipment().stream().flatMap(entry -> entry.candidates().stream()).anyMatch(cooler::equals));
-        assertTrue(offer.equipment().stream().flatMap(entry -> entry.candidates().stream()).noneMatch(tank::equals));
-        assertTrue(offer.supplies().stream().flatMap(entry -> entry.candidates().stream()).anyMatch(jars::equals));
+        assertTrue(offer.staff().stream().allMatch(entry -> entry.candidates().contains(PersonView.of(worker))));
+        assertTrue(offer.equipment().stream().flatMap(entry -> entry.instruments().stream()).anyMatch(InstrumentView.of(cooler)::equals));
+        assertTrue(offer.equipment().stream().flatMap(entry -> entry.instruments().stream()).noneMatch(InstrumentView.of(tank)::equals));
+        assertTrue(offer.supplies().stream().flatMap(entry -> entry.candidates().stream()).anyMatch(SupplyView.of(jars)::equals));
     }
 
     @Test
@@ -172,7 +175,7 @@ class ItineraryUseCasesTest {
 
         final var offer = candidates.candidatesFor(expedition.getId(), new ActivityId("a-2"));
 
-        assertEquals(List.of(List.of(nightWorker)), offer.staff().stream().map(entry -> entry.candidates()).toList());
-        assertTrue(offer.equipment().stream().flatMap(entry -> entry.candidates().stream()).anyMatch(lamp::equals));
+        assertEquals(List.of(List.of(PersonView.of(nightWorker))), offer.staff().stream().map(entry -> entry.candidates()).toList());
+        assertTrue(offer.equipment().stream().flatMap(entry -> entry.instruments().stream()).anyMatch(InstrumentView.of(lamp)::equals));
     }
 }

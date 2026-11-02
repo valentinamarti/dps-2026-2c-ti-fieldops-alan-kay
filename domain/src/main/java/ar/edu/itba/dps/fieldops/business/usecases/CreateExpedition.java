@@ -4,6 +4,7 @@ import ar.edu.itba.dps.fieldops.business.models.commands.CreateExpeditionCommand
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionBuilder;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.models.responses.ExpeditionView;
 import ar.edu.itba.dps.fieldops.business.ports.in.CreateExpeditionPort;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
@@ -23,7 +24,7 @@ public class CreateExpedition implements CreateExpeditionPort {
     }
 
     @Override
-    public Expedition create(CreateExpeditionCommand command) {
+    public ExpeditionView create(CreateExpeditionCommand command) {
         final var draft = new ExpeditionBuilder()
                 .withName(command.name())
                 .withPeriod(command.period())
@@ -32,7 +33,7 @@ public class CreateExpedition implements CreateExpeditionPort {
         command.zoneIds().forEach(id -> draft.addZone(Lookups.zone(zones, id)));
         command.responsibleIds().forEach(id -> draft.addResponsible(Lookups.staff(catalog, id)));
         command.grantedPermits().forEach(draft::addPermit);
-        return create(draft);
+        return ExpeditionView.of(create(draft));
     }
 
     Expedition create(ExpeditionBuilder draft) {

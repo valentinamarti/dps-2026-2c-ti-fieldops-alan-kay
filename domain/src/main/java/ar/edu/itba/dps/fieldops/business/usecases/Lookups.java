@@ -20,6 +20,7 @@ import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ReplanProposalRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 final class Lookups {
@@ -65,6 +66,10 @@ final class Lookups {
 
     static Depletable depletable(ResourceCatalog catalog, ResourceId id) {
         return ofKind(catalog.findSupply(id), Depletable.class, "supply", id);
+    }
+
+    static <T> List<T> onlyOf(List<?> resources, Class<T> kind) {
+        return resources.stream().filter(kind::isInstance).map(kind::cast).toList();
     }
 
     private static <T> T ofKind(Optional<?> found, Class<T> kind, String name, ResourceId id) {

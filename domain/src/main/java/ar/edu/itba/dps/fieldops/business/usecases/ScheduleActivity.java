@@ -5,6 +5,7 @@ import ar.edu.itba.dps.fieldops.business.models.commands.ScheduleActivityCommand
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
+import ar.edu.itba.dps.fieldops.business.models.responses.ScheduledActivityView;
 import ar.edu.itba.dps.fieldops.business.ports.in.ScheduleActivityPort;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
@@ -24,11 +25,11 @@ public class ScheduleActivity implements ScheduleActivityPort {
     }
 
     @Override
-    public ItineraryItem schedule(ScheduleActivityCommand command) {
+    public ScheduledActivityView schedule(ScheduleActivityCommand command) {
         final var expedition = Lookups.expedition(repository, command.expeditionId());
         final var planned = command.activity();
         final var activity = new PlannedActivities(expedition, zones, types).of(planned);
-        return expedition.schedule(activity, planned.scheduledPeriod());
+        return ScheduledActivityView.of(expedition.schedule(activity, planned.scheduledPeriod()));
     }
 
     ItineraryItem schedule(ExpeditionId expeditionId, Activity activity, TimePeriod scheduledPeriod) {

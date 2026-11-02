@@ -1,6 +1,6 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
-import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
+import ar.edu.itba.dps.fieldops.business.models.responses.ZoneView;
 import ar.edu.itba.dps.fieldops.business.ports.in.QueryZonesPort;
 import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
 
@@ -16,12 +16,12 @@ public class QueryZones implements QueryZonesPort {
     }
 
     @Override
-    public Zone get(String id) {
-        return Lookups.zone(zones, id);
+    public ZoneView get(String id) {
+        return ZoneView.of(Lookups.zone(zones, id));
     }
 
     @Override
-    public List<Zone> list() {
-        return zones.findAll();
+    public List<ZoneView> list() {
+        return zones.findAll().stream().map(ZoneView::of).toList();
     }
 }

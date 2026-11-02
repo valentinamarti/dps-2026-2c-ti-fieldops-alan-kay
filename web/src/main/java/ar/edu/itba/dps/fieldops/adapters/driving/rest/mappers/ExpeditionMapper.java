@@ -3,12 +3,11 @@ package ar.edu.itba.dps.fieldops.adapters.driving.rest.mappers;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.CreateExpeditionRequest;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.ExpeditionResponse;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.RestrictionsDto;
-import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionRestrictions;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
+import ar.edu.itba.dps.fieldops.business.models.responses.ExpeditionView;
 import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
-import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.models.commands.CreateExpeditionCommand;
 
 import java.util.List;
@@ -30,25 +29,21 @@ public final class ExpeditionMapper {
                 toRestrictions(request.restrictions()));
     }
 
-    public static ExpeditionResponse toResponse(Expedition expedition) {
-        return toResponse(expedition, false);
-    }
-
-    public static ExpeditionResponse toResponse(Expedition expedition, boolean staleAlternative) {
-        final var restrictions = expedition.getRestrictions();
+    public static ExpeditionResponse toResponse(ExpeditionView expedition) {
+        final var restrictions = expedition.restrictions();
         return new ExpeditionResponse(
-                expedition.getId().value(),
-                expedition.getName(),
-                expedition.getStatus(),
-                Mappings.toDto(expedition.getPeriod()),
-                expedition.getObjectives(),
-                Mappings.sorted(expedition.getZones().stream().map(Zone::getId)),
-                Mappings.sorted(expedition.getResponsibles().stream().map(person -> person.getId().value())),
-                Mappings.sorted(expedition.getGrantedPermits().stream().map(Permit::name)),
+                expedition.id().value(),
+                expedition.name(),
+                expedition.status(),
+                Mappings.toDto(expedition.period()),
+                expedition.objectives(),
+                Mappings.sorted(expedition.zoneIds().stream()),
+                Mappings.sorted(expedition.responsibleIds().stream().map(ResourceId::value)),
+                Mappings.sorted(expedition.grantedPermits().stream().map(Permit::name)),
                 new RestrictionsDto(restrictions.maxParticipants(), restrictions.riskTolerance()),
-                expedition.getReplacedExpedition().map(ExpeditionId::value).orElse(null),
-                expedition.getReplacement().map(ExpeditionId::value).orElse(null),
-                staleAlternative);
+                expedition.replacedExpedition().map(ExpeditionId::value).orElse(null),
+                expedition.replacement().map(ExpeditionId::value).orElse(null),
+                expedition.staleAlternative());
     }
 
     private static ExpeditionRestrictions toRestrictions(RestrictionsDto restrictions) {

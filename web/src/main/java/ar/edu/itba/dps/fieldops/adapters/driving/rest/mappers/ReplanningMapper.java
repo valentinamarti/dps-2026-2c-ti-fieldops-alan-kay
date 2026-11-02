@@ -11,18 +11,15 @@ import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Incident;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.IncidentReport;
-import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanDecision;
-import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanOption;
-import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposal;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposalId;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.commands.RegisterIncidentCommand;
 import ar.edu.itba.dps.fieldops.business.models.commands.ReplanDecisionCommand;
+import ar.edu.itba.dps.fieldops.business.models.responses.ReplanDecisionView;
+import ar.edu.itba.dps.fieldops.business.models.responses.ReplanProposalView;
 
 import java.time.Duration;
-import java.util.List;
 import java.util.Optional;
-import java.util.stream.IntStream;
 
 public final class ReplanningMapper {
     private ReplanningMapper() {
@@ -43,15 +40,15 @@ public final class ReplanningMapper {
                 request.decidedAt());
     }
 
-    public static ReplanProposalResponse toResponse(ReplanProposal proposal) {
+    public static ReplanProposalResponse toResponse(ReplanProposalView proposal) {
         return new ReplanProposalResponse(
-                proposal.getId().value(),
-                proposal.getOriginalExpedition().value(),
-                proposal.getStatus(),
-                toDto(proposal.getIncident()),
-                toDtos(proposal.getOptions()),
-                proposal.getDecision().map(decision -> toDto(proposal, decision)).orElse(null),
-                proposal.getSupersededBy().map(ReplanProposalId::value).orElse(null));
+                proposal.id().value(),
+                proposal.originalExpedition().value(),
+                proposal.status(),
+                toDto(proposal.incident()),
+                proposal.options().stream().map(option -> new ReplanOptionDto(option.number(), option.summary())).toList(),
+                proposal.decision().map(ReplanningMapper::toDto).orElse(null),
+                proposal.supersededBy().map(ReplanProposalId::value).orElse(null));
     }
 
     static IncidentDto toDto(Incident incident) {
@@ -64,19 +61,13 @@ public final class ReplanningMapper {
                 incident.expectedDelay().map(Duration::toMinutes).orElse(null));
     }
 
-    private static List<ReplanOptionDto> toDtos(List<ReplanOption> options) {
-        return IntStream.rangeClosed(1, options.size())
-                .mapToObj(number -> new ReplanOptionDto(number, options.get(number - 1).summary()))
-                .toList();
-    }
-
-    private static ReplanDecisionDto toDto(ReplanProposal proposal, ReplanDecision decision) {
+    private static ReplanDecisionDto toDto(ReplanDecisionView decision) {
         return new ReplanDecisionDto(
-                decision.responsible().getId().value(),
+                decision.responsibleId().value(),
                 decision.justification(),
                 decision.decidedAt(),
-                proposal.getChosenOptionNumber().orElse(null),
-                proposal.getAlternative().map(ExpeditionId::value).orElse(null));
+                decision.chosenOptionNumber().orElse(null),
+                decision.alternative().map(ExpeditionId::value).orElse(null));
     }
 
     private static ResourceId toResponsible(String responsibleId) {

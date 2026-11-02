@@ -1,27 +1,27 @@
 package ar.edu.itba.dps.fieldops.business.ports.in;
 
-import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
-import ar.edu.itba.dps.fieldops.business.models.resources.Instrument;
-import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
-import ar.edu.itba.dps.fieldops.business.models.resources.Vehicle;
+import ar.edu.itba.dps.fieldops.business.models.responses.InstrumentView;
+import ar.edu.itba.dps.fieldops.business.models.responses.PersonView;
+import ar.edu.itba.dps.fieldops.business.models.responses.SupplyView;
+import ar.edu.itba.dps.fieldops.business.models.responses.VehicleView;
 
 import java.util.List;
 
 public interface QueryCatalogPort {
-    List<Person> staff();
+    List<PersonView> staff();
 
-    Person person(ResourceId id);
+    PersonView person(ResourceId id);
 
-    List<Vehicle> vehicles();
+    List<VehicleView> vehicles();
 
-    Vehicle vehicle(ResourceId id);
+    VehicleView vehicle(ResourceId id);
 
-    List<Instrument> instruments();
+    List<InstrumentView> instruments();
 
-    Instrument instrument(ResourceId id);
+    InstrumentView instrument(ResourceId id);
 
-    List<Depletable> supplies();
+    List<SupplyView> supplies();
 
-    Depletable supply(ResourceId id);
+    SupplyView supply(ResourceId id);
 }
