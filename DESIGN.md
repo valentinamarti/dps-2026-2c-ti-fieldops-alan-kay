@@ -1309,6 +1309,27 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - Pasar el catálogo a `TrackActivity` y `FinishExpedition` por otro servicio — son los casos de uso los que cambian los consumibles, así que reciben el puerto.
 - **Consecuencia:** `TrackActivity` y `FinishExpedition` reciben el catálogo. `save` guarda el último estado, también si no existía: `add` es quien rechaza los duplicados. Mientras los datos sigan en memoria, olvidar un `save` no se notaría al ejecutar; por eso cada `save` tiene su test con Mockito.
 
+### D67 — Adaptador JPA sobre PostgreSQL, con entidades propias y una instancia por transacción (corrección de la Entrega 2, persistencia, revisa D36, D37 y D51)
+
+- **Origen:** corrección de la Entrega 2: el enunciado exige persistencia real y pruebas de repositorio contra una base. D51 lo había postergado.
+- **Patrón / principio:** adaptador driven (D35) + Data Mapper: el dominio no sabe que hay una base, y las entidades JPA no salen del adaptador. Identity Map por transacción.
+- **Dónde:** en `app`, paquete `adapters.driven.persistence`: `JpaExpeditionRepository`, `JpaReplanProposalRepository`, `JpaZoneRepository`, `JpaResourceCatalog`; `ExpeditionEntity`, `ReplanProposalEntity`, `ZoneEntity`, `ResourceEntity` y sus filas `@Embeddable`; `ExpeditionMapper`, `ReplanReasonMapper`, `IncidentMapper`; `LoadedAggregates`; `db/migration/V1__create_schema.sql`; `docker-compose.yml`. En los tests: `PersistenceTestApplication` con Testcontainers, subclases de los cuatro contratos y `PersistedStateRoundTripTest`.
+- **Por qué:**
+  - **PostgreSQL con Testcontainers** para que los tests corran contra la misma base que la aplicación, sin diferencias de dialecto.
+  - **Entidades separadas del modelo:** D36 prohíbe anotar `domain`. Los mappers trabajan sobre los snapshots de D65, sin saltear reglas.
+  - **Las colecciones de la expedición son filas `@ElementCollection` con orden,** y se reemplazan al guardar. El árbol es una tabla plana con la posición del padre, en orden de recorrido. Una expedición tiene decenas de filas, así que reescribirlas no es un problema real, y evita sincronizar diferencias a mano.
+  - **Una sola instancia por id en cada transacción (`LoadedAggregates`).** Es lo que resuelve la objeción de D15: dentro de una operación, la expedición y el catálogo ven el mismo recurso, y un `save` no puede pisar lo que otra instancia cambió.
+  - **Sin claves foráneas entre agregados.** Una expedición referencia recursos y zonas por id, y una propuesta a su expedición por id: cada agregado se guarda por separado.
+  - Las actividades se guardan con sus dependencias aunque ya no estén agendadas: en una alternativa, una actividad terminada puede depender de una cancelada.
+  - `JpaResourceCatalog` redefine las consultas `default` del puerto solo para delegarlas: `@Transactional` sobre la clase no alcanza a un método heredado de una interfaz, y sin transacción Hibernate no puede leer las colecciones.
+  - `@Version` en las raíces que cambian. Hibernate solo valida el esquema: lo crea Flyway.
+  - `app` ahora conoce Spring Data, y el enforcer sigue protegiendo a `domain`. Revisa "Spring solo en `web`" de D37.
+- **Alternativas descartadas:**
+  - Guardar la expedición como un documento JSON — ahorra tablas y mapeo, pero esconde el esquema, y no se aprovecha lo que PostgreSQL verifica.
+  - Una entidad JPA por nodo con relaciones — más clases y más cascadas para un árbol que siempre se lee y se escribe entero.
+  - H2 para los tests — otra base distinta de la de producción, con otras diferencias.
+- **Consecuencia:** en esta fase los adaptadores existen y pasan los contratos, pero la aplicación todavía arranca en memoria, y las dependencias de JPA son opcionales en `app` para no activarse en `web`. Correr los tests de `app` requiere Docker.
+
 ## Funcionalidades nuevas de la Entrega 2
 
 ### F1 — Actividades nocturnas

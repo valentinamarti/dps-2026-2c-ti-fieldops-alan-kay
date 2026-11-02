@@ -28,9 +28,13 @@ public abstract class ExpeditionRepositoryContract {
 
     protected abstract ExpeditionRepository createRepository();
 
+    protected void registerReferences(Zone zone, Person responsible) {
+    }
+
     @BeforeEach
     void setUpRepository() {
         repository = createRepository();
+        registerReferences(coast, leader);
     }
 
     @Test

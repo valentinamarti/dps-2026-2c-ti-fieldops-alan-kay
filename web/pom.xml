@@ -14,7 +14,6 @@
     <description>Spring Boot application and composition root.</description>
 
     <properties>
-        <spring-boot.version>4.1.1</spring-boot.version>
         <springdoc.version>3.1.1</springdoc.version>
     </properties>
 

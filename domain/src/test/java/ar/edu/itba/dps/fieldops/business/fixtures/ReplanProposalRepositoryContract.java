@@ -9,6 +9,7 @@ import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanDecision;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposal;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposalId;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposalStatus;
+import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.providers.ReplanProposalRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,9 @@ public abstract class ReplanProposalRepositoryContract {
     protected ReplanProposalRepository repository;
 
     protected abstract ReplanProposalRepository createRepository();
+
+    protected void registerResponsible(Person responsible) {
+    }
 
     @BeforeEach
     void setUpRepository() {
@@ -72,7 +76,9 @@ public abstract class ReplanProposalRepositoryContract {
         final var proposal = proposalFor(expedition, 1);
         repository.add(proposal);
 
-        proposal.reject(new ReplanDecision(person("p-1"), "The plan holds", LocalDateTime.of(2026, 10, 1, 10, 0)));
+        final var responsible = person("p-1");
+        registerResponsible(responsible);
+        proposal.reject(new ReplanDecision(responsible, "The plan holds", LocalDateTime.of(2026, 10, 1, 10, 0)));
         repository.save(proposal);
 
         assertEquals(ReplanProposalStatus.REJECTED, repository.findById(proposal.getId()).orElseThrow().getStatus());
