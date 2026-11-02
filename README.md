@@ -1,9 +1,9 @@
 # TPI — Field Ops
 
-Backend for planning, validating, approving and following the execution of scientific field expeditions:
+Application for planning, validating, approving and following the execution of scientific field expeditions:
 expeditions with zones, resources, permits and restrictions; an itinerary of activities and of sequential and
 parallel blocks; validation, estimation and assignment; the approval lifecycle; tracking; and automatic
-replanning after an incident.
+replanning after an incident. A REST API over PostgreSQL, with a web frontend served by the same application.
 
 **Group:** Alan-Kay
 **Course:** DPS
@@ -20,6 +20,8 @@ replanning after an incident.
 
 - **JDK 25** — the build checks it with `maven-enforcer-plugin` and fails with any other version.
 - **Maven 3.9+**
+- **Docker**, running, with Compose: the application needs PostgreSQL and the tests of `app` and `web` start
+  their own container with Testcontainers.
 
 Check both before building; `mvn -v` must report Java 25 too, since Maven uses the JDK found through `JAVA_HOME`:
 
@@ -36,20 +38,21 @@ If Maven picks another JDK, point `JAVA_HOME` to JDK 25:
 | macOS | `export JAVA_HOME=$(/usr/libexec/java_home -v 25)` |
 | Windows (PowerShell) | `$env:JAVA_HOME = "C:\Program Files\Java\jdk-25"` |
 
-Nothing else is needed: persistence is in memory, so there is no database to install or configure.
+Nothing else is needed: Compose starts the database and Flyway creates the schema when the application starts.
 
 ## Build and test
 
 Run from the repository root. The commands are the same on Linux, macOS and Windows:
 
 ```bash
-mvn test      # compiles and runs the tests (the JDK 25 check runs first, in validate)
-mvn -B verify # full build, the same command as the CI
+mvn -B verify        # full build, the same command as the CI; Docker has to be running
+mvn test -pl domain  # only the domain tests, which do not need Docker
 ```
 
 ## Run
 
 ```bash
+docker compose up -d          # PostgreSQL on port 5433, with its data in the fieldops-data volume
 mvn -B install -DskipTests    # once, and after changing domain or app: puts the modules in your local Maven repository
 mvn spring-boot:run -pl web
 ```
@@ -58,12 +61,23 @@ The application starts Tomcat on port 8080:
 
 | URL | What it is |
 | --- | --- |
+| <http://localhost:8080> | The frontend |
 | <http://localhost:8080/swagger-ui.html> | Swagger UI, where every endpoint can be tried |
 | <http://localhost:8080/v3/api-docs> | The OpenAPI document springdoc generates from the controllers |
 
-Without the `demo` profile the catalog and the zones start empty, so an expedition has to be created from
-scratch: register the zones and the staff it references first, otherwise `POST /api/expeditions` answers `404`.
-Stop the application with `Ctrl+C`.
+The connection defaults to the Compose database and can be changed with environment variables:
+
+| Variable | Default |
+| --- | --- |
+| `FIELDOPS_DB_URL` | `jdbc:postgresql://localhost:5433/fieldops` |
+| `FIELDOPS_DB_USER` | `fieldops` |
+| `FIELDOPS_DB_PASSWORD` | `fieldops` |
+
+Compose publishes port 5433 and not 5432 so that it does not collide with a PostgreSQL installed on the machine.
+
+The data survives a restart. On an empty database and without the `demo` profile the catalog and the zones
+start empty, so an expedition has to be created from scratch: register the zones and the staff it references first, otherwise `POST /api/expeditions` answers `404`.
+Stop the application with `Ctrl+C` and the database with `docker compose down`.
 
 To run the packaged jar instead:
 
@@ -72,14 +86,25 @@ mvn -B package -DskipTests
 java -jar web/target/web-1.0-SNAPSHOT.jar
 ```
 
+## Frontend
+
+Static HTML, CSS and JavaScript modules in `web/src/main/resources/static`, with no build step and no framework
+(D69). Spring Boot serves them, so there is nothing to install or start apart from the application. It only
+talks to the API, and shows the `ProblemDetail` of a failed request as it comes.
+
+It covers the catalog and the zones, creating an expedition, the itinerary with its blocks, the assignment of
+resources, validation and estimation, the approval with the acceptance of warnings, the lifecycle, the tracking,
+the incidents and their replan proposals, and the final report.
+
 ## Run the demonstration
 
 The `demo` profile loads [`demo/catalog.json`](demo/catalog.json) and
-[`demo/expedition.json`](demo/expedition.json) on startup, through the same use cases the REST adapter goes
+[`demo/expedition.json`](demo/expedition.json) on startup if the database has no zones, through the same use cases the REST adapter goes
 through. [`demo.http`](demo.http) is the script that tells the story against the API from there, step by step
 and commented (in Spanish, which is the language of the presentation).
 
 ```bash
+docker compose up -d
 mvn -B install -DskipTests
 mvn spring-boot:run -pl web -Dspring-boot.run.profiles=demo
 ```
@@ -93,7 +118,8 @@ java -jar web/target/web-1.0-SNAPSHOT.jar --spring.profiles.active=demo
 
 Then open `demo.http` in IntelliJ (Tools > HTTP Client, or the ▶ button next to each request) and run the
 requests in order. VS Code works too, with the REST Client extension. Every step that needs an id takes it
-from the previous answer, so nothing has to be copied by hand.
+from the previous answer, so nothing has to be copied by hand. The expedition of the seed can also be followed
+from the frontend, at <http://localhost:8080>.
 
 What the seed leaves loaded:
 
@@ -107,8 +133,10 @@ What the script adds and walks: the **night activity** of F1 (which is where the
 from), the approval that the critical blocks, the correction, the acceptance of the warning with its
 justification, the approval, the execution, an incident, and the replanning of F3 with its audit trail.
 
-The script is **not idempotent**: it leaves the expedition replaced and the night dive scheduled. To run it
-again, **restart the application** — the profile loads the data from the files on every startup. The same walk
+The script is **not idempotent**: it leaves the expedition replaced and the night dive scheduled, and restarting
+the application no longer undoes that, because the data stays in the database. To run it again, stop the
+application, delete the volume with `docker compose down -v`, and start both again: the seed loads on the empty
+database. The same walk
 runs in the CI as `DemoScriptApiTest`, so if the script and the test drift apart the build says so.
 
 The files are read off the classpath, so the same build works from `spring-boot:run`, from the jar and from
@@ -127,27 +155,31 @@ The project is a multi-module Maven build following a hexagonal architecture (se
 
 | Module | Contains | Depends on |
 | --- | --- | --- |
-| `domain` | All of `business.*`: model, rules, validations, services, use cases (input ports) and `business.providers` (output ports). Publishes a `test-jar` with shared fixtures | No frameworks. The enforcer bans `org.springframework*`, direct or transitive |
-| `app` | `adapters.driven`: driven adapters, today the in-memory repositories (`InMemoryExpeditionRepository`, `InMemoryZoneRepository`, `InMemoryReplanProposalRepository`) and the synchronous `InMemoryEventPublisher` | `domain` |
-| `web` | Spring Boot application (`FieldOpsApplication`), the `@Configuration` classes that wire the use cases (composition root, D37) — `FieldOpsConfig` and `ReplanningConfig` (F3) — and `adapters.driving`: the REST adapter (`rest`) and the seed loader of the demonstration (`seed`, D50) | `domain`, `app` |
+| `domain` | All of `business.*`: model, rules, validations, services, use cases, `business.ports.in` (input ports) and `business.providers` (output ports). Publishes a `test-jar` with shared fixtures | No frameworks. The enforcer bans `org.springframework*`, direct or transitive |
+| `app` | `adapters.driven`: the JPA adapters of `adapters.driven.persistence` (`JpaExpeditionRepository`, `JpaZoneRepository`, `JpaReplanProposalRepository`, `JpaResourceCatalog`), with their own entities and mappers, the Flyway migrations, and the synchronous `InMemoryEventPublisher` | `domain` |
+| `web` | Spring Boot application (`FieldOpsApplication`), the `@Configuration` classes that wire the use cases (composition root, D37) — `FieldOpsConfig` and `ReplanningConfig` (F3) — the transactional proxy of the use cases (`TransactionalUseCases`), `adapters.driving`: the REST adapter (`rest`) and the seed loader of the demonstration (`seed`, D50), and the frontend (`static`) | `domain`, `app` |
 
 ```
 domain/src/main/java/ar/edu/itba/dps/fieldops/business
 ├── interfaces      # domain contracts: ActivityRules, ActivityType, ItineraryNode, ReplanReason, ReplanOptionGenerator, DomainEvent/EventSubscriber, resources, ValidationRule
-├── models          # entities and value objects (activities, common, estimation, events, expeditions, replanning, report, resources, validation, zones)
-├── providers       # output ports: ExpeditionRepository, ZoneRepository, ReplanProposalRepository, EventPublisher
+├── models          # entities and value objects (activities, common, estimation, events, expeditions, replanning, report, resources, validation, zones), commands and responses
+├── ports/in        # input ports, one per use case class: what the driving adapters depend on
+├── providers       # output ports: ExpeditionRepository, ZoneRepository, ReplanProposalRepository, ResourceCatalog, EventPublisher, ...
 ├── rules           # ActivityRules implementations, one per activity type, the night decorator (NightOperationRules) and the ActivityTypeRegistry
 ├── validations     # ValidationRule implementations and the ApprovalPolicy
 ├── estimations     # ExpeditionEstimator
 ├── reports         # ExpeditionReporter
 ├── replanning      # ExpeditionReplanner, the replan reasons (Cancellation, Delay, ResourceWithdrawn, ResourceReplaced) and the option generators of F3
 ├── services        # ResourceReservations
-├── usecases        # input ports: commands and operations by id (create, schedule, assign, transition, approve, track, finish, replan, register an incident, decide a replan proposal) and queries (get, list, validate, estimate, report, candidates, activity types, replan proposals)
+├── usecases        # implementations of the input ports: operations by id (create, schedule, assign, transition, approve, track, finish, replan, register an incident, decide a replan proposal) and queries (get, list, validate, estimate, report, candidates, activity types, replan proposals)
 └── exceptions      # domain exceptions
-app/src/main/java/ar/edu/itba/dps/fieldops/adapters/driven     # in-memory repositories and InMemoryEventPublisher
-web/src/main/java/ar/edu/itba/dps/fieldops                     # FieldOpsApplication, FieldOpsConfig, ReplanningConfig
+app/src/main/java/ar/edu/itba/dps/fieldops/adapters/driven     # persistence (JPA adapters, entities, mappers) and InMemoryEventPublisher
+app/src/main/resources/db/migration                            # Flyway migrations of the schema
+web/src/main/java/ar/edu/itba/dps/fieldops                     # FieldOpsApplication, FieldOpsConfig, ReplanningConfig, TransactionalUseCases
 web/src/main/java/.../adapters/driving/rest                    # controllers, DomainExceptionHandler, OpenApiConfig, and the dtos and mappers subpackages
 web/src/main/java/.../adapters/driving/seed                    # DemoDataLoader and the @Profile("demo") that turns it on
+web/src/main/resources/static                                  # the frontend
+docker-compose.yml                                             # the PostgreSQL of local development
 demo/                                                          # the data of the demonstration, as JSON
 demo.http                                                      # the script of the demonstration, against the API
 */src/test/java/...                                            # unit tests per module and end-to-end integration tests in web
@@ -166,7 +198,7 @@ verbs in the URL (`/approval`, `/suspension`, `/completion`), which is the conve
 | --- | --- |
 | `POST /api/expeditions` | Creates a draft expedition, with its zones and responsibles referenced by id |
 | `GET /api/expeditions` | Lists every expedition |
-| `GET /api/expeditions/{id}` | One expedition, with its status and the replacement links of a replanning |
+| `GET /api/expeditions/{id}` | One expedition, with its status, the replacement links of a replanning, and `staleAlternative` when the original changed after the alternative was built |
 
 ### Catalog of resources
 
@@ -220,7 +252,7 @@ A supply has stock and not a calendar, so `/api/supplies/{id}/unavailabilities` 
 | --- | --- |
 | `POST /api/expeditions/{id}/review` | Draft -> in review |
 | `POST /api/expeditions/{id}/draft` | In review -> draft, to correct it |
-| `POST /api/expeditions/{id}/approval` | Approves it, with the warnings a responsible accepts and their justification. A critical left open is a `422` that lists which ones |
+| `POST /api/expeditions/{id}/approval` | Approves it, with the warnings a responsible accepts and their justification. A critical left open is a `422` that lists which ones, and a stale alternative is a `409` |
 | `POST /api/expeditions/{id}/execution` | Approved or suspended -> in execution |
 | `POST /api/expeditions/{id}/suspension` | In execution -> suspended |
 | `POST /api/expeditions/{id}/resumption` | Suspended -> in execution |
@@ -252,9 +284,9 @@ status codes lives in the adapter and not in the domain (D49):
 
 | Status | When |
 | --- | --- |
-| `400` | An invalid argument, a malformed schedule or tracking, an unknown activity type or a parameter that does not serve it |
+| `400` | An invalid argument, a malformed schedule or tracking, a period shorter than the estimate of the activity, an unknown activity type or a parameter that does not serve it |
 | `404` | A resource, zone, expedition, scheduled activity, proposal, option or warning that does not exist |
-| `409` | An illegal status transition, an expedition that is no longer editable, an activity in progress, a resource that is not available, a repeated id, a proposal that was already decided |
+| `409` | An illegal status transition, an expedition that is no longer editable, an activity in progress, a resource that is not available, a repeated id, a proposal that was already decided, an alternative built on a plan that has changed, two writes in conflict over the same data |
 | `422` | A critical that blocks the approval (the body carries the list in `criticals`), a warning left unaccepted, stock that is not enough, someone who is not a responsible of the expedition |
 
 The `422` of the approval carries both: the `detail` enumerates the criticals in text and the `criticals`
@@ -262,18 +294,20 @@ property brings them structured, with the same shape `GET /api/expeditions/{id}/
 
 ## Tests
 
-`mvn -B verify` runs 787 tests: 641 in `domain`, 20 in `app` and 126 in `web`.
+`mvn -B verify` runs 923 tests: 706 in `domain`, 69 in `app` and 148 in `web`. The ones in `app` and `web` run
+against a real PostgreSQL, the same image as Compose, in a container that Testcontainers starts by itself, so
+Docker has to be running and `docker compose up` does not.
 
 | Kind | Where |
 | --- | --- |
 | Unit | Model, rules, validations and use cases in `domain`, with Mockito only where there is an output port |
 | Parameterized | `DomainExceptionHandlerTest` walks the whole table of exception to status code, and fails if an exception of `business.exceptions` has no row |
-| Repository | `app`: the in-memory adapters against the contract of each port (`InMemory*RepositoryTest`) |
-| API | `web`: the full context with the real in-memory adapters and no mocks, one happy path per capability plus the acceptance criteria of F1, F2 and F3 |
+| Repository | `app`: the JPA adapters against the contract of each port (`Jpa*Test`, with the contracts in the `test-jar` of `domain`), and `PersistedStateRoundTripTest` for what a save and a load have to preserve |
+| API | `web`: the full context over the database and no mocks, one happy path per capability plus the acceptance criteria of F1, F2 and F3 |
+| Architecture | `HexagonalArchitectureTest`: ArchUnit checks the direction of the dependencies between packages |
+| Transactions | `TransactionalUseCasesTest`: rollback and the translation of a write conflict |
+| Frontend | `FrontendPagesTest`: the application serves the static pages |
 | Demonstration | `DemoDataLoaderTest` (the files of `demo/` load and leave the expected scenario) and `DemoScriptApiTest` (the same walk as `demo.http`, end to end) |
-
-Persistence is in memory, which the repository tests cover against the contract of each port. Real
-persistence is registered as technical debt of this delivery in D51.
 
 ## Continuous integration
 
@@ -291,9 +325,6 @@ Work happens on one branch per phase with small pull requests.
 
 ## Out of scope of this delivery
 
-- **Frontend.** The group decided it is out of the scope of phase 5, which delivers the API, Swagger UI and
-  the script. Swagger UI is not a replacement for a frontend.
-- **Real persistence.** In memory, behind the output ports, with the repository tests as the contract (D51).
 - Security, deployment and anything the statement explicitly does not ask for (microservices, cloud).
 
 ## Design decisions

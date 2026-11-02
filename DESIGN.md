@@ -12,6 +12,8 @@ Antes de poder aprobarse, una expedición se corre contra un conjunto de reglas 
 
 Durante la ejecución se registra el comienzo, la finalización, las observaciones y los **incidentes** de cada actividad. Un incidente publica un evento de dominio y, del otro lado, una **propuesta de replanificación** (`ReplanProposal`) ofrece las opciones que se pueden armar —reprogramar, reemplazar un recurso, cancelar—, cada una con el motivo (`ReplanReason`) con el que el replanificador construiría la alternativa. Un responsable acepta una opción o la rechaza, y la propuesta queda como el registro de la auditoría: el incidente que la motivó, las opciones que se ofrecieron y la decisión que se tomó. Aceptar no modifica el plan original: construye **otra expedición** en borrador que lo reemplaza, y la original sigue siendo consultable tal como estaba (D45, D46, D47, D48).
 
+La persistencia no aparece en el modelo: los casos de uso hablan con puertos de salida (`business.providers`), y el adaptador JPA guarda el estado en PostgreSQL con sus propias entidades (D65 a D68). Cada caso de uso es una transacción, y dos escrituras en conflicto terminan en un 409.
+
 ## Patrones y principios aplicados
 
 ### D1 — Tipos de actividad: composición en vez de herencia (Strategy)
@@ -244,6 +246,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - Un catálogo por tipo de recurso: repetiría la regla de unicidad y permitiría repetir un `id` entre tipos.
   - Exponer las listas con getters y filtrar afuera: cada cliente reimplementaría "cumple el requisito y está libre".
 - **Consecuencia:** es una clase concreta en memoria. Si más adelante hay persistencia, el contrato se extrae a `business/providers` con estas mismas consultas y esta clase pasa a ser un detalle, como ya se hizo con las expediciones (D26).
+- **Resuelto en D66 y D67:** el contrato pasó a `business.providers` y `JpaResourceCatalog` lo implementa.
 
 
 ### D19 — La expedición es la única puerta para modificar su itinerario
@@ -571,11 +574,13 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - Una aceptación de advertencia por id se arma contra las advertencias que la expedición levanta en ese momento. Si no existe esa advertencia, falla con `NotFoundException` en vez de ignorarse: una aceptación vieja no debería quedar como si hubiera cubierto algo.
   - Cada caso de uso depende de los puertos que usa (D35). Los tests unitarios usan Mockito para el repositorio y entidades reales.
   - Los repositorios tienen un test de contrato (`ExpeditionRepositoryContract`, `ZoneRepositoryContract`) que hoy corre contra el adaptador en memoria y después correrá contra JPA.
+    **Resuelto en D67:** los contratos corren contra los adaptadores JPA, sobre PostgreSQL.
 - **Alternativas descartadas:**
   - Una clase por transición de estado — cinco clases de una línea cada una; `TransitionExpedition` las agrupa porque todas hacen lo mismo (buscar y llamar a la entidad).
   - Que el adaptador REST busque la expedición y llame a la entidad — duplicaría en cada adaptador la resolución de ids y los errores de "no existe".
   - Reemplazar las variantes que reciben el objeto — rompería los tests y el uso de la Entrega 1 sin necesidad.
   - Un método `save` en el repositorio — con el repositorio en memoria las entidades se modifican en el lugar. Cuando haya persistencia real hará falta.
+    **Revisado en D66:** con persistencia real hizo falta, y los casos de uso guardan lo que cambian.
 - **Consecuencia:**
   - ~~`ScheduleActivityCommand` recibe la `Activity` ya armada: crearla requiere elegir su `ActivityRules` por tipo y parámetros, y eso lo resuelve el registro de tipos de la Fase 3. Hasta entonces el adaptador que agenda una actividad la construye.~~ **Resuelto en D53:** el comando recibe el id de la actividad, su nombre, su ventana, el horario, el id de la zona, los ids de las dependencias, el nombre del tipo, sus parámetros y el indicador de nocturna, y `ScheduleActivity` resuelve las tres cosas (zona, dependencias y reglas). Ningún adaptador arma una `Activity`.
   - `ValidateExpedition` y `ApproveExpedition` reciben cada uno su lista de reglas adicionales; hoy ambas están vacías en `FieldOpsConfig`.
@@ -759,6 +764,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - Cada suscriptor declara el tipo de evento que atiende (`eventType()`). El publicador en memoria se lo entrega a los que corresponden, en el orden en que los recibió. La comparación de tipos queda en el adaptador, no en el dominio.
   - El evento lleva el id de la expedición y el incidente completo (un `record` inmutable), así el suscriptor no depende de volver a leer el incidente.
   - La entidad no publica eventos ni guarda una lista de pendientes: con el repositorio en memoria las entidades se modifican en el lugar (D38) y no hay un "al guardar" donde despacharlos. Publicar desde el caso de uso deja el orden explícito: primero registra, después avisa.
+    **Revisado en D66:** los casos de uso guardan lo que cambian, y el orden sigue explícito: primero guarda, después avisa.
 - **Alternativas descartadas:**
   - Que `RegisterIncident` llame directo al replanificador — acopla el registro con la replanificación; cada reacción nueva a un incidente obligaría a modificarlo.
   - Usar el `ApplicationEventPublisher` de Spring dentro del dominio — rompe D36 y D37: `domain` no puede depender de Spring, y el enforcer lo prohíbe.
@@ -766,6 +772,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - Un puerto por evento (`IncidentListener`) — cada evento nuevo sería un puerto nuevo con su adaptador.
   - Que la entidad acumule los eventos y el repositorio los despache al guardar — hoy no existe ese "guardar" (D38).
 - **Consecuencia:** no hay transacción ni reintentos. Si el suscriptor falla, la excepción llega a quien registró el incidente, pero el incidente ya quedó registrado en la expedición. Con persistencia real, registrar y proponer tienen que ir en la misma transacción o pasar a un outbox. Queda como deuda técnica de F3.
+- **Revisado en D68:** el incidente y la propuesta corren en la misma transacción, así que si el suscriptor falla el incidente se deshace y no queda registrado sin propuesta. Sigue sin haber reintentos.
 
 ### D46 — La propuesta ofrece varias opciones, una por generador, y solo las que se pueden armar (Entrega 2, F3, revisa D25, D33 y D40)
 
@@ -967,6 +974,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - Validar en los DTOs con Bean Validation para que el id o el nombre vacío no lleguen al dominio — ya está descartado en D49 y en la tabla de patrones no aplicados.
 - **Consecuencia:**
   - **El catálogo sigue sin puerto de salida y es deuda.** `ResourceCatalog` es una clase del modelo, no una interfaz de `business.providers`, y en `FieldOpsConfig` es un único bean compartido: registrar un recurso muta estado compartido del contexto, que es el precedente que ya usaba `CreateExpedition` al leerlo. Mientras la persistencia sea en memoria funciona y los tests de API lo acotan levantando un contexto nuevo por test (`@DirtiesContext`, D37). Cuando llegue la persistencia real hace falta un puerto propio (un `ResourceRepository` en `business.providers`, con el catálogo como la vista en memoria que arman las consultas, o un catálogo que reciba el repositorio), porque hoy no hay dónde enganchar la escritura ni la transacción. La señal es el primer adaptador que no sea en memoria.
+    **Resuelto en D66 y D67:** `ResourceCatalog` es un puerto de salida, con `JpaResourceCatalog` como adaptador.
   - Agregar un tipo de recurso nuevo es un método en `RegisterResources`, su comando, dos métodos en `QueryCatalog` y un controller con sus DTOs y su mapper.
   - Las traducciones que comparten los mappers (período, cantidad, certificaciones y listas ordenadas) quedaron en `Mappings`, package-private en `rest.mappers`, en vez de repetidas en cada uno; `ExpeditionMapper` pasó a usarlo y no cambió de comportamiento.
   - El `amount` de una cantidad viaja como texto (`"10"`): `Quantity` guarda el decimal exacto con los ceros al final removidos, así que un stock de diez unidades serializado como número saldría `1E+1`.
@@ -1527,6 +1535,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - `business.usecases.QueryReplanProposals` — consultar una propuesta o las de una expedición.
   - `business.exceptions.NotAResponsibleException`, `ProposalAlreadyDecidedException` y `DuplicateReplanProposalException`.
   - `adapters.driven.InMemoryEventPublisher` e `InMemoryReplanProposalRepository` (módulo `app`).
+    **Revisado en D67 y D68:** `JpaReplanProposalRepository` reemplazó al repositorio en memoria; el publicador sigue.
   - `ReplanningConfig` (módulo `web`) — los beans de F3 en su propia `@Configuration` (D37).
   - `adapters.driving.rest.IncidentController` (módulo `web`) — `POST /api/expeditions/{id}/incidents`, que responde con la propuesta que generó (D58).
   - `adapters.driving.rest.ReplanProposalController` (módulo `web`) — las dos lecturas de propuestas y los dos sub-recursos de decisión (D58).
@@ -1558,6 +1567,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - `ExpeditionLifecycleApiTest.approvingWithACriticalStillOpenFailsAndTheBodyListsIt` pasó a verificar el arreglo de `criticals` además del `detail`. Al escribirlo quedó a la vista que las críticas de ese escenario son tres y no dos: la tercera (`insufficient-supplies`) ya estaba en el mensaje, pero el test solo buscaba dos subcadenas. Es justamente lo que la lista estructurada hace fácil de ver (D58).
 - **Deuda técnica que se decidió no resolver:**
   - **Entrega sin transacción ni reintentos.** Si el suscriptor falla, el incidente queda registrado sin propuesta. Se aceptó porque todo está en memoria y en el mismo hilo; con persistencia real hace falta una transacción o un outbox (D45).
+    **Resuelto en D68:** el incidente y la propuesta se confirman o se deshacen juntos. Sigue sin haber reintentos, y un suscriptor externo seguiría necesitando un outbox.
   - **Un incidente por propuesta.** Dos incidentes sobre la misma actividad generan dos propuestas, y aceptar una deja sin efecto a la otra. Habría que agruparlos si los incidentes encadenados se vuelven frecuentes.
   - **El reemplazo es de a un recurso.** Un incidente nombra a lo sumo un recurso. Si se rompen dos cosas, son dos incidentes.
   - **El retraso lo informa una persona.** El sistema no calcula cuánto correr una actividad; sin retraso informado no hay reprogramación.
@@ -1577,6 +1587,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - Reglas de la decisión (solo un responsable, una vez, todo o nada, actividad en curso, propuestas que quedan sin efecto) — `DecideReplanProposalTest`.
   - `RegisterIncident` publica el evento y el suscriptor guarda la propuesta, con Mockito — `RegisterIncidentTest`; el publicador en memoria, `InMemoryEventPublisherTest`.
   - Contrato del repositorio de propuestas — `ReplanProposalRepositoryContract`, que corre `InMemoryReplanProposalRepositoryTest`.
+    **Revisado en D67:** el contrato corre ahora contra `JpaReplanProposalRepositoryTest`.
   - La cascada y el arrastre — `ItineraryCascadeTest` y los tests nuevos de `ExpeditionReplannerTest`; la bitácora de incidentes, `ExpeditionIncidentsTest`.
   - **En la demostración** (D50): el guion registra el incidente sobre la actividad en curso con retraso y recurso afectado, recibe las cinco opciones, cierra la actividad, acepta la reprogramación, aprueba la alternativa —que conserva los bloques y corre lo que depende de la actividad afectada, incluida la nocturna— y recorre la auditoría entera y los dos informes — `DemoScriptApiTest.walksTheScriptOfTheDemoFromTheNightActivityToTheAuditOfTheReplanning`.
 
@@ -1594,8 +1605,8 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
 | Visitor para las operaciones propias del dominio sobre el árbol del itinerario | Lo que el dominio le pregunta a un nodo son pocas operaciones estables (duración, riesgo, consumo, hojas, si dos actividades corren en paralelo, el plan que conserva su forma), y cada una tiene una respuesta natural por tipo de nodo, así que van como métodos de `ItineraryNode` (D39). Un Visitor separaría cada una en una clase aparte y obligaría a tocar todos los visitors al sumar un tipo de bloque, sin que ninguna de ellas lo necesite. **Revisado en D54:** cuando apareció una operación nueva y de afuera del dominio (mostrar el árbol en la respuesta del itinerario), con un motivo distinto (no exponer la estructura a los clientes del dominio, D39), ahí sí se usó un Visitor (`ItineraryNodeVisitor`). Esta fila sigue describiendo por qué las operaciones del propio dominio no lo usan. | Cada operación nueva del dominio sobre el árbol agrega un método a `ItineraryNode` y a sus implementaciones. Cada operación nueva de afuera (otra vista del árbol) agrega un método a `ItineraryNodeVisitor` y a cada visitor existente (D54). Si las operaciones del dominio empezaran a crecer mucho más rápido que los tipos de nodo, convendría reconsiderar también esa parte. |
 | Event Sourcing | La auditoría que pide F3 (plan original, incidente y decisión) ya queda con lo que hay: la expedición original no se reescribe (D25), la alternativa la referencia (D33) y la propuesta guarda el incidente y la decisión (D48). Reconstruir el estado de la expedición desde sus eventos obligaría a modelar cada cambio como evento, versionarlos y guardarlos, para responder lo mismo. | Si hiciera falta reconstruir el estado de una expedición en cualquier momento, o auditar cada asignación y transición y no solo las replanificaciones, habría que reconsiderarlo. |
 | Bean Validation en los DTOs de entrada (`@Valid` y anotaciones de `jakarta.validation`) | Las reglas ya están en el dominio: `DomainArguments` y los constructores rechazan un nombre vacío, una lista de objetivos vacía o un período al revés (D8, D49). Repetirlas en los DTOs daría dos fuentes de verdad que se desincronizan, y la validación de la API quedaría más laxa o más estricta que la del negocio según quién toque cuál. El adaptador no valida: deja pasar lo que llegó y traduce la excepción del dominio a 400. | Los mensajes de error son los del dominio, de a uno por pedido, y no una lista de todos los campos mal a la vez. Si hiciera falta responder todos juntos, la salida es que la validación del dominio devuelva varios resultados (como hace `ApprovalPolicy` con las críticas), no anotar los DTOs. |
-| Entrega asíncrona de eventos (bus o cola) | El criterio de F3 exige que la propuesta exista cuando vuelve el registro del incidente. Con un solo proceso y todo en memoria, la entrega síncrona del `InMemoryEventPublisher` lo garantiza sin reintentos ni orden de entrega que resolver (D45). | Si un suscriptor se vuelve lento o externo (avisar por correo, otro servicio), habría que sumar un adaptador asíncrono detrás del mismo `EventPublisher`, con un outbox para no perder eventos. |
-| JPA (y una base de datos) en esta entrega | El grupo decidió el 11/10 esperar la clase de Spring Data, que cae después de la entrega, en vez de elegir a las apuradas el mapeo y arrastrar esa decisión a todo el proyecto. La persistencia queda en memoria detrás de los mismos puertos de salida, y lo que un repositorio tiene que cumplir está escrito como contrato que corre contra el adaptador real, no contra mocks (D51). | Nada sobrevive a un reinicio, no hay transacciones ni concurrencia, y la consigna pide pruebas reales de persistencia, así que es el riesgo asumido más grande de la entrega. El cambio es un adaptador por puerto con entidades de persistencia separadas y sus mappers (anotar `domain` está prohibido por D36), más un puerto propio para el catálogo (D52); los tres contratos de repositorio pasan a correr también contra la base. Está registrado como deuda técnica en D51. |
+| Entrega asíncrona de eventos (bus o cola) | El criterio de F3 exige que la propuesta exista cuando vuelve el registro del incidente. Con un solo proceso y una transacción por caso de uso, la entrega síncrona del `InMemoryEventPublisher` lo garantiza sin reintentos ni orden de entrega que resolver (D45, D68). | Si un suscriptor se vuelve lento o externo (avisar por correo, otro servicio), habría que sumar un adaptador asíncrono detrás del mismo `EventPublisher`, con un outbox para no perder eventos. |
+| Anotar el dominio con JPA | D36 prohíbe que `domain` dependa de un framework, y el enforcer lo hace cumplir. El adaptador tiene sus propias entidades y mappers, y el dominio solo sabe volcar y reconstruir su estado (D65, D67). | Hay más código de mapeo, y un atributo nuevo se escribe en el modelo, la entidad, el mapper y una migración. `PersistedStateRoundTripTest` avisa si algo se pierde en el camino. |
 | Clases de Java con el escenario de la demostración | Los datos de la demostración son datos: viven en `demo/catalog.json` y `demo/expedition.json`, y el único Java es un cargador genérico que los mete por los casos de uso, igual que el adaptador REST (D50). Una clase que armara el escenario en código lo dejaría en el lenguaje más caro de leer y de cambiar, y haría recompilar para mover un horario. | El esquema de los documentos es el de los cuerpos de la API, así que lo que se puede sembrar es exactamente lo que se puede pedir por HTTP. Un escenario que necesitara un estado que la API no sabe producir no se puede expresar, y eso es a propósito. |
 
 ## Supuestos
