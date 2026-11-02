@@ -933,7 +933,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - **Queda registrado como deuda técnica de la entrega.** Nada de lo que la aplicación guarda sobrevive a un reinicio, no hay transacciones y no hay concurrencia: dos pedidos simultáneos sobre la misma expedición se pisan, porque los adaptadores usan `LinkedHashMap` sin sincronizar y las entidades se mutan en el lugar. Alcanza para la entrega y para la demostración, que son de un solo usuario y de un solo proceso.
   - **Qué habría que hacer:** un adaptador JPA por puerto en un módulo propio (o en `app`), entidades de persistencia separadas del modelo con sus mappers para no anotar `domain` (D36), un `ResourceRepository` que le dé puerto al catálogo (D52), decidir si el puerto gana un `save`, y las subclases de los tres contratos corriendo contra la base real. El escenario de `demo/` pasa a ser una migración (D50).
   - **El riesgo está asumido y conviene consultarlo con el docente:** la consigna pide pruebas reales de persistencia y un adaptador en memoria puede leerse como insuficiente, aunque los tres contratos de repositorio corran contra implementaciones reales y no contra mocks.
-  - El frontend mínimo queda pendiente del grupo por la misma clase de decisión, y está anotado en el README: la Fase 5 entrega API, Swagger y guion, y Swagger UI no reemplaza un frontend.
+  - **Resuelto en D69.** El frontend mínimo queda pendiente del grupo por la misma clase de decisión, y está anotado en el README: la Fase 5 entrega API, Swagger y guion, y Swagger UI no reemplaza un frontend.
 
 ### D52 — Casos de uso de alta y consulta del catálogo y de las zonas (Entrega 2, F5, extiende D38)
 
@@ -1348,6 +1348,24 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - `@Transactional` en los controllers — la transacción quedaría atada a HTTP, y el cargador de la demo no la tendría.
   - Mantener los adaptadores en memoria para los tests de dominio — los tests usan dobles propios, y el código de producción no debe tener una segunda implementación sin uso.
 - **Consecuencia:** correr la aplicación y los tests de `web` y `app` requiere Docker. La deuda de D51 queda resuelta.
+
+### D69 — Frontend mínimo con páginas estáticas que consumen la API (corrección de la Entrega 2, cierra el pendiente de D51)
+
+- **Origen:** el enunciado pide un frontend con lo mínimo indispensable para llevar a cabo las funcionalidades, y la corrección de la Entrega 2 señala que no hay. Swagger UI no lo reemplaza.
+- **Patrón / principio:** el frontend es un cliente más de la API (separación cliente-servidor): no agrega lógica de negocio, y lo que rechaza el dominio se muestra tal cual lo devuelve el `ProblemDetail`.
+- **Dónde:** `web/src/main/resources/static`: `index.html`, `styles.css` y módulos JavaScript: `api`, `dom`, `messages`, `catalog`, `expedition-list`, `expedition`, `itinerary`, `planning`, `approval` y `proposals`. `FrontendPagesTest`.
+- **Por qué:**
+  - Cubre el mismo recorrido del guion: administrar el catálogo y las zonas, crear una expedición, agendar actividades (también nocturnas) y bloques, asignar recursos, validar, aceptar advertencias y aprobar, ejecutar, seguir actividades, registrar incidentes, decidir propuestas y ver el informe.
+  - El estado de cada pantalla sale siempre de la API: después de cada acción se vuelve a pedir, así no hay reglas ni estado duplicados en el navegador.
+  - **Sin framework ni build:** los archivos los sirve `web`, así que se levanta con el mismo comando, y no suma Node a la CI.
+  - Un bloque se carga como JSON: construir un árbol con formularios es mucho código para lo que pide el enunciado, y el contrato ya es ese.
+- **Alternativas descartadas:**
+  - Thymeleaf — la opción anotada en octubre; metería la presentación en el servidor con un segundo camino hacia los casos de uso, además de la API.
+  - React u otra SPA con build — un proceso de compilación y dependencias para un frontend mínimo.
+- **Consecuencia:**
+  - La pantalla ofrece iniciar y finalizar en todas las actividades mientras la expedición está en ejecución, porque la respuesta del itinerario no trae el seguimiento. Si la acción no corresponde, el dominio la rechaza y se muestra el motivo.
+  - Las fechas de seguimiento son las del momento de la acción.
+  - Los tests verifican que los archivos se sirven, pero no recorren la pantalla con un navegador: ese recorrido se probó a mano.
 
 ## Funcionalidades nuevas de la Entrega 2
 
