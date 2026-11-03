@@ -32,7 +32,7 @@ public class ProposeReplan implements EventSubscriber<IncidentRegistered> {
 
     @Override
     public void on(IncidentRegistered event) {
-        final var expedition = Lookups.expedition(expeditions, event.expedition());
+        final var expedition = Lookups.expedition(expeditions, event.expeditionId());
         final var incident = event.incident();
         final var affected = Lookups.item(expedition, incident.activity());
         final var options = generators.stream()

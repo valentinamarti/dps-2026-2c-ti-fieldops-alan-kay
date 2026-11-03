@@ -20,6 +20,7 @@ import ar.edu.itba.dps.fieldops.business.replanning.CancellationOptions;
 import ar.edu.itba.dps.fieldops.business.replanning.ExpeditionReplanner;
 import ar.edu.itba.dps.fieldops.business.replanning.RescheduleOptions;
 import ar.edu.itba.dps.fieldops.business.replanning.ResourceReplacementOptions;
+import ar.edu.itba.dps.fieldops.business.services.PublishingExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
 
 import java.time.LocalDateTime;
@@ -48,7 +49,7 @@ final class IncidentScenario {
     final ProposeReplan proposeReplan = new ProposeReplan(expeditions, proposals, replanner,
             List.of(new RescheduleOptions(), new ResourceReplacementOptions(catalog), new CancellationOptions()));
     final EventPublisher publisher = event -> proposeReplan.on(IncidentRegistered.class.cast(event));
-    final RegisterIncident registerIncident = new RegisterIncident(expeditions, publisher, proposals);
+    final RegisterIncident registerIncident = new RegisterIncident(new PublishingExpeditionRepository(expeditions, publisher), proposals);
     final DecideReplanProposal decide = new DecideReplanProposal(proposals, expeditions, replanner, replanExpedition, catalog);
     final QueryReplanProposals queryProposals = new QueryReplanProposals(proposals, expeditions);
 

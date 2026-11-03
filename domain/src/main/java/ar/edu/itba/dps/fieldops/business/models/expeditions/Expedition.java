@@ -21,6 +21,8 @@ import ar.edu.itba.dps.fieldops.business.interfaces.validation.ValidationRule;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
+import ar.edu.itba.dps.fieldops.business.models.events.EventId;
+import ar.edu.itba.dps.fieldops.business.models.events.IncidentRegistered;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.validation.AcceptedWarning;
@@ -287,6 +289,7 @@ public class Expedition {
         final var incident = Incident.registered(new IncidentId(id, incidents.size() + 1), affected.getActivity().getId(), report);
         incidents.add(incident);
         executionRevision++;
+        pendingEvents.add(new IncidentRegistered(EventId.generate(), id, incident));
         return incident;
     }
 

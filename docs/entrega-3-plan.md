@@ -244,16 +244,16 @@ Todas se cierran el martes 03/11, antes de arrancar, porque la fase bloquea al r
 - **Por qué:** _a completar_
 - **Se registra en:** D71
 
-#### 1.4 — Qué lleva `IncidentRegistered` · ⬜ pendiente
+#### 1.4 — Qué lleva `IncidentRegistered` · ✅ decidida
 
 - **Pregunta:** hoy lleva el `Incident` entero (un `record` con `IncidentId`, `ActivityId`, descripción, `occurredAt`, `Optional<ResourceId>` y `Optional<Duration>`), y `ProposeReplan.on` lo usa directo. Eso define qué se serializa en la Fase 2.
 - **Opciones:**
   - a) Dejarlo así: se serializa entero, y Jackson 3 maneja records y `Optional`.
   - b) Achicarlo a `IncidentId` más `occurredAt`. `ProposeReplan` relee el incidente de la expedición, con un `Expedition.incident(IncidentId)` nuevo.
 - **Recomendación:** a). El `Incident` es un value object inmutable, y achicarlo suma un método y una búsqueda sin un problema real. Si el test de ida y vuelta de la Fase 2 falla con el `Optional`, se reconsidera.
-- **Decisión:** _a completar_
-- **Quién y cuándo:** _a completar_
-- **Por qué:** _a completar_
+- **Decisión:** a). `IncidentRegistered(id, expeditionId, incident)`, y su `occurredAt()` sale del incidente.
+- **Quién y cuándo:** Valentina, 03/11/2026.
+- **Por qué:** `ProposeReplan` lo sigue usando sin releerlo, y el momento del hecho no se guarda dos veces.
 - **Se registra en:** D71
 
 #### 1.5 — Quién publica los eventos y con qué firma · ✅ decidida
@@ -808,7 +808,7 @@ Es un índice. El detalle de cada decisión y su registro están en la sección 
 | 1.1 | Qué responde `POST /incidents` (review 2 y 5) 👥 | 1 | 03/11 | Fase 1 | ⬜ |
 | 1.2 | `occurredAt` de la aprobación 👥 | 1 | 03/11 | Fase 1, y la aprobación en la Fase 5 | ⬜ |
 | 1.3 | Quién genera el `EventId` | 1 | 03/11 | Fase 1 | ⬜ |
-| 1.4 | Qué lleva `IncidentRegistered` | 1 | 03/11 | JSON de la Fase 2 | ⬜ |
+| 1.4 | Qué lleva `IncidentRegistered` | 1 | 03/11 | JSON de la Fase 2 | ✅ |
 | 1.5 | Quién publica los eventos y con qué firma | 1 | 03/11 | Fases 1 y 2 | ✅ |
 | 1.6 | Resumen en palabras de cada evento | 1 (con la 4) | 03/11 | `DomainEvent` y la Fase 4 | ⬜ |
 | 2.1 | Serializador y Jackson en `app` | 2 | 05/11 | PR 2b | ⬜ |

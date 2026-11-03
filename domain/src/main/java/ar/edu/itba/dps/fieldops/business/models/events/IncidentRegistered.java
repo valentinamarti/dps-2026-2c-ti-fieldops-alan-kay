@@ -4,12 +4,19 @@ import ar.edu.itba.dps.fieldops.business.interfaces.events.DomainEvent;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Incident;
 
+import java.time.LocalDateTime;
 import java.util.Objects;
 
-public record IncidentRegistered(ExpeditionId expedition, Incident incident) implements DomainEvent {
+public record IncidentRegistered(EventId id, ExpeditionId expeditionId, Incident incident) implements DomainEvent {
 
     public IncidentRegistered {
-        Objects.requireNonNull(expedition, "expedition is required");
+        Objects.requireNonNull(id, "id is required");
+        Objects.requireNonNull(expeditionId, "expeditionId is required");
         Objects.requireNonNull(incident, "incident is required");
+    }
+
+    @Override
+    public LocalDateTime occurredAt() {
+        return incident.occurredAt();
     }
 }

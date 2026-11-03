@@ -773,7 +773,7 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
   - Que la entidad acumule los eventos y el repositorio los despache al guardar — hoy no existe ese "guardar" (D38).
 - **Consecuencia:** no hay transacción ni reintentos. Si el suscriptor falla, la excepción llega a quien registró el incidente, pero el incidente ya quedó registrado en la expedición. Con persistencia real, registrar y proponer tienen que ir en la misma transacción o pasar a un outbox. Queda como deuda técnica de F3.
 - **Revisado en D68:** el incidente y la propuesta corren en la misma transacción, así que si el suscriptor falla el incidente se deshace y no queda registrado sin propuesta. Sigue sin haber reintentos.
-- **Revisado en D70:** la expedición guarda sus eventos pendientes y un decorador del repositorio los publica al guardarla.
+- **Revisado en D70 y D71:** la expedición registra `IncidentRegistered` y un decorador del repositorio lo publica al guardarla, así que `RegisterIncident` ya no conoce a `EventPublisher`. El evento suma su id y el momento en que ocurrió.
 
 ### D46 — La propuesta ofrece varias opciones, una por generador, y solo las que se pueden armar (Entrega 2, F3, revisa D25, D33 y D40)
 
@@ -1381,15 +1381,18 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
 - **Origen:** la propuesta de valor de la Entrega 3 pide modelar los hechos del dominio como eventos y publicarlos sin que quien los produce conozca a sus consumidores. D45 publicaba desde el caso de uso y descartaba que la entidad acumulara sus eventos, porque no había un "guardar" (D38). Desde D66 los casos de uso guardan lo que cambian, así que ese motivo ya no existe.
 - **Patrón / principio:** eventos de dominio acumulados por el agregado + Decorator sobre el puerto `ExpeditionRepository`, que publica al guardar.
 - **Dónde:**
-  - `Expedition` guarda sus eventos pendientes, y `pullEvents` los devuelve y los vacía.
+  - `Expedition` guarda sus eventos pendientes, y `pullEvents` los devuelve y los vacía. `registerIncident` registra `IncidentRegistered` al final de la operación.
   - `PublishingExpeditionRepository` (en `business.services`) guarda con el repositorio que decora y después publica cada evento pendiente con `EventPublisher`.
-  - `FieldOpsConfig` (en `web`) lo expone como el `ExpeditionRepository` de la aplicación (`@Primary`), sobre `JpaExpeditionRepository`.
+  - `FieldOpsConfig` (en `web`) lo expone como el `ExpeditionRepository` de la aplicación, sobre `JpaExpeditionRepository`.
+  - `RegisterIncident` ya no conoce a `EventPublisher`: registra el incidente y guarda la expedición.
 - **Por qué:**
+  - **La regla de cuándo ocurre el hecho vive en el modelo.** La expedición sabe cuándo un incidente quedó registrado: después de validar el estado, la actividad y el recurso. Si el evento lo armara el caso de uso, cada caso de uso tendría que repetir cuándo corresponde.
+  - **Una operación que falla no deja eventos.** El evento se agrega al final, cuando todas las validaciones ya pasaron.
   - **Nadie se puede olvidar de publicar.** Toda expedición que se guarda publica lo que registró, sea cual sea el caso de uso que la modificó, incluidos los que guardan más de una expedición. Si cada caso de uso tuviera que publicar después de guardar, uno nuevo que no lo hiciera perdería los eventos sin ningún error.
   - **El caso de uso no tiene que saber que hay eventos.** Modifica la expedición y la guarda.
   - **El adaptador de persistencia no cambia.** `JpaExpeditionRepository` sigue haciendo solo persistencia. Publicar es una capa encima, que se prueba sola.
   - **Primero se guarda y después se publica**, como en D45 y D66, ahora en un solo lugar. Si guardar falla, los eventos no se toman ni se publican. Como el repositorio se llama adentro del caso de uso, la publicación corre en la misma transacción (D68).
-  - **Los pendientes no se guardan.** No entran en el `snapshot()`, así que una expedición restaurada arranca sin eventos.
+  - **Los pendientes no se guardan.** No entran en el `snapshot()`, así que una expedición restaurada arranca sin eventos. La alternativa que hereda los incidentes de la original (D48) tampoco los vuelve a emitir, porque los recibe por el builder y no por `registerIncident`.
   - **`EventPublisher` sigue publicando de a un evento.** El único que recorre los pendientes es el decorador.
 - **Alternativas descartadas:**
   - Que el caso de uso arme y publique el evento (lo que hacía D45) — la regla de cuándo ocurre el hecho quedaría fuera del modelo, y cada caso de uso tendría que acordarse de publicar.
@@ -1402,7 +1405,26 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
   - Leyendo un caso de uso no se ve que se publique algo: se publica al guardar. Esta entrada es la que lo explica.
   - En `web` sigue habiendo un solo bean `expeditionRepository`. Arma el `JpaExpeditionRepository` con `new` adentro del decorador, así que la anotación `@Transactional` del adaptador ya no aplica, porque Spring solo la aplica a sus beans. Por eso el decorado se envuelve con `TransactionalUseCases.writing`, el mismo mecanismo de los casos de uso (D68): cada operación del repositorio corre en una transacción, o se suma a la del caso de uso que la llamó.
   - El bean recibe el `EventPublisher` con `@Lazy`, porque el publicador necesita a sus suscriptores y `ProposeReplan` necesita el repositorio.
-  - Los tests de los casos de uso con un repositorio simulado no ven la publicación: está probada en `PublishingExpeditionRepositoryTest`.
+  - Los tests de los casos de uso con un repositorio simulado no ven la publicación: está probada en `PublishingExpeditionRepositoryTest`, y cada evento, en los tests de la expedición.
+
+### D71 — Qué lleva cada evento (Entrega 3, propuesta de valor, revisa D45)
+
+- **Origen:** la consigna pide eventos "como objetos inmutables del dominio". El registro de eventos los va a guardar y mostrar, así que cada uno tiene que identificarse y decir cuándo ocurrió.
+- **Patrón / principio:** value objects inmutables (`record`) + un contrato común (`DomainEvent`) que permite tratar a todos los eventos igual sin preguntar de qué tipo son.
+- **Dónde:** `EventId` (en `business.models.events`); `DomainEvent` (en `business.interfaces.events`) con `id()`, `expeditionId()` y `occurredAt()`; `IncidentRegistered(id, expeditionId, incident)`.
+- **Por qué:**
+  - **`EventId` es un value object del dominio:** identifica un hecho que ocurrió una sola vez. Lo genera la expedición al registrar el evento (`EventId.generate()`, un UUID). Un proveedor, como `ExpeditionIdProvider` (D60), sumaría un colaborador sin una variante real que lo justifique.
+  - **`occurredAt` sale del hecho y no de un `now()`.** En `IncidentRegistered` es el momento del incidente que informó quien lo registró, y se lee del incidente en vez de guardarse dos veces. El dominio sigue sin fuente de tiempo propia.
+  - **`IncidentRegistered` lleva el incidente completo.** `Incident` ya es un `record` inmutable, y el suscriptor lo usa sin volver a buscarlo (D45). Achicarlo a su id obligaría a `ProposeReplan` a releerlo de la expedición, sin un problema real que lo pida.
+  - **El contrato común** deja que quien trate eventos en general los ordene y los muestre sin un condicional por tipo.
+  - `IncidentRegistered` es el `IncidentReported` del ejemplo de la consigna: se mantuvo el nombre que ya tenían el código, los tests y D45.
+- **Alternativas descartadas:**
+  - Ids de tipo `String` o `UUID` sueltos — un concepto del dominio como primitivo (D26).
+  - Un proveedor de ids de eventos — ver arriba.
+  - Tomar `occurredAt` de un reloj al registrar el evento — sería el momento en que el sistema se enteró y no el del hecho, y metería un reloj en el dominio.
+- **Consecuencia:**
+  - El `occurredAt` de un evento es el que informó el cliente. No sirve para ordenar los eventos en el orden en que el sistema los conoció.
+  - Como el id es aleatorio, los tests no comparan un evento entero con `equals`: verifican su tipo y sus datos.
 
 ## Funcionalidades nuevas de la Entrega 2
 

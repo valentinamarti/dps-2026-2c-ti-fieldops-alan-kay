@@ -4,6 +4,7 @@ import ar.edu.itba.dps.fieldops.business.exceptions.ActivitiesInProgressExceptio
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidTrackingException;
 import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
+import ar.edu.itba.dps.fieldops.business.models.events.IncidentRegistered;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,8 @@ import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.pers
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.sampling;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ExpeditionIncidentsTest {
@@ -84,11 +87,53 @@ class ExpeditionIncidentsTest {
     }
 
     @Test
+    void registeringAnIncidentRecordsTheEventOfTheFact() {
+        final var incident = inExecution().registerIncident(afternoon, IncidentReport.of("Storm forecast", at(10)));
+
+        final var events = expedition.pullEvents();
+
+        assertEquals(1, events.size());
+        final var event = assertInstanceOf(IncidentRegistered.class, events.getFirst());
+        assertEquals(expedition.getId(), event.expeditionId());
+        assertEquals(incident, event.incident());
+        assertEquals(at(10), event.occurredAt());
+    }
+
+    @Test
+    void theEventsAreTakenOnlyOnce() {
+        inExecution().registerIncident(afternoon, IncidentReport.of("Storm forecast", at(10)));
+        expedition.pullEvents();
+
+        assertEquals(List.of(), expedition.pullEvents());
+    }
+
+    @Test
+    void eachIncidentRecordsItsOwnEventInTheOrderTheyHappen() {
+        final var first = inExecution().registerIncident(morning, IncidentReport.of("One jar broke", at(9)));
+        final var second = expedition.registerIncident(afternoon, IncidentReport.of("Storm forecast", at(10)));
+
+        final var events = expedition.pullEvents();
+
+        assertEquals(List.of(first, second), events.stream().map(IncidentRegistered.class::cast).map(IncidentRegistered::incident).toList());
+        assertNotEquals(events.get(0).id(), events.get(1).id());
+    }
+
+    @Test
+    void aRestoredExpeditionDoesNotBringBackTheEventsOfTheOneItCameFrom() {
+        inExecution().registerIncident(afternoon, IncidentReport.of("Storm forecast", at(10)));
+
+        final var restored = Expedition.restore(expedition.snapshot());
+
+        assertEquals(List.of(), restored.pullEvents());
+    }
+
+    @Test
     void rejectsAResourceThatIsNotAssignedToTheActivity() {
         final var report = IncidentReport.of("Engine failure", at(10)).affecting(new ResourceId("v-99"));
 
         assertThrows(InvalidTrackingException.class, () -> inExecution().registerIncident(afternoon, report));
         assertEquals(List.of(), expedition.getIncidents());
+        assertEquals(List.of(), expedition.pullEvents());
     }
 
     @Test
@@ -104,6 +149,7 @@ class ExpeditionIncidentsTest {
     void onlyAnExpeditionInExecutionRegistersIncidents() {
         assertThrows(InvalidTrackingException.class,
                 () -> expedition.registerIncident(morning, IncidentReport.of("Storm forecast", at(8))));
+        assertEquals(List.of(), expedition.pullEvents());
     }
 
     @Test

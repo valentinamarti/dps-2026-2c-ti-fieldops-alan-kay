@@ -509,6 +509,7 @@ class ExpeditionReplannerTest {
         final var alternative = replanner.planAlternative(expedition, affectedItem, new Cancellation());
 
         assertEquals(List.of(incident), alternative.getIncidents());
+        assertEquals(List.of(), alternative.pullEvents());
     }
 
     @Test
