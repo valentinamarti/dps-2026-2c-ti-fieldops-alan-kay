@@ -21,6 +21,7 @@ import ar.edu.itba.dps.fieldops.business.interfaces.validation.ValidationRule;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
+import ar.edu.itba.dps.fieldops.business.models.events.ActivityCompleted;
 import ar.edu.itba.dps.fieldops.business.models.events.EventId;
 import ar.edu.itba.dps.fieldops.business.models.events.IncidentRegistered;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
@@ -272,6 +273,7 @@ public class Expedition {
         consumeAssignedSupplies(item);
         tracking.finish(at, result);
         executionRevision++;
+        pendingEvents.add(new ActivityCompleted(EventId.generate(), id, item.getActivity().getId(), at, result));
     }
 
     public void recordObservation(ItineraryItem item, Observation observation) {

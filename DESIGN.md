@@ -1381,7 +1381,7 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
 - **Origen:** la propuesta de valor de la Entrega 3 pide modelar los hechos del dominio como eventos y publicarlos sin que quien los produce conozca a sus consumidores. D45 publicaba desde el caso de uso y descartaba que la entidad acumulara sus eventos, porque no había un "guardar" (D38). Desde D66 los casos de uso guardan lo que cambian, así que ese motivo ya no existe.
 - **Patrón / principio:** eventos de dominio acumulados por el agregado + Decorator sobre el puerto `ExpeditionRepository`, que publica al guardar.
 - **Dónde:**
-  - `Expedition` guarda sus eventos pendientes, y `pullEvents` los devuelve y los vacía. `registerIncident` registra `IncidentRegistered` al final de la operación.
+  - `Expedition` guarda sus eventos pendientes, y `pullEvents` los devuelve y los vacía. `registerIncident` registra `IncidentRegistered` y `finishActivity` registra `ActivityCompleted`, cada uno al final de su operación. `TrackActivity` no cambió: ya guardaba la expedición después de terminar la actividad.
   - `PublishingExpeditionRepository` (en `business.services`) guarda con el repositorio que decora y después publica cada evento pendiente con `EventPublisher`.
   - `FieldOpsConfig` (en `web`) lo expone como el `ExpeditionRepository` de la aplicación, sobre `JpaExpeditionRepository`.
   - `RegisterIncident` ya no conoce a `EventPublisher`: registra el incidente y guarda la expedición.
@@ -1406,16 +1406,18 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
   - En `web` sigue habiendo un solo bean `expeditionRepository`. Arma el `JpaExpeditionRepository` con `new` adentro del decorador, así que la anotación `@Transactional` del adaptador ya no aplica, porque Spring solo la aplica a sus beans. Por eso el decorado se envuelve con `TransactionalUseCases.writing`, el mismo mecanismo de los casos de uso (D68): cada operación del repositorio corre en una transacción, o se suma a la del caso de uso que la llamó.
   - El bean recibe el `EventPublisher` con `@Lazy`, porque el publicador necesita a sus suscriptores y `ProposeReplan` necesita el repositorio.
   - Los tests de los casos de uso con un repositorio simulado no ven la publicación: está probada en `PublishingExpeditionRepositoryTest`, y cada evento, en los tests de la expedición.
+  - Un suscriptor síncrono corre en el `save` de la expedición, así que ve lo que el caso de uso guardó hasta ese momento. En `TrackActivity.finish`, por ejemplo, los insumos consumidos se guardan en el catálogo después de la expedición: un suscriptor síncrono de `ActivityCompleted` que leyera el stock todavía no lo vería guardado. Hoy `ActivityCompleted` no tiene suscriptores síncronos.
 
 ### D71 — Qué lleva cada evento (Entrega 3, propuesta de valor, revisa D45)
 
 - **Origen:** la consigna pide eventos "como objetos inmutables del dominio". El registro de eventos los va a guardar y mostrar, así que cada uno tiene que identificarse y decir cuándo ocurrió.
 - **Patrón / principio:** value objects inmutables (`record`) + un contrato común (`DomainEvent`) que permite tratar a todos los eventos igual sin preguntar de qué tipo son.
-- **Dónde:** `EventId` (en `business.models.events`); `DomainEvent` (en `business.interfaces.events`) con `id()`, `expeditionId()` y `occurredAt()`; `IncidentRegistered(id, expeditionId, incident)`.
+- **Dónde:** `EventId` (en `business.models.events`); `DomainEvent` (en `business.interfaces.events`) con `id()`, `expeditionId()` y `occurredAt()`; `IncidentRegistered(id, expeditionId, incident)`; `ActivityCompleted(id, expeditionId, activity, occurredAt, result)`.
 - **Por qué:**
   - **`EventId` es un value object del dominio:** identifica un hecho que ocurrió una sola vez. Lo genera la expedición al registrar el evento (`EventId.generate()`, un UUID). Un proveedor, como `ExpeditionIdProvider` (D60), sumaría un colaborador sin una variante real que lo justifique.
   - **`occurredAt` sale del hecho y no de un `now()`.** En `IncidentRegistered` es el momento del incidente que informó quien lo registró, y se lee del incidente en vez de guardarse dos veces. El dominio sigue sin fuente de tiempo propia.
   - **`IncidentRegistered` lleva el incidente completo.** `Incident` ya es un `record` inmutable, y el suscriptor lo usa sin volver a buscarlo (D45). Achicarlo a su id obligaría a `ProposeReplan` a releerlo de la expedición, sin un problema real que lo pida.
+  - **`ActivityCompleted` lleva el id de la actividad, el momento en que terminó y su resultado.** No lleva el `ItineraryItem` ni la `Activity`, porque son entidades mutables y el evento tiene que ser inmutable. A diferencia de `Incident`, que es un `record`, copiarlas lo dejaría expuesto a cambios posteriores. El resultado va porque es lo que muestran los interesados en que una actividad termine. El momento es el `at` con el que se la terminó, como el del incidente.
   - **El contrato común** deja que quien trate eventos en general los ordene y los muestre sin un condicional por tipo.
   - `IncidentRegistered` es el `IncidentReported` del ejemplo de la consigna: se mantuvo el nombre que ya tenían el código, los tests y D45.
 - **Alternativas descartadas:**

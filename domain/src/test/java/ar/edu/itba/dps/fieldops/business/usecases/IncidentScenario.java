@@ -48,7 +48,11 @@ final class IncidentScenario {
     final ApproveExpedition approveExpedition = new ApproveExpedition(List.of(), reservations, expeditions, catalog);
     final ProposeReplan proposeReplan = new ProposeReplan(expeditions, proposals, replanner,
             List.of(new RescheduleOptions(), new ResourceReplacementOptions(catalog), new CancellationOptions()));
-    final EventPublisher publisher = event -> proposeReplan.on(IncidentRegistered.class.cast(event));
+    final EventPublisher publisher = event -> {
+        if (event instanceof IncidentRegistered incident) {
+            proposeReplan.on(incident);
+        }
+    };
     final RegisterIncident registerIncident = new RegisterIncident(new PublishingExpeditionRepository(expeditions, publisher), proposals);
     final DecideReplanProposal decide = new DecideReplanProposal(proposals, expeditions, replanner, replanExpedition, catalog);
     final QueryReplanProposals queryProposals = new QueryReplanProposals(proposals, expeditions);
