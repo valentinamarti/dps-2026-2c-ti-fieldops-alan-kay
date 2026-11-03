@@ -1,0 +1,847 @@
+# Plan de implementación — Entrega 3 FieldOps
+
+03/11/2026 · Complementa `docs/entrega-3-decisiones.md`. Consigna: `docs/fieldops-entrega-3.md`. Entrega: lunes 09/11/2026.
+
+## Resumen
+
+La Entrega 3 suma la propuesta de valor, una arquitectura orientada a eventos, y la presentación oral. Se reparte en cinco fases, una por integrante. Primero se mergea una base de dominio (Fase 1). Después avanzan en paralelo el registro, el despachador y los consumidores, y la Fase 5 integra el frontend, la demo y la presentación. Cada fase cierra con su PR en verde, sus tests y sus entradas de `DESIGN.md` en el mismo PR.
+
+| Fase | Qué entrega | Entradas de `DESIGN.md` | Responsable |
+| --- | --- | --- | --- |
+| 1. Eventos en el dominio | Los tres eventos, la entidad que los acumula, las dos interfaces de suscriptor y `RegisterIncident` desacoplado | D70 a D73 | Sin asignar |
+| 2. Outbox y registro | Tablas de eventos y entregas, publicador que guarda en la misma transacción, consulta del registro y su endpoint | D74 a D76 | Sin asignar |
+| 3. Despachador y garantías | `@Scheduled`, orden, reintentos, `FAILED` y deduplicación | D77 y D78 | Sin asignar |
+| 4. Consumidores asíncronos | Notificaciones, avance del informe y eventos en el informe, con sus endpoints | D79 y D80 | Sin asignar |
+| 5. Frontend, demo y presentación | Seguimiento en el itinerario, secciones nuevas del frontend, `demo.http`, README, cierre de `DESIGN.md`, la presentación y **la organización de la demo y su video, que se graba con los cinco** | D81 | Sin asignar |
+
+**Lección de la Entrega 2:** el plan anterior dejaba los endpoints a la fase de API, las fases 2 a 4 mergearon sin ellos y la Fase 5 quedó sobrecargada. Acá **cada fase escribe los endpoints de lo que construye**, con su test de API. La Fase 5 solo suma el frontend y lo que la demo necesita.
+
+Supuestos del plan, tomados de las decisiones del 02/11:
+
+- Outbox en la misma base PostgreSQL. Sin broker.
+- La aplicación corre en una sola instancia.
+- La propuesta de replanificación sigue síncrona.
+- Las correcciones de la Entrega 2 ya están en `main` (#11). El plan arranca desde ahí.
+
+## Convenciones de trabajo
+
+Las mismas de la Entrega 2. Se repiten acá para que nadie tenga que buscarlas.
+
+- **Idioma:** código, tests, mensajes de excepción y README en inglés. `DESIGN.md` y estos documentos en español.
+- **Sin comentarios** en Java ni en los `pom` (se sacaron todos en `aac8518`).
+- **Ramas:** `assignment-3-phase-N` (o `-phase-2a`, `-phase-2b`), una por fase, con PR a `main` y CI en verde. Sin push directo a `main`. Cada PR lo revisa otro integrante.
+- **Paquetes:** los de siempre. Puertos de entrada en `business.ports.in`, puertos de salida en `business.providers`, interfaces del dominio en `business.interfaces.*`, modelos en `business.models.*`, vistas de los puertos en `business.models.responses` (D64), adaptadores driven en `app` (`adapters.driven.*`) y driving, configuración y `@Scheduled` en `web`.
+- **Wiring:** los casos de uso de escritura se envuelven en `TransactionalUseCases.writing`, los de lectura en `.reading`, y se exponen por su puerto (D63, D68).
+- **`DESIGN.md`:** una entrada por decisión, con el formato de siempre (patrón o principio, dónde, por qué, alternativas descartadas y consecuencia). Una decisión que cambia otra no la reescribe: suma la línea "Revisado en Dnn" en la vieja. Se escriben solo decisiones ya implementadas, sin anunciar pasos futuros.
+- **Antes de abrir el PR:** `mvn -B verify` desde la raíz (necesita Docker por Testcontainers), y `mvn test -pl domain` para iterar rápido sin Docker.
+
+### Cómo se registran las decisiones de cada fase
+
+Cada fase abre con una sección **"Decisiones de la fase"**. El responsable de la fase la lee antes de empezar y, para cada decisión:
+
+1. Si hace falta, la consulta con el equipo (las marcadas 👥 son del equipo y no se toman solas).
+2. Completa los campos `Decisión`, `Quién y cuándo` y `Por qué`, y cambia el estado: ⬜ pendiente, ✅ decidida.
+3. Si contradice algo de `docs/entrega-3-decisiones.md`, lo dice en el `Por qué`.
+4. La lleva a la entrada de `DESIGN.md` que indica `Se registra en`, en el mismo PR que el código.
+
+El registro queda en este documento. El PR de la fase incluye este archivo con sus decisiones completas, así la revisión del PR también revisa qué se decidió.
+
+Formato de cada decisión:
+
+```markdown
+#### N.M — Título · ⬜ pendiente
+
+- **Pregunta:** qué hay que decidir.
+- **Opciones:** a) …, b) …
+- **Recomendación:** cuál y por qué.
+- **Decisión:** _a completar_
+- **Quién y cuándo:** _a completar_
+- **Por qué:** _a completar_
+- **Se registra en:** Dnn
+```
+
+## Comentarios de la review a resolver
+
+La review del PR de decisiones (MatiSapino, 03/11) aprobó el documento con ocho puntos y cinco menores. **No se aplicaron a `docs/entrega-3-decisiones.md`.** Cada uno quedó en la fase que lo implementa. Los ya aceptados están como bloques `> Review`, que son informativos. Los que quedaron abiertos (2, 5 y 6) son decisiones de esa fase (1.1 y 3.1), para que el responsable las cierre y las registre ahí.
+
+Todos los puntos se verificaron contra el código y son correctos.
+
+| # | Tema | Fase | Bloquea | Propuesta | Estado |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Ordenar por `occurredAt` no es el orden en que el sistema conoció los eventos | 2 y 3 | Esquema de la tabla de eventos | Orden por la secuencia de inserción. `occurredAt` queda solo como dato del hecho | Aceptado |
+| 2 | Sin la propuesta, no hay `Location` en el `POST /incidents` | 1 | Contrato de la API | El controller compone `RegisterIncident` y la consulta de la propuesta | Decisión 1.1 |
+| 3 | El cambio revisa D58, no D45 | 1 | `DESIGN.md` | D72 revisa D58 y D64, y D45 recibe la nota | Aceptado |
+| 4 | Por D64, el puerto no devuelve `Incident` | 1 | Firma del puerto | `IncidentView` en `business.models.responses` | Aceptado |
+| 5 | `demo.http` y `DemoScriptApiTest` cambian más de lo que dice el documento | 1 | — | Con la opción a) de la decisión 1.1, no cambian | Decisión 1.1 |
+| 6 | "Por poco tiempo" no se sostiene sin acotar el backoff | 3 | D78 | Fijar los valores concretos | Decisión 3.1 |
+| 7 | Awaitility y `@EnableScheduling` todavía no existen | 3 | — | Se suman en la Fase 3 y se anotan en el costo del cambio | Aceptado |
+| 8 | Cómo se cumple "sin switch" en el JSON | 2 | Formato del registro | Guardar el nombre de la clase junto al JSON | Aceptado |
+| m1 | `docs/entrega-3-plan.md` no existía | — | — | Resuelto con este documento | Resuelto |
+| m2 | `fieldops-entrega-3.md` no termina en newline | 5 | — | Se corrige en el cierre | Aceptado |
+| m3 | Falta el argumento de las dependencias de `RegisterIncident` | 1 | — | Va en D72 | Aceptado |
+| m4 | La fila "Qué lleva cada evento" junta cinco decisiones | 1 | — | Se separan entre D70 y D71 | Aceptado |
+| m5 | `SKIP LOCKED` como salida para varias instancias | 3 | — | Va en D77 y en los supuestos | Aceptado |
+
+Además de la review, el relevamiento del código para este plan encontró puntos que no estaban en las decisiones. Están marcados como **Agregado** en cada fase, y los más importantes son:
+
+| Tema | Fase | Por qué importa |
+| --- | --- | --- |
+| `IncidentRegistered` lleva el `Incident` entero | 1 | Define qué se serializa. `ProposeReplan` lo usa directo |
+| `ApproveExpedition` guarda dos expediciones | 1 | Hay que tomar los eventos de las dos |
+| El orden de la secuencia no es el orden de commit | 2 | Se sostiene por el `@Version` y el `executionRevision` de la expedición |
+| `app` no tiene Jackson, y el proyecto usa Jackson 3 | 2 | Dependencia nueva y cómo se mapea el `jsonb` |
+| `clean-database.sql` no conoce las tablas nuevas | 2 y 4 | Sin eso, los tests de `web` se contaminan entre sí |
+| El backoff necesita un reloj inyectable | 3 | Si no, los tests tienen que dormir |
+| La falla se marca después del rollback, en otra transacción | 3 | Si se marca adentro, el intento se pierde |
+| `DemoScriptApiTest` no lee `demo.http`: lo replica a mano | 3 y 5 | Tiene que invocar el despachador entre pasos |
+| El informe ya cuenta las actividades terminadas | 4 | La proyección del avance puede duplicar `ExpeditionReporter` |
+| La demo actual ya dispara los tres eventos | 5 | Los pasos nuevos son consultas, no operaciones nuevas |
+
+## Punto de partida
+
+El repo tiene tres módulos Maven (`domain`, `app` y `web`) con 886 tests: 698 en `domain`, 40 en `app` y 148 en `web`. Usa Spring Boot 4.1.1, con Jackson 3 (`tools.jackson`) y Hibernate 7.4. La persistencia es JPA sobre PostgreSQL con Flyway (`app/src/main/resources/db/migration/V1__create_schema.sql`) y `ddl-auto: validate`. Los tests de `app` y `web` levantan PostgreSQL 17 con Testcontainers, y cada test de `web` limpia la base con `web/src/test/resources/clean-database.sql`. El frontend es estático y consume la API (D69). `DESIGN.md` llega a D69 y el README lista 48 endpoints.
+
+| Requisito de la consigna | Qué hay hoy | Qué falta | Fase |
+| --- | --- | --- | --- |
+| Tres eventos inmutables del dominio | `IncidentRegistered(ExpeditionId, Incident)`, sin id ni momento | `EventId` y `occurredAt`, `ExpeditionApproved` y `ActivityCompleted` | 1 |
+| Publicación desacoplada | `RegisterIncident` publica, pero busca la propuesta y falla si no está | Que el productor no conozca a los consumidores | 1 |
+| Consumidor asíncrono | Solo `InMemoryEventPublisher`, síncrono | Outbox, despachador y dos consumidores | 2, 3 y 4 |
+| Registro de eventos consultable | Nada: el evento no se guarda | Tablas, puerto de lectura y endpoint | 2 |
+| Integrado a la auditoría | El informe reúne incidentes y advertencias (D48) | Eventos en el informe | 4 |
+| Tests de emisión, efecto y falla | `RegisterIncident` verifica la publicación | La lista de "Qué se prueba" de las decisiones | Todas |
+| Presentación con el flujo completo | — | Guion, demo y respuestas preparadas | 5 |
+
+Lo que ya existe y se reusa:
+
+| Pieza | Dónde | Para qué sirve en esta entrega |
+| --- | --- | --- |
+| `EventPublisher`, `DomainEvent`, `EventSubscriber` | `business.providers`, `business.interfaces.events` | La base de la Fase 1. No se cambia el nombre de nada |
+| `InMemoryEventPublisher` | `app/.../adapters/driven` | Lo reemplaza el publicador del outbox |
+| `ReplanningConfig.eventPublisher(List<EventSubscriber<?>>)` | `web` | Lo reemplaza una `EventsConfig` |
+| `TransactionalUseCases` | `web` | Transacción por caso de uso. El despachador usa su propia `TransactionTemplate` |
+| `LoadedAggregates` | `app/.../persistence` | Identidad por transacción: el caso de uso toma los eventos de la misma instancia que guardó |
+| `ConcurrentUpdateException` y `@Version` en `ExpeditionEntity` | `domain` y `app` | Sostienen el orden por expedición (Fase 2) |
+| `HexagonalArchitectureTest` (ArchUnit) | `web/src/test` | Los adaptadores driving no pueden depender de `business.usecases` ni de las entidades mutables |
+| Enforcer de `domain` | `domain/pom.xml` | Prohíbe Spring. No prohíbe Jackson, así que eso depende de la disciplina del equipo |
+
+## Dependencias y orden de merge
+
+```mermaid
+flowchart TD
+  F1["Fase 1 · Eventos en el dominio y suscriptores"]
+  F1 --> F2a["Fase 2 · PR 2a: esquema y puertos del registro"]
+  F2a --> F2b["Fase 2 · PR 2b: publicador outbox, consulta y endpoint"]
+  F2a --> F3["Fase 3 · Despachador y garantías"]
+  F2b --> F3
+  F1 --> F4["Fase 4 · Consumidores asíncronos"]
+  F2b -- puerto de lectura para el informe --> F4
+  F2b --> F5["Fase 5 · Frontend, demo y presentación"]
+  F3 --> F5
+  F4 --> F5
+```
+
+| Día | Qué se cierra |
+| --- | --- |
+| Mar 03/11 | Cerrar las decisiones 1.1 a 1.6, repartir las fases y acordar los contratos de abajo |
+| Mié 04/11 | Mergear la Fase 1 y el PR 2a |
+| Jue 05/11 | PR 2b, Fase 3 sobre el 2a y Fase 4 (dominio y JPA) |
+| Vie 06/11 | Mergear 2b, 3 y 4. La Fase 5 arranca el frontend y el seguimiento del itinerario, que solo necesitan la Fase 1 |
+| Sáb 07/11 | Fase 5: integración, `demo.http`, README y cierre de `DESIGN.md` |
+| Dom 08/11 | Grabación del video de la demo con los cinco, ensayo de la presentación y últimos arreglos |
+| Lun 09/11 | Entrega: el último commit en `main` y su hash |
+
+La Fase 1 tiene que ser corta, porque bloquea a todos. Hasta que mergee, las fases 3 y 4 pueden escribir sus consumidores y sus tests sobre la interfaz acordada, llamándolos directo, sin despachador. La Fase 3 desarrolla sobre el 2a con un publicador de prueba que inserta filas, y se rebasea cuando entra el 2b.
+
+### Contratos que se acuerdan el primer día
+
+| Contrato | Lo define | Lo usan | Qué se fija |
+| --- | --- | --- | --- |
+| `DomainEvent` | Fase 1 | Todas | Qué expone todo evento: `id()`, `expeditionId()` y `occurredAt()`. Así el registro, el despachador y las notificaciones no preguntan por el tipo |
+| Suscriptor asíncrono | Fase 1 | Fases 3 y 4 | Nombre de la interfaz, `eventType()`, `on(E)` y el nombre estable del consumidor que se guarda en la tabla de entregas |
+| Esquema del registro | Fase 2 (PR 2a) | Fase 3 | Columnas de las dos tablas, la secuencia de orden y los estados de entrega |
+| Puerto de lectura del registro y su vista | Fase 2 (PR 2a) | Fases 4 y 5 | `RecordedEventView` con el estado de cada consumidor |
+| Versiones de Flyway | — | Fases 2 y 4 | `V2__event_log.sql` (Fase 2) y `V3__notifications_and_progress.sql` (Fase 4) |
+| Claves de configuración | Fase 3 | Fase 5 | `fieldops.events.*`: intervalo, reintentos, backoff y si el despachador arranca |
+| Operación del despachador | Fase 3 | Fases 4 y 5 | El método que se invoca a mano en los tests, por ejemplo `dispatchPending()`, y en qué bean está |
+| Rutas nuevas | Fases 2 y 4 | Fase 5 | `GET /api/expeditions/{id}/events` y `GET /api/expeditions/{id}/notifications`, con su JSON |
+
+### Archivos que tocan varias fases
+
+| Archivo | Fases | Cómo se evita el conflicto |
+| --- | --- | --- |
+| `Expedition` | 1 | Solo la Fase 1. Las demás leen los eventos por el puerto |
+| `ReplanningConfig`, `FieldOpsConfig` | 1 y 2 | Una `EventsConfig` nueva en `web` para el publicador, el despachador y los suscriptores asíncronos. La Fase 2 saca de `ReplanningConfig` el bean `eventPublisher`, y cada fase agrega sus beans al final de `EventsConfig` |
+| `clean-database.sql` | 2 y 4 | Cada fase agrega sus tablas al `TRUNCATE` |
+| `application.yml` de `web` (main y test) | 3 | Solo la Fase 3 agrega `fieldops.events.*` |
+| `web/pom.xml`, `app/pom.xml` | 2 y 3 | La Fase 2 suma Jackson a `app` y la 3 suma Awaitility a `web` (test) |
+| `ExpeditionReporter`, `ExpeditionReport`, `ExpeditionReportResponse`, `ReportMapper` | 4 | Solo la Fase 4. Se agregan campos al final |
+| `ScheduledActivityResponse`, `ItineraryMapper` | 5 | Solo la Fase 5 |
+| `IncidentController`, `QueryReplanProposalsPort` | 1 | Solo la Fase 1, según la decisión 1.1 |
+| `demo.http`, `DemoScriptApiTest` | 1 y 5 | La Fase 1 solo si cambia el `POST /incidents` (decisión 1.1). Los pasos nuevos son de la Fase 5 |
+| `web/src/main/resources/static/js/*` | 5 (y 1 si se elige `approvedAt`) | La Fase 5 hace todo el frontend, incluido `approval.js` |
+| `DomainExceptionHandler` y su test | Cualquiera | Si una fase suma una excepción del dominio, suma su fila. El parametrizado falla si falta |
+| `DESIGN.md` | Todas | Números reservados. Cada fase edita solo sus entradas, su parte de la sección nueva y sus filas en las tablas compartidas |
+| `README.md` | 2, 3, 4 y 5 | Cada fase agrega sus endpoints a la tabla. La Fase 5 cierra el texto y la cantidad de tests |
+
+## Fase 1: eventos en el dominio
+
+Los tres hechos pasan a ser eventos del dominio que la expedición registra cuando ocurren. Los casos de uso guardan y publican sin saber qué eventos hubo ni quién los escucha. El publicador sigue siendo `InMemoryEventPublisher`: el outbox llega en la Fase 2 sin tocar el dominio.
+
+```mermaid
+flowchart LR
+  A[Caso de uso: aprueba, termina o registra] --> B[Expedition registra el evento]
+  B --> C[El caso de uso guarda]
+  C --> D[Toma los eventos pendientes de la entidad]
+  D --> E[EventPublisher.publish]
+  E --> F[Síncronos: ProposeReplan]
+  E --> G[Asíncronos: los entrega el despachador, Fase 3]
+```
+
+### Decisiones de la fase
+
+Todas se cierran el martes 03/11, antes de arrancar, porque la fase bloquea al resto.
+
+#### 1.1 — Qué responde `POST /incidents` (review, puntos 2 y 5) · 👥 · ⬜ pendiente
+
+- **Pregunta:** hoy `IncidentController` (línea 40) responde `ResponseEntity.created(Locations.replanProposal(proposal.id().value()))`. Si `RegisterIncident` devuelve el incidente, el adaptador se queda sin el id de la propuesta. Además, D58 descartó apuntar el `Location` al incidente ("no existe ese endpoint").
+- **Opciones:**
+  - a) El controller compone `RegisterIncidentPort` con una consulta nueva, `QueryReplanProposalsPort.ofIncident(IncidentId)`, implementada con el `findByIncident` que el repositorio ya tiene. La respuesta y el `Location` quedan como en D58.
+  - b) 201 con el `IncidentView` y sin `Location`. Rompe la convención de D49 y D58.
+  - c) 204, y el cliente consulta las propuestas aparte.
+- **Recomendación:** a).
+  - La consigna pide que **el productor del hecho** no conozca a sus consumidores, y eso se cumple: `RegisterIncident` ya no sabe que existe una propuesta.
+  - Que la respuesta HTTP traiga la propuesta es una decisión del contrato de la API (D58), y componer dos puertos es trabajo de un adaptador driving. `HexagonalArchitectureTest` lo permite, porque el controller depende de puertos y no de `business.usecases`.
+  - Conserva el argumento de D58 de que el criterio de F3 se ve en una sola llamada. b) y c) lo pierden, y las decisiones no lo registran como costo.
+  - Costo: el controller sabe que la propuesta es síncrona. Si pasara a asíncrona, `ofIncident` devolvería vacío. Se registra como acoplamiento aceptado en el adaptador.
+  - La review descartaba la a) porque "mueve el acoplamiento al adaptador".
+- **Consecuencia si no es a) (punto 5):** el paso 31 de `demo.http` hace los asserts (`status === "PENDING"`, `options.length === 5`) y el `client.global.set("proposal", response.body.id)`, y su comentario dice "La respuesta YA TRAE LA PROPUESTA… El `Location` apunta a la propuesta". El paso 32 no tiene handler. Hay que mover los asserts y el `set` al 32, reescribir el comentario y ajustar `DemoScriptApiTest` y `ReplanningApiTest`, todo en el PR de esta fase.
+- **Decisión:** _a completar_
+- **Quién y cuándo:** _a completar_
+- **Por qué:** _a completar_
+- **Se registra en:** D72 (revisa D58)
+
+#### 1.2 — De dónde sale el `occurredAt` de la aprobación · 👥 · ⬜ pendiente
+
+- **Pregunta:** el dominio no tiene ninguna fuente de tiempo (no hay `now()` ni `Clock`). Todos los timestamps los manda el cliente: `StartActivityRequest.at`, `FinishActivityRequest.at` y `RegisterIncidentRequest.occurredAt`. La aprobación no tiene ninguno.
+- **Opciones:**
+  - a) Un `approvedAt` en el comando, como dicen las decisiones. Cambia `ApproveExpeditionPort.approve(id, acceptances)`, `ApprovalRequest(acceptedWarnings)`, `ApprovalMapper`, `approval.js`, los pasos 26 y 39 de `demo.http`, `DemoScriptApiTest` y los tests de API de aprobación.
+  - b) Un puerto de reloj en `business.providers`. No cambia la API, pero mete la primera fuente de tiempo del dominio.
+- **Recomendación:** a), por coherencia con los otros tres timestamps. El frontend y la demo los actualiza la Fase 5.
+- **Decisión:** _a completar_
+- **Quién y cuándo:** _a completar_
+- **Por qué:** _a completar_
+- **Se registra en:** D71
+
+#### 1.3 — Quién genera el `EventId` · ⬜ pendiente
+
+- **Pregunta:** el id del evento lo crea la entidad o un proveedor.
+- **Opciones:**
+  - a) La entidad, con `UUID.randomUUID()` (por ejemplo, `EventId.generate()`).
+  - b) Un proveedor, como `ExpeditionIdProvider`.
+- **Recomendación:** a). b) suma un colaborador a los tres casos de uso que publican, sin una variante real. Los tests comparan los eventos por tipo y por datos, no por id.
+- **Decisión:** _a completar_
+- **Quién y cuándo:** _a completar_
+- **Por qué:** _a completar_
+- **Se registra en:** D71
+
+#### 1.4 — Qué lleva `IncidentRegistered` · ⬜ pendiente
+
+- **Pregunta:** hoy lleva el `Incident` entero (un `record` con `IncidentId`, `ActivityId`, descripción, `occurredAt`, `Optional<ResourceId>` y `Optional<Duration>`), y `ProposeReplan.on` lo usa directo. Eso define qué se serializa en la Fase 2.
+- **Opciones:**
+  - a) Dejarlo así: se serializa entero, y Jackson 3 maneja records y `Optional`.
+  - b) Achicarlo a `IncidentId` más `occurredAt`. `ProposeReplan` relee el incidente de la expedición, con un `Expedition.incident(IncidentId)` nuevo.
+- **Recomendación:** a). El `Incident` es un value object inmutable, y achicarlo suma un método y una búsqueda sin un problema real. Si el test de ida y vuelta de la Fase 2 falla con el `Optional`, se reconsidera.
+- **Decisión:** _a completar_
+- **Quién y cuándo:** _a completar_
+- **Por qué:** _a completar_
+- **Se registra en:** D71
+
+#### 1.5 — Firma de `EventPublisher` · ⬜ pendiente
+
+- **Pregunta:** cómo recibe los eventos el publicador.
+- **Opciones:**
+  - a) `publish(List<DomainEvent>)`.
+  - b) `publish(DomainEvent)`, una llamada por evento.
+- **Recomendación:** a), así el caso de uso pasa lo que tomó de la entidad sin iterar.
+- **Decisión:** _a completar_
+- **Quién y cuándo:** _a completar_
+- **Por qué:** _a completar_
+- **Se registra en:** D70
+
+#### 1.6 — Resumen en palabras de cada evento (con la Fase 4) · ⬜ pendiente
+
+- **Pregunta:** las notificaciones de la Fase 4 necesitan un texto por evento, y no puede salir de un `switch` sobre el tipo. Como la respuesta toca `DomainEvent`, se decide acá.
+- **Opciones:**
+  - a) `DomainEvent` expone un `summary()` y cada evento escribe el suyo, como hace `OptionSummaries` con las opciones.
+  - b) Cada consumidor resuelve el texto con un mapa de tipo a función, registrado en la configuración.
+- **Recomendación:** a). El hecho sabe describirse, y sumar un evento sigue siendo sumar una clase.
+- **Decisión:** _a completar_
+- **Quién y cuándo:** _a completar, con el responsable de la Fase 4_
+- **Por qué:** _a completar_
+- **Se registra en:** D71 y D79
+
+### Diseño
+
+- [ ] `EventId` (value object, `record`) en `business.models.events`.
+- [ ] `DomainEvent` expone `id()`, `expeditionId()` y `occurredAt()`. Para respetar la consigna ("objetos inmutables del dominio"), los eventos son `record` con value objects, sin colecciones mutables.
+- [ ] Los eventos:
+  - `ExpeditionApproved(EventId id, ExpeditionId expeditionId, LocalDateTime occurredAt)`.
+  - `ActivityCompleted(EventId id, ExpeditionId expeditionId, ActivityId activity, LocalDateTime occurredAt, String result)`.
+  - `IncidentRegistered`, que ya existe, suma `id` y `occurredAt`. Su campo `expedition` pasa a llamarse `expeditionId` para cumplir con `DomainEvent`.
+- [ ] `Expedition` acumula sus eventos en `approve(...)`, `finishActivity(...)` y `registerIncident(...)`, siempre después de que la operación ya validó todo. Así, una operación que falla no deja eventos (por ejemplo, el paso 20 de la demo, el 422).
+- [ ] `Expedition` tiene un método que toma los eventos pendientes y los vacía, por ejemplo `pullEvents()`. Los pendientes no entran en `snapshot()` ni en `restore()`.
+- [ ] Cada caso de uso publica lo que toma de la entidad después de guardar:
+  - `ApproveExpedition.approve(Expedition, ...)`: guarda la aprobada y, si era una alternativa, también la reemplazada. **Agregado:** hay que tomar los eventos de las dos, aunque hoy solo la aprobada genera uno. Si no, un evento futuro de la reemplazada se pierde sin que nadie lo note.
+  - `TrackActivity.finish`.
+  - `RegisterIncident.register`.
+  - `start` y `observe` no generan eventos, y ningún otro caso de uso tampoco.
+- [ ] La firma de `EventPublisher`, según la decisión 1.5.
+- [ ] Interfaz nueva para los suscriptores asíncronos en `business.interfaces.events`, junto a `EventSubscriber`, que sigue siendo el síncrono. Por ejemplo `AsyncEventSubscriber<E>`, con `eventType()`, `on(E)` y `consumerName()`. El nombre se guarda en la base, así que no puede ser `getClass().getName()`: un refactor dejaría entregas huérfanas.
+- [ ] `InMemoryEventPublisher` entrega solo a los `EventSubscriber`. En esta fase, los asíncronos no tienen quién los entregue: eso lo construyen las fases 2 y 3.
+- [ ] `RegisterIncident` deja de depender de `ReplanProposalRepository` y devuelve un `IncidentView` (punto 4).
+- [ ] `POST /incidents` según la decisión 1.1. Si es la a), las dos llamadas del controller corren en transacciones distintas, pero como la propuesta se confirmó junto con el incidente, la segunda siempre la encuentra.
+
+> **Review, punto 3 — Revisa D58, no D45.** D58 (`DESIGN.md:1135`) es la que decidió "201 con la propuesta y `Location`", y la tabla de endpoints está en D58 y D49. D72 dice "revisa D58 y D64", y D45 solo recibe una nota, por el cambio en quién genera los eventos (D70). Si la decisión 1.1 es la a), D58 cambia una línea: de dónde saca la propuesta el adaptador.
+>
+> **Estado:** aceptado, se aplica en D72.
+
+> **Review, punto 4 — El puerto devuelve `IncidentView`, no `Incident`.** `RegisterIncidentPort.register` devuelve un `IncidentView` nuevo en `business.models.responses`, con el `of(Incident)` de las otras vistas, por D64. Hoy devuelve `ReplanProposalView`.
+>
+> **Estado:** aceptado.
+
+> **Review, menor m3 — El argumento más fuerte del desacople.** `RegisterIncident` pasa de tres dependencias a dos (sin `ReplanProposalRepository`) y desaparece el `IllegalStateException` "no replan proposal was made for the incident". Va en el "Por qué" de D72.
+
+> **Review, menor m4 — Una decisión por entrada.** La fila "Qué lleva cada evento" se divide:
+> - D70: quién genera el evento.
+> - D71: qué lleva cada evento: `EventId` como VO, `occurredAt` del hecho, `approvedAt` y los datos mínimos. Cada uno con su descarte.
+> - D75 (Fase 2): el JSON en el adaptador y sin versión de esquema.
+
+### Archivos
+
+- Nuevos: `business/models/events/EventId.java`, `ExpeditionApproved.java`, `ActivityCompleted.java`, `business/interfaces/events/AsyncEventSubscriber.java` y `business/models/responses/IncidentView.java`.
+- Modificados: `DomainEvent`, `IncidentRegistered`, `EventPublisher`, `Expedition`, `ApproveExpedition`, `TrackActivity`, `RegisterIncident`, `RegisterIncidentPort`, `ProposeReplan` (por el nombre del campo), `InMemoryEventPublisher` y `ReplanningConfig` (el constructor de `RegisterIncident`).
+- Según la decisión 1.1: `IncidentController` y `QueryReplanProposalsPort`/`QueryReplanProposals`.
+- Según la decisión 1.2: `ApproveExpeditionPort`, `ApproveExpedition`, `ApprovalRequest`, `ApprovalMapper` y los tests de API de aprobación.
+
+### API
+
+- [ ] `POST /api/expeditions/{id}/incidents`: según la decisión 1.1.
+- [ ] Si la decisión 1.2 es `approvedAt` en el comando: `POST .../approval` suma el campo, con su test de API y el 400 si falta.
+
+### Tests
+
+- [ ] Unitarios de `Expedition`: aprobar registra `ExpeditionApproved`, terminar una actividad registra `ActivityCompleted` y registrar un incidente registra `IncidentRegistered`, cada uno con los datos del hecho.
+- [ ] Una operación que falla no deja eventos: aprobar con críticas, terminar sin haber iniciado o un incidente sobre una actividad terminada.
+- [ ] `pullEvents()` vacía, y una expedición restaurada no trae eventos.
+- [ ] La alternativa que arma `ExpeditionReplanner` hereda los incidentes (`builder.addInheritedIncident`) **sin** emitir `IncidentRegistered`.
+- [ ] Unitarios con Mockito: cada caso de uso publica los eventos de la entidad después de guardar, `ApproveExpedition` publica también los de la reemplazada y `RegisterIncident` ya no consulta propuestas.
+- [ ] `InMemoryEventPublisher` no entrega a los asíncronos.
+- [ ] `ReplanningApiTest`, `DemoScriptApiTest` y `HexagonalArchitectureTest` siguen en verde.
+
+### `DESIGN.md`
+
+- D70: la entidad acumula los eventos y el caso de uso publica. Revisa D45, que lo había descartado porque no había `save`.
+- D71: qué lleva cada evento.
+- D72: publicación desacoplada de `RegisterIncident`. Revisa D58 y D64, con nota en D45.
+- D73: dos interfaces de suscriptor y qué garantía tiene cada una.
+- Nota en D45: `IncidentRegistered` es el `IncidentReported` de la consigna.
+- Supuesto nuevo: los timestamps del hecho los manda el cliente.
+
+**Terminado cuando:** las tres operaciones emiten su evento con test, `RegisterIncident` no conoce la propuesta y la API de F3 responde como antes (o como diga la decisión 1.1), con la CI en verde.
+
+## Fase 2: outbox y registro de eventos
+
+El evento se guarda en la misma transacción que el cambio, con una entrega pendiente por cada consumidor asíncrono, y el registro se puede consultar por expedición. Son dos PR: el 2a desbloquea a la Fase 3 y tiene que ser corto.
+
+### Decisiones de la fase
+
+La 2.2 se prueba el primer día del PR 2b. La 2.1 y la 2.3, antes de abrirlo.
+
+#### 2.1 — Dónde vive el serializador y Jackson en `app` · ⬜ pendiente
+
+- **Pregunta:** el proyecto usa Jackson 3 (`tools.jackson.databind`, por Spring Boot 4.1.1), y solo `web` lo tiene en el classpath. `app` tiene JPA y Flyway, pero no Jackson.
+- **Opciones:**
+  - a) Sumar `tools.jackson.core:jackson-databind` a `app/pom.xml`, con la versión del BOM, y que el serializador viva en el adaptador del outbox.
+  - b) Dejar el serializador en `web` y pasárselo al publicador por una interfaz del adaptador.
+- **Recomendación:** a). El serializador es parte del adaptador del outbox. Jackson 3 trae de fábrica los records, `java.time` y `Optional`, así que no hacen falta módulos, y lo confirma el test de ida y vuelta.
+- **Decisión:** _a completar_
+- **Quién y cuándo:** _a completar_
+- **Por qué:** _a completar_
+- **Se registra en:** D75
+
+#### 2.2 — Tipo de la columna `payload` · ⬜ pendiente
+
+- **Pregunta:** cómo se guarda el JSON. Con Hibernate 7.4 y Jackson 3, el mapeo de `jsonb` no está probado en el proyecto.
+- **Opciones:**
+  - a) `jsonb`, con un `String` y `@JdbcTypeCode(SqlTypes.JSON)`, o con `@ColumnTransformer(write = "?::jsonb")`.
+  - b) `text`.
+- **Recomendación:** a) si funciona en la primera prueba con una inserción real. Si no, b): el payload no se consulta por SQL, así que no se pierde nada.
+- **Decisión:** _a completar_
+- **Quién y cuándo:** _a completar_
+- **Por qué:** _a completar_
+- **Se registra en:** D74
+
+#### 2.3 — Qué pasa con `InMemoryEventPublisher` · ⬜ pendiente
+
+- **Pregunta:** el publicador del outbox lo reemplaza en el wiring. Hay que ver si el viejo sigue sirviendo para algo.
+- **Opciones:**
+  - a) Borrarlo, si ningún test lo usa.
+  - b) Dejarlo para los tests de `domain` que necesiten un publicador real sin base.
+- **Recomendación:** a). Un adaptador sin uso es código muerto, y los tests de `domain` usan Mockito.
+- **Decisión:** _a completar_
+- **Quién y cuándo:** _a completar_
+- **Por qué:** _a completar_
+- **Se registra en:** D74
+
+### PR 2a: esquema y puertos (bloqueante para la Fase 3)
+
+- [ ] `V2__event_log.sql`:
+  - `domain_event` (inmutable): `sequence BIGSERIAL PRIMARY KEY`, `event_id` (único), `expedition_id`, `event_type` (nombre de la clase), `occurred_at`, `recorded_at` y `payload`. Índice por `(expedition_id, sequence)`.
+  - `event_delivery`: `event_sequence` (FK a `domain_event`), `consumer`, `status` (`PENDING`, `DELIVERED`, `FAILED`), `attempts`, `last_error`, `next_attempt_at` y `delivered_at`. Clave `(event_sequence, consumer)` e índice por `(status, next_attempt_at)`.
+  - Sin FK de `domain_event` a `expedition`: el registro no depende del ciclo de vida de la expedición.
+- [ ] Puerto de lectura en `business.providers`, por ejemplo `EventLog.ofExpedition(ExpeditionId)`. Devuelve `RecordedEventView` (tipo, `occurredAt`, momento de registro y una línea por consumidor con estado, intentos y último error), que vive en `business.models.responses`.
+- [ ] Entidades JPA y repositorios Spring Data en `app.adapters.driven.persistence`. Con `ddl-auto: validate`, tienen que coincidir columna por columna con la migración.
+- [ ] `clean-database.sql`: sumar `domain_event` y `event_delivery` al `TRUNCATE`.
+
+> **Review, punto 1 — El orden sale de la secuencia, no de `occurredAt`.** Los tres timestamps los manda el cliente (`StartActivityRequest(at)`, `FinishActivityRequest(at, result)` y `RegisterIncidentRequest(..., occurredAt, ...)`). Un fin de actividad cargado tarde quedaría antes de un incidente ya registrado, y el bloqueo por falla trabaría al evento equivocado. Por eso el orden es el de la columna `sequence`, y `occurredAt` es solo un dato del hecho.
+>
+> **Agregado:** un `BIGSERIAL` se asigna al insertar, no al commitear, así que dos transacciones concurrentes pueden commitear en otro orden que su secuencia. Para la misma expedición no pasa:
+> - Las tres operaciones que emiten eventos cambian una columna de la fila `expedition`: `status` al aprobar y `execution_revision` al terminar una actividad o registrar un incidente.
+> - Esa fila tiene `@Version`, así que de dos transacciones concurrentes sobre la misma expedición, una falla con `ConcurrentUpdateException` y se deshace junto con su evento.
+>
+> El orden por expedición queda garantizado y entre expediciones no se promete. Va en D78, porque es una pregunta probable en la presentación. Si algún día un evento se emite sin cambiar la fila `expedition`, esta garantía se rompe. Conviene un test que lo cubra, por ejemplo uno de concurrencia sobre `TrackActivity.finish`, o al menos dejarlo escrito como supuesto.
+>
+> **Estado:** aceptado, cambia el esquema. Fila propia en la tabla de garantías de D78.
+
+### PR 2b: publicador, consulta y endpoint
+
+- [ ] `OutboxEventPublisher` en `app`, que reemplaza a `InMemoryEventPublisher` en el wiring:
+  1. Entrega a los suscriptores síncronos.
+  2. Guarda el evento.
+  3. Crea una entrega `PENDING` por cada suscriptor asíncrono interesado en ese tipo.
+
+  Todo corre dentro de la transacción del caso de uso (D68). Si el síncrono falla, no se guarda nada.
+- [ ] Serializador de eventos en el adaptador, según el punto 8.
+- [ ] `EventsConfig` en `web`: el bean del publicador recibe `List<EventSubscriber<?>>` y `List<AsyncEventSubscriber<?>>`. Se saca `eventPublisher` de `ReplanningConfig`.
+- [ ] Caso de uso de consulta en `business.usecases`, por ejemplo `QueryExpeditionEvents`, con su puerto en `business.ports.in`. Se envuelve en `transactional.reading` y devuelve 404 si la expedición no existe.
+- [ ] `GET /api/expeditions/{id}/events`: la línea de tiempo en orden de `sequence`, con el estado de cada consumidor. Controller, DTO y mapper propios en `adapters.driving.rest`.
+- [ ] `InMemoryEventPublisher`, según la decisión 2.3.
+
+> **Review, punto 8 — JSON sin `switch`.** `domain/pom.xml` no tiene dependencias, así que no se puede anotar el evento con Jackson. Además, el enforcer solo prohíbe Spring, así que el build no lo frenaría. La forma que cumple "agregar un evento = agregar una clase" es:
+> - Guardar `event.getClass().getName()` en `event_type`.
+> - Serializar el `record` de forma genérica con un `JsonMapper` del adaptador.
+> - Para leerlo, `Class.forName(event_type)` más `readValue`, y verificar que la clase implementa `DomainEvent`.
+>
+> **Costo a registrar en D75:** renombrar o mover una clase de evento deja ilegibles las filas viejas. Va junto a "sin versión de esquema", como consecuencia aceptada.
+>
+> **Estado:** aceptado.
+
+### Tests
+
+- [ ] Contrato del registro contra PostgreSQL (Testcontainers), en el estilo de `ExpeditionRepositoryContract`.
+- [ ] Ida y vuelta del JSON para cada uno de los tres eventos, incluido un `IncidentRegistered` con y sin recurso y retraso.
+- [ ] Un `event_type` desconocido falla con un error claro al leer.
+- [ ] Si la transacción del caso de uso se deshace, el evento no queda registrado.
+- [ ] Si el consumidor síncrono falla, se deshace la operación y no queda ni el incidente ni el evento (D68).
+- [ ] Se registra un evento aunque no tenga consumidores asíncronos.
+- [ ] Cada consumidor asíncrono interesado tiene su entrega `PENDING`, y los que no están interesados en ese tipo no.
+- [ ] Test de API del endpoint de eventos, más el 404 de una expedición inexistente.
+- [ ] `DataSurvivesARestartTest` sigue en verde, y si es fácil, suma que el registro sobrevive.
+
+### `DESIGN.md`
+
+- D74: outbox en PostgreSQL, con dos tablas. Cierra la deuda de D45 y revisa la idea inicial de una sola tabla.
+- D75: serialización genérica por nombre de clase, en el adaptador, sin versión de esquema.
+- D76: consulta del registro detrás de un puerto de salida y un caso de uso.
+- La fila de Event Sourcing de la tabla de patrones no aplicados, actualizada: ahora sí hay un registro de eventos, pero el estado no se reconstruye desde él.
+- La fila nueva de broker de mensajería.
+
+**Terminado cuando:** cada operación deja su evento y sus entregas pendientes en la misma transacción, y la línea de tiempo se consulta por HTTP.
+
+## Fase 3: despachador y garantías
+
+Un `@Scheduled` toma las entregas pendientes y se las da a cada consumidor asíncrono, con las garantías de la tabla de decisiones. Qué entregar y en qué orden se decide en un componente que se puede invocar a mano en los tests. El `@Scheduled` solo lo dispara.
+
+### Decisiones de la fase
+
+#### 3.1 — Valores del despachador (review, punto 6) · 👥 · ⬜ pendiente
+
+- **Pregunta:** cuánto se espera entre corridas y entre reintentos, y cuántos intentos hay antes de `FAILED`. Las decisiones dicen que una falla traba a la expedición "por poco tiempo", pero la espera total es la suma del backoff, y esos valores estaban sin definir.
+- **Opciones:**
+  - a) Intervalo de 2 s, cinco intentos y backoff de 1, 2, 4 y 8 s, con un tope de 30 s. La espera total queda acotada a unos 15 s más los intervalos.
+  - b) Otros valores que proponga el equipo.
+  - c) No fijarlos, y sacar "por poco tiempo" de D78.
+- **Recomendación:** a). D78 escribe el número en vez de "por poco tiempo", y la presentación lo puede decir con números.
+- **Decisión:** _a completar_
+- **Quién y cuándo:** _a completar, antes del miércoles 04/11_
+- **Por qué:** _a completar_
+- **Se registra en:** D78 y `application.yml`
+
+#### 3.2 — Método del despachador para los tests · ⬜ pendiente
+
+- **Pregunta:** el contrato que usan las fases 4 y 5 para invocar el despachador a mano.
+- **Opciones:**
+  - a) `EventDispatcher.dispatchPending()`, que procesa todo lo que esté listo y vuelve.
+  - b) `dispatchPending(int max)`, con un límite por corrida.
+- **Recomendación:** a) para los tests. El límite se puede sumar adentro como configuración, sin cambiar la firma.
+- **Decisión:** _a completar, avisando a las fases 4 y 5_
+- **Quién y cuándo:** _a completar_
+- **Por qué:** _a completar_
+- **Se registra en:** D77
+
+### Diseño
+
+- [ ] `EventDispatcher` en `app` (junto al outbox), con un método público, por ejemplo `dispatchPending()`:
+  - Por cada par (expedición, consumidor), toma la primera entrega no `DELIVERED` en orden de `sequence`.
+  - Si es `PENDING` y ya pasó su `next_attempt_at`, la entrega. Si es `FAILED`, sigue con la próxima.
+  - Busca el suscriptor por `consumerName()` y deserializa el evento.
+- [ ] Cada entrega corre en su propia transacción, con una `TransactionTemplate`: `on(event)` más la marca `DELIVERED`. Los consumidores no pasan por `TransactionalUseCases`, porque no son puertos de entrada.
+- [ ] **Agregado:** si el consumidor falla, esa transacción se deshace entera, y **después**, en otra transacción, se suma el intento, se guarda el error y se calcula `next_attempt_at`. No hace falta `REQUIRES_NEW`: son dos transacciones seguidas. Si el intento se marcara adentro de la que falló, el rollback lo borraría y el evento se reintentaría para siempre. Al agotar el límite, la entrega queda `FAILED`.
+- [ ] **Agregado:** si una entrega `PENDING` nombra un consumidor que ya no existe en el código, queda `FAILED` con ese error, para que no trabe a la expedición.
+- [ ] **Agregado:** reloj inyectable. El despachador recibe un `java.time.Clock` (un bean en `EventsConfig`) para `next_attempt_at`, `delivered_at` y `recorded_at`. Así los tests del backoff adelantan el reloj en vez de dormir. El dominio sigue sin reloj, porque esto es del adaptador.
+- [ ] `@EnableScheduling` y un `EventDispatchScheduler` en `web`, que llama a `dispatchPending()` cada `fieldops.events.dispatch-interval`.
+- [ ] Configuración con `@ConfigurationProperties` (un `record`): `dispatch-interval`, `max-attempts`, `initial-backoff`, `max-backoff` y `dispatcher-enabled`.
+  - El scheduler solo se crea si `dispatcher-enabled` es `true`, con `@ConditionalOnProperty`.
+  - En `web/src/test/resources/application.yml` va `false`, y los tests invocan el despachador a mano.
+  - En `web/src/main/resources/application.yml` va `true`, y lo mismo en el perfil `demo`.
+- [ ] La deduplicación la hace la tabla de entregas: una entrega `DELIVERED` no se vuelve a tomar, y el efecto del consumidor y la marca se confirman juntos.
+- [ ] Sin backfill: un consumidor que se agrega después no recibe los eventos viejos. Se anota como consecuencia en D78.
+- [ ] El despachador depende solo de la interfaz `AsyncEventSubscriber`, no de las clases concretas de `business.usecases`.
+
+> **Review, punto 7 — Infraestructura nueva.** No hay ni un `@Scheduled` ni Awaitility en el proyecto. Se suman `@EnableScheduling` en `web` y `org.awaitility:awaitility` en `web/pom.xml`, con scope `test` y la versión del BOM de Spring Boot. Los dos se anotan en el costo del cambio de la sección nueva de `DESIGN.md`.
+>
+> **Estado:** aceptado.
+
+> **Review, menor m5 — Varias instancias.** El supuesto de una sola instancia va con su salida: tomar las entregas con `SELECT … FOR UPDATE SKIP LOCKED`, para que dos despachadores no tomen la misma fila. Va en D77 y en los supuestos de `DESIGN.md`, listo para las preguntas.
+
+> **Agregado — `DemoScriptApiTest` no lee `demo.http`.** Replica el guion a mano con `MockMvc`, con el perfil `demo` y `@Sql("/clean-database.sql")`. Con el despachador apagado en los tests, cada paso que espere un efecto asíncrono tiene que invocar `dispatchPending()` antes de consultar. La Fase 3 deja el bean accesible para inyectarlo en los tests (`@Autowired`), y la Fase 5 escribe los pasos.
+
+### Tests
+
+Con consumidores de prueba registrados solo en el contexto de test (uno que anota lo que recibe y otro que falla N veces), invocando el despachador a mano y con un `Clock` que se adelanta:
+
+- [ ] Entrega lo pendiente y lo marca `DELIVERED`.
+- [ ] Un evento entregado dos veces no duplica el efecto: el despachador no vuelve a tomarlo, y una caída a mitad de la entrega (un fallo después de que el consumidor escribió) deja todo como estaba.
+- [ ] Un consumidor que falla reintenta, respeta `next_attempt_at`, y al agotar el límite queda `FAILED` con su error y la cantidad de intentos.
+- [ ] La falla no deshace la operación original ni frena al otro consumidor del mismo evento.
+- [ ] Los eventos posteriores de esa expedición esperan para ese consumidor, siguen después del `FAILED`, y los de otra expedición no esperan.
+- [ ] Un consumidor desconocido deja la entrega `FAILED`.
+- [ ] Un test de punta a punta con el `@Scheduled` real, con `dispatcher-enabled=true` solo en ese test y Awaitility.
+
+### `DESIGN.md`
+
+- D77: despachador `@Scheduled` en `web`, con la lógica en `app`. Descartado: entregar al commit con el `@Scheduled` de respaldo. Supuesto: una sola instancia, con `SKIP LOCKED` como salida.
+- D78: garantías, con una fila por tema y cada valor con su número:
+  - Al-menos-una-vez.
+  - Duplicados evitados por el despachador.
+  - Orden por la secuencia y por qué se sostiene (punto 1).
+  - Los posteriores esperan.
+  - Reintentos con valores concretos (punto 6) y `FAILED`.
+  - Sin backfill y sin reentrega manual de `FAILED`, como consecuencias.
+- La fila nueva de Saga en patrones no aplicados: no hay operaciones distribuidas que compensar, y la única que se deshace es la síncrona.
+
+**Terminado cuando:** los casos de "Qué se prueba" que le tocan tienen test, y la tabla de garantías de D78 dice cada valor con su número.
+
+## Fase 4: consumidores asíncronos
+
+Los dos interesados que justifican los eventos: avisar a los responsables y mantener el avance que muestra el informe. Sus reglas son de negocio y viven en `business`. El despachador solo les entrega.
+
+### Decisiones de la fase
+
+La 4.1 se cierra el miércoles 04/11, antes de arrancar el avance. El texto del aviso sin `switch` se decide en la Fase 1 (decisión 1.6), con el responsable de esta fase.
+
+#### 4.1 — Qué es el "avance del informe" · 👥 · ⬜ pendiente
+
+- **Pregunta:** `ExpeditionReporter.reportOf` ya calcula, a partir de la expedición, `scheduledActivities`, `finishedActivities` y `actualConsumption`. Una proyección que "cuenta lo terminado" repite lo que el informe ya sabe calcular. La consigna pide que la lógica de negocio no se duplique, y el docente lo puede preguntar.
+- **Opciones:**
+  - a) **La proyección guarda lo que el agregado no guarda:** en qué orden supo el sistema de cada actividad terminada (la secuencia del evento), con su resultado y el momento. El informe la lee como "avance", en vez de calcularlo. Es lo que proponen las decisiones. Hay que explicar por qué no es CQRS.
+  - b) **Actualización de informes, literal de la consigna:** ante cualquiera de los tres eventos, el consumidor regenera el informe con el mismo `ExpeditionReporter` y lo guarda. `GET .../report` devuelve el guardado, con "actualizado a las HH:MM". No duplica lógica y muestra la consistencia eventual en la demo, pero el informe puede estar unos segundos atrasado y cambia qué devuelve un endpoint que ya existe.
+- **Recomendación:** a), si el equipo puede explicar en una frase qué agrega la proyección que el informe no tiene. Si no, b), que se defiende sola.
+- **Decisión:** _a completar_
+- **Quién y cuándo:** _a completar, antes del miércoles 04/11_
+- **Por qué:** _a completar_
+- **Se registra en:** D80, y la fila de CQRS en patrones no aplicados
+
+#### 4.2 — Un suscriptor de notificaciones o uno por evento · ⬜ pendiente
+
+- **Pregunta:** cómo se suscriben las notificaciones a los tres eventos.
+- **Opciones:**
+  - a) Uno solo, con `eventType()` = `DomainEvent.class`.
+  - b) Uno por evento.
+- **Recomendación:** a), porque la regla es la misma para los tres (un aviso por responsable). Requiere que el publicador de la Fase 2 filtre con `isInstance`, como hace hoy `InMemoryEventPublisher`: hay que confirmarlo con la Fase 2.
+- **Decisión:** _a completar_
+- **Quién y cuándo:** _a completar_
+- **Por qué:** _a completar_
+- **Se registra en:** D79
+
+### Notificaciones
+
+- [ ] `Notification` en `business.models.notifications`: id, expedición, responsable (`PersonId`), id del evento que la originó, texto y `occurredAt` del hecho.
+- [ ] Puerto `NotificationRepository` en `business.providers`.
+- [ ] Un suscriptor asíncrono en `business.usecases` (por ejemplo `NotifyResponsibles`) que, ante cada evento, carga la expedición y crea un aviso por cada responsable (`Expedition.getResponsibles()`). Si la expedición tiene dos responsables, son dos avisos.
+- [ ] El texto del aviso, según la decisión 1.6, sin `switch` sobre el tipo de evento.
+- [ ] La forma de suscribirse, según la decisión 4.2.
+- [ ] Adaptador JPA, tabla `notification` en `V3__notifications_and_progress.sql` y la tabla en `clean-database.sql`.
+- [ ] Caso de uso de consulta y `GET /api/expeditions/{id}/notifications`, con su test de API.
+
+### Avance del informe
+
+- [ ] El suscriptor asíncrono, según la decisión 4.1. Con la a), es un suscriptor de `ActivityCompleted` que actualiza la proyección. Con la b), es uno de los tres eventos que regenera el informe. En los dos casos va con su puerto en `business.providers`, su adaptador JPA y su tabla en `V3` y en `clean-database.sql`.
+- [ ] `ExpeditionReport` suma el avance y la línea de tiempo de eventos, que lee por el puerto `EventLog` de la Fase 2. Así, los eventos quedan integrados a la auditoría existente. `ExpeditionReportResponse` y `ReportMapper` suman los campos al final, y `GET .../report` los devuelve.
+
+### Tests
+
+- [ ] Unitarios de cada consumidor, llamando a `on(event)` directo: a quién se avisa, qué texto lleva, qué se proyecta.
+- [ ] Contrato de `NotificationRepository` y del puerto de la proyección contra PostgreSQL.
+- [ ] Integración con el despachador de la Fase 3: aprobar, terminar o registrar, invocar el despachador y ver el aviso y el avance.
+- [ ] Un evento despachado dos veces (simulando la reentrega) no duplica el aviso.
+- [ ] Si un consumidor real falla (por ejemplo, con un repositorio que falla en el contexto de test), queda `FAILED` y el otro consumidor del mismo evento igual recibe el suyo.
+- [ ] Test de API del informe con el avance y la línea de tiempo.
+
+### `DESIGN.md`
+
+- D79: notificaciones como consumidor asíncrono del dominio, guardadas en la base, sin mail ni servicio externo. Por qué el texto sale del evento.
+- D80: avance del informe y eventos en la auditoría. Revisa D48.
+- La fila nueva de CQRS en patrones no aplicados.
+
+**Terminado cuando:** aprobar, terminar una actividad o registrar un incidente deja, después del despacho, los avisos y el avance consultables por HTTP y en el informe.
+
+## Fase 5: frontend, demo y presentación
+
+Integra lo de las otras fases en lo que se muestra en vivo y prepara a los cinco para presentar. El seguimiento del itinerario y el frontend pueden empezar el viernes 06/11, sobre la Fase 1. La demo y el README necesitan todo mergeado.
+
+### Decisiones de la fase
+
+#### 5.1 — Duración y fecha de la presentación · 👥 · ⬜ pendiente
+
+- **Pregunta:** la consigna no dice cuánto dura ni qué día es, y la gestión del tiempo se evalúa.
+- **Opciones:** no hay: hay que preguntarle al docente.
+- **Recomendación:** preguntarlo cuanto antes, porque define cuánto se muestra de la demo en vivo.
+- **Decisión:** _a completar_
+- **Quién y cuándo:** _a completar_
+- **Por qué:** —
+- **Se registra en:** este plan
+
+#### 5.2 — Formato de la presentación y cómo se preparan los cinco · 👥 · ⬜ pendiente
+
+- **Pregunta:** cómo es el material de apoyo y cómo se asegura que cualquiera de los cinco pueda presentar.
+- **Opciones:**
+  - a) Slides con un momento por sección de la consigna, más la demo en vivo, con un guion escrito por slide.
+  - b) Solo la demo y el frontend, con un guion oral.
+- **Recomendación:** a), con un ensayo el domingo 08/11 rotando quién presenta. b) depende demasiado de que la demo no falle y de la memoria de quien salga sorteado.
+- **Decisión:** _a completar_
+- **Quién y cuándo:** _a completar, antes del viernes 06/11_
+- **Por qué:** _a completar_
+- **Se registra en:** este plan
+
+#### 5.3 — Cómo espera la demo al despachador · ⬜ pendiente
+
+- **Pregunta:** en vivo, el aviso y el avance aparecen unos segundos después.
+- **Opciones:**
+  - a) Confiar en el intervalo de 2 s: el paso siguiente ya ve el efecto.
+  - b) Agregar una nota de "esperar unos segundos" antes de cada consulta asíncrona.
+- **Recomendación:** b). Es más honesto, y la espera sirve para explicar la consistencia eventual.
+- **Decisión:** _a completar_
+- **Quién y cuándo:** _a completar_
+- **Por qué:** _a completar_
+- **Se registra en:** `demo.http`
+
+#### 5.4 — Cómo se reparte y se graba el video de la demo · 👥 · ⬜ pendiente
+
+- **Pregunta:** qué parte presenta cada uno, cuándo y cómo se graba, y con qué herramienta. El video se graba con los cinco integrantes, y lo organiza el responsable de esta fase.
+- **Opciones:**
+  - a) Una sola sesión en llamada, compartiendo pantalla, con cada integrante presentando su parte en vivo.
+  - b) Cada uno graba su parte por separado, y el responsable las une.
+- **Recomendación:** a). Sale más parejo, se nota que es un trabajo de equipo y no hace falta editar. b) sirve si no hay un horario en común.
+- **Decisión:** _a completar, con el reparto de partes por integrante_
+- **Quién y cuándo:** _a completar, antes del viernes 06/11_
+- **Por qué:** _a completar_
+- **Se registra en:** este plan
+
+### Seguimiento en el itinerario
+
+- [ ] `ScheduledActivityResponse` suma el estado del seguimiento (pendiente, en curso o terminada), inicio, fin, resultado y observaciones. Hoy no tiene nada de eso, aunque la API lo registra. Se mapea en `ItineraryMapper`, y si el dominio no lo expone para leer, se suma una vista.
+- [ ] Su test de API, en el test del itinerario.
+
+### Frontend
+
+- [ ] `itinerary.js`: hoy `trackingView` muestra siempre los formularios de iniciar, terminar, observar e incidente cuando la expedición está `IN_EXECUTION`. Pasa a mostrar un badge de estado y solo los botones que corresponden: iniciar si está pendiente, terminar y observar si está en curso, nada si terminó.
+- [ ] `expedition.js`: secciones "Eventos" (línea de tiempo con el estado de cada consumidor, y el error si quedó `FAILED`) y "Notificaciones". Las dos se recargan después de cada acción, con el mismo `refresh` que ya usa la página.
+- [ ] `expedition.js` (`reportView`): el avance y la línea de tiempo del informe.
+- [ ] Si la Fase 1 eligió `approvedAt`, `approval.js` lo manda.
+- [ ] Consume solo la API, como D69.
+
+### Demo
+
+**El responsable de la Fase 5 organiza la demo.** Arma el guion, reparte las partes, coordina cuándo se graba y se encarga de que el video quede listo para la entrega. **El video de la demo se graba con los cinco integrantes:** cada uno presenta al menos una parte, y nadie queda afuera. Organizar no es hacerla solo, y no se puede delegar en una sola persona.
+
+#### Video de la demo
+
+- [ ] Guion del video, con una parte por integrante y su duración. Por ejemplo:
+  1. El dominio y la expedición del seed.
+  2. La planificación, la validación y la aprobación con su evento.
+  3. La ejecución, el incidente y la propuesta síncrona.
+  4. Las notificaciones, el avance y el despachador.
+  5. El registro de eventos, la auditoría y qué pasa si un consumidor falla (con los tests).
+- [ ] Repartir las partes según la decisión 5.4, y que cada integrante ensaye la suya antes de grabar.
+- [ ] Grabar el domingo 08/11, con todo mergeado y la demo corriendo desde un clon limpio.
+- [ ] Revisar el video completo: que se vea y se escuche bien, que cada parte respete su duración y que aparezcan los cinco.
+- [ ] Dejar el link del video en el README y en el checklist de entrega.
+- [ ] El mismo video es el plan B de la presentación en vivo, si falla Docker o la red.
+
+**Agregado:** el guion actual ya dispara los tres eventos. El paso 26 aprueba, el 34 cierra la actividad afectada, el 31 registra el incidente y el 39 aprueba la alternativa. No hacen falta operaciones nuevas: los pasos nuevos son consultas intercaladas. Ni el README ni `DESIGN.md` citan pasos por número, así que se puede renumerar.
+
+- [ ] Después del 26/27: `GET .../events` (`ExpeditionApproved`, con las entregas) y `GET .../notifications` (un aviso por responsable).
+- [ ] Después del 31: el `IncidentRegistered` en el registro y el aviso.
+- [ ] Después del 34: `ActivityCompleted`, el avance en `GET .../report` y la línea de tiempo.
+- [ ] Al final: la línea de tiempo completa de la original y de la alternativa.
+- [ ] Cada paso nuevo con su handler y sus asserts, como los existentes.
+- [ ] La espera del despachador en vivo, según la decisión 5.3.
+- [ ] `DemoScriptApiTest`: replica los pasos nuevos e invoca `dispatchPending()` antes de cada consulta asíncrona.
+- [ ] La falla se muestra con los tests y se explica con el registro: no hay código que exista solo para la demo (D50).
+- [ ] Probar la demo entera desde un clon limpio, con `docker compose up` y el perfil `demo`, siguiendo el README.
+
+### README y cierre
+
+- [ ] README: los endpoints nuevos (de 48 a los que sean), una sección corta de cómo funcionan los eventos, la configuración `fieldops.events.*`, cómo correr la demo con el despachador y la cantidad de tests por módulo.
+- [ ] `DESIGN.md`:
+  - La sección "Propuesta de valor: arquitectura orientada a eventos" (ver abajo).
+  - El párrafo de "Modelo de dominio" actualizado con los eventos.
+  - Las filas de patrones no aplicados y los supuestos.
+- [ ] Revisar que la numeración de `DESIGN.md` siga sin huecos ni repetidos y que no haya referencias a entradas inexistentes.
+- [ ] Revisar que `docs/entrega-3-decisiones.md` no contradiga lo implementado. Si algo cambió, se agrega una línea al documento.
+
+> **Review, menor m2 — Newline.** Agregar el salto de línea final a `docs/fieldops-entrega-3.md`.
+
+### Presentación
+
+Presenta un integrante elegido al azar al comienzo de la clase, así que el material tiene que permitir que cualquiera de los cinco la dé completa. La gestión del tiempo se evalúa. Duración, fecha y formato: decisiones 5.1 y 5.2.
+
+- [ ] Material de apoyo (slides o equivalente), con un momento por sección de la consigna:
+  1. **Dominio desde cero:** problema, actores, reglas centrales y puntos de extensión. La audiencia no conoce el dominio. Se reusan los ejemplos de la demo (la expedición de Patagonia, la nocturna y la tormenta).
+  2. **Propuesta de valor:** qué es, por qué aporta acá (un hecho con varios interesados) y cómo se integró a la hexagonal. Después, la demo en vivo.
+  3. **Decisiones clave:** tres o cuatro, cada una con sus alternativas y consecuencias. Por ejemplo: outbox contra broker o async en proceso; propuesta síncrona y avisos asíncronos; orden por secuencia; y quién genera los eventos.
+  4. **Preguntas.**
+- [ ] El flujo completo de un evento, con un diagrama: quién lo emite, quién lo consume y qué garantías tiene la entrega. Son los cinco pasos de "Para la presentación" de las decisiones.
+- [ ] Dónde se eligieron eventos y dónde llamadas síncronas, y por qué.
+- [ ] Consecuencias: consistencia eventual, orden (y por qué la secuencia y no `occurredAt`), reintentos con sus números y duplicados.
+- [ ] Costo del cambio: qué clases existentes se tocaron, qué infraestructura se sumó y cuántos tests.
+- [ ] Preguntas probables, con su respuesta escrita:
+  - ¿Y con dos instancias? (`SKIP LOCKED`).
+  - ¿Por qué no un broker?
+  - ¿Por qué no Event Sourcing?
+  - ¿Qué pasa si se renombra un evento?
+  - ¿Qué pasa si se cae la app entre el commit y la entrega?
+  - ¿Qué pasa si el consumidor síncrono falla?
+  - ¿Qué pasa con un consumidor nuevo y los eventos viejos?
+  - ¿Cómo se reintenta un `FAILED`?
+  - ¿Por qué la proyección del avance no es CQRS?
+- [ ] Plan B para la demo en vivo: el video de la demo grabado con los cinco (ver "Video de la demo").
+- [ ] Ensayo el domingo 08/11 con los cinco, rotando quién presenta y cronometrando.
+
+### `DESIGN.md`
+
+- D81: seguimiento en el itinerario y frontend de eventos. Completa D69.
+
+**Terminado cuando:** la demo corre entera desde un clon limpio, `DemoScriptApiTest` la recorre en la CI y los cinco ensayaron.
+
+## `DESIGN.md`: qué escribe cada fase
+
+Cada fase escribe sus entradas en el mismo PR que el código, con el formato de siempre.
+
+### Numeración reservada
+
+| Entrada | Tema | Fase |
+| --- | --- | --- |
+| D70 | La entidad acumula los eventos y el caso de uso publica | 1 |
+| D71 | Qué lleva cada evento: `EventId`, `occurredAt` del hecho y datos mínimos | 1 |
+| D72 | `RegisterIncident` desacoplado de la propuesta | 1 |
+| D73 | Suscriptores síncronos y asíncronos | 1 |
+| D74 | Outbox en PostgreSQL: registro y entregas | 2 |
+| D75 | Serialización de eventos sin `switch` | 2 |
+| D76 | Consulta del registro de eventos | 2 |
+| D77 | Despachador `@Scheduled` | 3 |
+| D78 | Garantías de entrega | 3 |
+| D79 | Notificaciones | 4 |
+| D80 | Avance del informe y eventos en la auditoría | 4 |
+| D81 | Seguimiento en el itinerario y frontend de eventos | 5 |
+
+Si una fase necesita una entrada más, toma desde D82 y avisa al resto.
+
+| Decisión existente | La revisa | Por qué |
+| --- | --- | --- |
+| D45 | Fases 1 y 2 | La entidad genera los eventos (D70) y la entrega pasa por el outbox (D74). Se aclara que `IncidentRegistered` es el `IncidentReported` de la consigna |
+| D48 | Fase 4 | La auditoría integra la línea de tiempo de eventos |
+| D58 | Fase 1 | Qué devuelve el `POST /incidents` y de dónde sale (punto 3 de la review) |
+| D64 | Fase 1 | `IncidentView` como respuesta del puerto |
+| D69 | Fase 5 | Secciones nuevas del frontend |
+
+### Sección nueva
+
+"Propuesta de valor: arquitectura orientada a eventos", después de "Funcionalidades nuevas de la Entrega 2". Cada fase completa su parte:
+
+- **Decisiones:** D70 a D81.
+- **Flujo de un evento:** el diagrama de la presentación.
+- **Clases agregadas** y **clases modificadas**: el costo del cambio, que la consigna pide presentar.
+- **Infraestructura agregada:** las migraciones `V2` y `V3`, Jackson en `app`, `@EnableScheduling` y Awaitility.
+- **Deuda técnica que se decidió no resolver:** una sola instancia, sin versión de esquema, sin backfill, sin reentrega manual de `FAILED`, el registro crece sin límite y sin broker.
+- **Cada requisito de la consigna con el test que lo cubre.**
+
+### Secciones compartidas
+
+- **Patrones que decidimos no aplicar:** broker de mensajería (Fase 2), Event Sourcing actualizado (Fase 2), Saga (Fase 3) y CQRS (Fase 4).
+- **Supuestos:** los timestamps del hecho los manda el cliente (Fase 1), y una sola instancia con `SKIP LOCKED` como salida (Fase 3).
+
+## Pendientes, riesgos y cierre
+
+### Decisiones que faltan
+
+Es un índice. El detalle de cada decisión y su registro están en la sección "Decisiones de la fase" de cada fase. Al cerrar una, el responsable actualiza el estado en las dos partes. Las marcadas 👥 son del equipo.
+
+| # | Decisión | Fase | Cuándo | Bloquea a | Estado |
+| --- | --- | --- | --- | --- | --- |
+| — | Reparto de las cinco fases 👥 | — | 03/11 | Todo | ⬜ |
+| 1.1 | Qué responde `POST /incidents` (review 2 y 5) 👥 | 1 | 03/11 | Fase 1 | ⬜ |
+| 1.2 | `occurredAt` de la aprobación 👥 | 1 | 03/11 | Fase 1, y la aprobación en la Fase 5 | ⬜ |
+| 1.3 | Quién genera el `EventId` | 1 | 03/11 | Fase 1 | ⬜ |
+| 1.4 | Qué lleva `IncidentRegistered` | 1 | 03/11 | JSON de la Fase 2 | ⬜ |
+| 1.5 | Firma de `EventPublisher` | 1 | 03/11 | Fases 1 y 2 | ⬜ |
+| 1.6 | Resumen en palabras de cada evento | 1 (con la 4) | 03/11 | `DomainEvent` y la Fase 4 | ⬜ |
+| 2.1 | Serializador y Jackson en `app` | 2 | 05/11 | PR 2b | ⬜ |
+| 2.2 | Tipo de la columna `payload` | 2 | 05/11 | PR 2b | ⬜ |
+| 2.3 | Qué pasa con `InMemoryEventPublisher` | 2 | 05/11 | PR 2b | ⬜ |
+| 3.1 | Valores del despachador (review 6) 👥 | 3 | 04/11 | D78 | ⬜ |
+| 3.2 | Método del despachador para los tests | 3 | 04/11 | Fases 4 y 5 | ⬜ |
+| 4.1 | Qué es el "avance del informe" 👥 | 4 | 04/11 | Fase 4 | ⬜ |
+| 4.2 | Un suscriptor de notificaciones o uno por evento | 4 | 05/11 | Fase 4 | ⬜ |
+| 5.1 | Duración y fecha de la presentación 👥 | 5 | Lo antes posible | Fase 5 | ⬜ |
+| 5.2 | Formato de la presentación 👥 | 5 | 06/11 | Fase 5 | ⬜ |
+| 5.3 | Cómo espera la demo al despachador | 5 | 08/11 | Demo | ⬜ |
+| 5.4 | Cómo se reparte y se graba el video de la demo 👥 | 5 | 06/11 | Video | ⬜ |
+
+### Riesgos
+
+- **Calendario.** Hay seis días hasta el lunes 09/11, y la Fase 1 bloquea a todos. El domingo queda para el video y el ensayo: si la integración del sábado se atrasa, se come ese margen. Si no mergea el 04/11, las fases 2, 3 y 4 avanzan sobre la rama de la Fase 1 y rebasean después.
+- **Transacciones del despachador.** Marcar el fallo en otra transacción, después del rollback, es lo más fácil de hacer mal. Lo cubre el test de `FAILED`.
+- **Tests inestables con el `@Scheduled`.** Todo se prueba invocando el despachador a mano, con un `Clock` que se adelanta. Awaitility queda para un solo test de punta a punta, y el resto de los tests corre con el despachador apagado.
+- **JSON con Jackson 3 y `jsonb` con Hibernate 7.** Hay que probarlos el primer día del PR 2b, con el test de ida y vuelta y una inserción real. La salida es la columna `text`.
+- **El orden depende de que cada evento cambie la fila `expedition`.** Hoy se cumple. Un evento nuevo que no la cambie rompe la garantía en silencio. Va en D78 como supuesto.
+- **La proyección del avance contra el informe.** Si no se decide bien, es la pregunta más incómoda de la presentación (ver Fase 4).
+- **Demo con consistencia eventual.** En vivo, el aviso aparece unos segundos después. El guion tiene que mostrarlo como lo que se quiere explicar, no como un error.
+- **Contaminación entre tests de `web`.** Si una tabla nueva no entra en `clean-database.sql`, los tests pasan solos y fallan juntos.
+
+### Checklist de entrega
+
+- [ ] URL del repositorio y hash del último commit.
+- [ ] Tres eventos inmutables del dominio, emitidos por la operación que corresponde, con test.
+- [ ] El productor no conoce a los consumidores: `RegisterIncident` sin `ReplanProposalRepository`, y los casos de uso solo conocen `EventPublisher`.
+- [ ] Al menos un consumidor asíncrono (hay dos), con su efecto probado.
+- [ ] Qué pasa si el consumidor falla, probado para los dos tipos de consumidor.
+- [ ] Registro de eventos consultable por API y frontend, e integrado al informe.
+- [ ] `domain` sin dependencias de framework, con `HexagonalArchitectureTest` y el enforcer en verde.
+- [ ] Tests en la CI con `mvn -B verify`.
+- [ ] `DESIGN.md` con D70 a D81, la sección de la propuesta de valor, los patrones no aplicados y los supuestos.
+- [ ] README actualizado.
+- [ ] `demo.http` con los pasos de eventos, recorrido por `DemoScriptApiTest`.
+- [ ] Video de la demo grabado con los cinco integrantes, organizado por el responsable de la Fase 5, con el link en el README.
+- [ ] Presentación ensayada por los cinco, con el video como plan B.

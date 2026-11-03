@@ -3,7 +3,7 @@
 Estado: decisiones tomadas antes de implementar, para validar con el equipo. Son la base de
 `docs/entrega-3-plan.md` y de las entradas nuevas de `DESIGN.md` (D70 en adelante).
 
-Consigna: `docs/fieldops-entrega-3.md`. Entrega: 08/11/2026.
+Consigna: `docs/fieldops-entrega-3.md`. Entrega: 09/11/2026.
 
 ## Punto de partida
 
