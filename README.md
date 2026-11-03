@@ -294,7 +294,7 @@ property brings them structured, with the same shape `GET /api/expeditions/{id}/
 
 ## Tests
 
-`mvn -B verify` runs 923 tests: 706 in `domain`, 69 in `app` and 148 in `web`. The ones in `app` and `web` run
+`mvn -B verify` runs 886 tests: 698 in `domain`, 40 in `app` and 148 in `web`. The ones in `app` and `web` run
 against a real PostgreSQL, the same image as Compose, in a container that Testcontainers starts by itself, so
 Docker has to be running and `docker compose up` does not.
 
