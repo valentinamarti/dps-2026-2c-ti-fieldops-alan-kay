@@ -113,16 +113,16 @@ El repo tiene tres módulos Maven (`domain`, `app` y `web`) con 886 tests: 698 e
 
 Lo que ya existe y se reusa:
 
-| Pieza                                                          | Dónde                                              | Para qué sirve en esta entrega                                                                 |
-|----------------------------------------------------------------|----------------------------------------------------|------------------------------------------------------------------------------------------------|
-| `EventPublisher`, `DomainEvent`, `EventSubscriber`             | `business.providers`, `business.interfaces.events` | La base de la Fase 1. No se cambia el nombre de nada                                           |
-| `InMemoryEventPublisher`                                       | `app/.../adapters/driven`                          | Lo reemplaza el publicador del outbox                                                          |
-| `ReplanningConfig.eventPublisher(List<EventSubscriber<?>>)`    | `web`                                              | Lo reemplaza una `EventsConfig`                                                                |
-| `TransactionalUseCases`                                        | `web`                                              | Transacción por caso de uso. El despachador usa su propia `TransactionTemplate`                |
-| `LoadedAggregates`                                             | `app/.../persistence`                              | Identidad por transacción: el caso de uso toma los eventos de la misma instancia que guardó    |
-| `ConcurrentUpdateException` y `@Version` en `ExpeditionEntity` | `domain` y `app`                                   | Sostienen el orden por expedición (Fase 2)                                                     |
-| `HexagonalArchitectureTest` (ArchUnit)                         | `web/src/test`                                     | Los adaptadores driving no pueden depender de `business.usecases` ni de las entidades mutables |
-| Enforcer de `domain`                                           | `domain/pom.xml`                                   | Prohíbe Spring. No prohíbe Jackson, así que eso depende de la disciplina del equipo            |
+| Pieza                                                          | Dónde                                              | Para qué sirve en esta entrega                                                                                      |
+|----------------------------------------------------------------|----------------------------------------------------|---------------------------------------------------------------------------------------------------------------------|
+| `EventPublisher`, `DomainEvent`, `EventSubscriber`             | `business.providers`, `business.interfaces.events` | La base de la Fase 1. No se cambia el nombre de nada                                                                |
+| `InMemoryEventPublisher`                                       | `app/.../adapters/driven`                          | Lo reemplaza el publicador del outbox                                                                               |
+| `ReplanningConfig.eventPublisher(List<EventSubscriber<?>>)`    | `web`                                              | Lo reemplaza una `EventsConfig`                                                                                     |
+| `TransactionalUseCases`                                        | `web`                                              | Transacción por caso de uso. El despachador usa su propia `TransactionTemplate`                                     |
+| `LoadedAggregates`                                             | `app/.../persistence`                              | Identidad por transacción: el repositorio decorado toma los eventos de la misma instancia que guardó el caso de uso |
+| `ConcurrentUpdateException` y `@Version` en `ExpeditionEntity` | `domain` y `app`                                   | Sostienen el orden por expedición (Fase 2)                                                                          |
+| `HexagonalArchitectureTest` (ArchUnit)                         | `web/src/test`                                     | Los adaptadores driving no pueden depender de `business.usecases` ni de las entidades mutables                      |
+| Enforcer de `domain`                                           | `domain/pom.xml`                                   | Prohíbe Spring. No prohíbe Jackson, así que eso depende de la disciplina del equipo                                 |
 
 ## Dependencias y orden de merge
 
@@ -185,14 +185,14 @@ La Fase 1 tiene que ser corta, porque bloquea a todos. Hasta que mergee, las fas
 
 ## Fase 1: eventos en el dominio
 
-Los tres hechos pasan a ser eventos del dominio que la expedición registra cuando ocurren. Los casos de uso guardan y publican sin saber qué eventos hubo ni quién los escucha. El publicador sigue siendo `InMemoryEventPublisher`: el outbox llega en la Fase 2 sin tocar el dominio.
+Los tres hechos pasan a ser eventos del dominio que la expedición registra cuando ocurren. Los casos de uso solo guardan la expedición: el repositorio decorado (`PublishingExpeditionRepository`, decisión 1.5) publica lo que la expedición registró, sin que el caso de uso sepa qué eventos hubo ni quién los escucha. El publicador sigue siendo `InMemoryEventPublisher`: el outbox llega en la Fase 2 sin tocar el dominio.
 
 ```mermaid
 flowchart LR
   A[Caso de uso: aprueba, termina o registra] --> B[Expedition registra el evento]
   B --> C[El caso de uso guarda]
-  C --> D[Toma los eventos pendientes de la entidad]
-  D --> E[EventPublisher.publish]
+  C --> D[PublishingExpeditionRepository: guarda y toma los pendientes]
+  D --> E[EventPublisher.publish, de a uno]
   E --> F[Síncronos: ProposeReplan]
   E --> G[Asíncronos: los entrega el despachador, Fase 3]
 ```
@@ -256,16 +256,21 @@ Todas se cierran el martes 03/11, antes de arrancar, porque la fase bloquea al r
 - **Por qué:** _a completar_
 - **Se registra en:** D71
 
-#### 1.5 — Firma de `EventPublisher` · ⬜ pendiente
+#### 1.5 — Quién publica los eventos y con qué firma · ✅ decidida
 
-- **Pregunta:** cómo recibe los eventos el publicador.
+- **Pregunta:** quién toma los eventos de la entidad y se los pasa al publicador, y cómo los recibe el publicador.
 - **Opciones:**
-  - a) `publish(List<DomainEvent>)`.
-  - b) `publish(DomainEvent)`, una llamada por evento.
-- **Recomendación:** a), así el caso de uso pasa lo que tomó de la entidad sin iterar.
-- **Decisión:** _a completar_
-- **Quién y cuándo:** _a completar_
-- **Por qué:** _a completar_
+  - a) Cada caso de uso, después de guardar, con `publish(List<DomainEvent>)`.
+  - b) Cada caso de uso, después de guardar, con `publish(DomainEvent)` de a uno.
+  - c) Un Decorator del repositorio, `PublishingExpeditionRepository`, que guarda y después publica de a uno con `publish(DomainEvent)`. El puerto no cambia.
+- **Recomendación inicial:** a). Se revisó al ver el código.
+- **Decisión:** c).
+- **Quién y cuándo:** Valentina, 03/11/2026.
+- **Por qué:**
+  - Con a) o b), un caso de uso que guarda sin publicar pierde los eventos sin ningún error. Con c), toda expedición que se guarda publica lo que registró.
+  - Los casos de uso dejan de conocer a `EventPublisher`, y el adaptador JPA no cambia.
+  - La lista no hacía falta: el único que recorre los pendientes es el decorador.
+  - Costo: el bean `expeditionRepository` arma el JPA adentro del decorador y lo envuelve con `TransactionalUseCases.writing`, porque el `@Transactional` del adaptador solo aplica a beans. Recibe el publicador con `@Lazy`, para cortar el ciclo publicador → `ProposeReplan` → repositorio. Además, leyendo un caso de uso no se ve que se publica.
 - **Se registra en:** D70
 
 #### 1.6 — Resumen en palabras de cada evento (con la Fase 4) · ⬜ pendiente
@@ -290,12 +295,10 @@ Todas se cierran el martes 03/11, antes de arrancar, porque la fase bloquea al r
   - `IncidentRegistered`, que ya existe, suma `id` y `occurredAt`. Su campo `expedition` pasa a llamarse `expeditionId` para cumplir con `DomainEvent`.
 - [ ] `Expedition` acumula sus eventos en `approve(...)`, `finishActivity(...)` y `registerIncident(...)`, siempre después de que la operación ya validó todo. Así, una operación que falla no deja eventos (por ejemplo, el paso 20 de la demo, el 422).
 - [ ] `Expedition` tiene un método que toma los eventos pendientes y los vacía, por ejemplo `pullEvents()`. Los pendientes no entran en `snapshot()` ni en `restore()`.
-- [ ] Cada caso de uso publica lo que toma de la entidad después de guardar:
-  - `ApproveExpedition.approve(Expedition, ...)`: guarda la aprobada y, si era una alternativa, también la reemplazada. **Agregado:** hay que tomar los eventos de las dos, aunque hoy solo la aprobada genera uno. Si no, un evento futuro de la reemplazada se pierde sin que nadie lo note.
-  - `TrackActivity.finish`.
-  - `RegisterIncident.register`.
+- [ ] `PublishingExpeditionRepository` en `business.services` (decisión 1.5): guarda y después publica los pendientes de a uno. `FieldOpsConfig` lo expone como el `ExpeditionRepository` de la aplicación. Con eso:
+  - `ApproveExpedition`, que guarda la aprobada y, si era una alternativa, también la reemplazada, publica los eventos de las dos sin hacer nada.
+  - `TrackActivity.finish` y `RegisterIncident.register` tampoco publican: solo guardan.
   - `start` y `observe` no generan eventos, y ningún otro caso de uso tampoco.
-- [ ] La firma de `EventPublisher`, según la decisión 1.5.
 - [ ] Interfaz nueva para los suscriptores asíncronos en `business.interfaces.events`, junto a `EventSubscriber`, que sigue siendo el síncrono. Por ejemplo `AsyncEventSubscriber<E>`, con `eventType()`, `on(E)` y `consumerName()`. El nombre se guarda en la base, así que no puede ser `getClass().getName()`: un refactor dejaría entregas huérfanas.
 - [ ] `InMemoryEventPublisher` entrega solo a los `EventSubscriber`. En esta fase, los asíncronos no tienen quién los entregue: eso lo construyen las fases 2 y 3.
 - [ ] `RegisterIncident` deja de depender de `ReplanProposalRepository` y devuelve un `IncidentView` (punto 4).
@@ -318,8 +321,8 @@ Todas se cierran el martes 03/11, antes de arrancar, porque la fase bloquea al r
 
 ### Archivos
 
-- Nuevos: `business/models/events/EventId.java`, `ExpeditionApproved.java`, `ActivityCompleted.java`, `business/interfaces/events/AsyncEventSubscriber.java` y `business/models/responses/IncidentView.java`.
-- Modificados: `DomainEvent`, `IncidentRegistered`, `EventPublisher`, `Expedition`, `ApproveExpedition`, `TrackActivity`, `RegisterIncident`, `RegisterIncidentPort`, `ProposeReplan` (por el nombre del campo), `InMemoryEventPublisher` y `ReplanningConfig` (el constructor de `RegisterIncident`).
+- Nuevos: `business/models/events/EventId.java`, `ExpeditionApproved.java`, `ActivityCompleted.java`, `business/services/PublishingExpeditionRepository.java`, `business/interfaces/events/AsyncEventSubscriber.java` y `business/models/responses/IncidentView.java`.
+- Modificados: `DomainEvent`, `IncidentRegistered`, `Expedition`, `RegisterIncident` (pierde `EventPublisher`), `RegisterIncidentPort`, `ProposeReplan` (por el nombre del campo), `InMemoryEventPublisher` (solo síncronos), `FieldOpsConfig` (el repositorio decorado) y `ReplanningConfig` (el constructor de `RegisterIncident`).
 - Según la decisión 1.1: `IncidentController` y `QueryReplanProposalsPort`/`QueryReplanProposals`.
 - Según la decisión 1.2: `ApproveExpeditionPort`, `ApproveExpedition`, `ApprovalRequest`, `ApprovalMapper` y los tests de API de aprobación.
 
@@ -334,7 +337,8 @@ Todas se cierran el martes 03/11, antes de arrancar, porque la fase bloquea al r
 - [ ] Una operación que falla no deja eventos: aprobar con críticas, terminar sin haber iniciado o un incidente sobre una actividad terminada.
 - [ ] `pullEvents()` vacía, y una expedición restaurada no trae eventos.
 - [ ] La alternativa que arma `ExpeditionReplanner` hereda los incidentes (`builder.addInheritedIncident`) **sin** emitir `IncidentRegistered`.
-- [ ] Unitarios con Mockito: cada caso de uso publica los eventos de la entidad después de guardar, `ApproveExpedition` publica también los de la reemplazada y `RegisterIncident` ya no consulta propuestas.
+- [ ] `PublishingExpeditionRepositoryTest`: publica lo que la expedición registró después de guardarla (con `save` y con `add`), en orden. Si guardar falla, no toma ni publica nada, y las lecturas pasan directo.
+- [ ] Con el repositorio decorado, aprobar una alternativa publica los eventos de las dos expediciones que se guardan, y `RegisterIncident` ya no consulta propuestas.
 - [ ] `InMemoryEventPublisher` no entrega a los asíncronos.
 - [ ] `ReplanningApiTest`, `DemoScriptApiTest` y `HexagonalArchitectureTest` siguen en verde.
 
@@ -805,7 +809,7 @@ Es un índice. El detalle de cada decisión y su registro están en la sección 
 | 1.2 | `occurredAt` de la aprobación 👥 | 1 | 03/11 | Fase 1, y la aprobación en la Fase 5 | ⬜ |
 | 1.3 | Quién genera el `EventId` | 1 | 03/11 | Fase 1 | ⬜ |
 | 1.4 | Qué lleva `IncidentRegistered` | 1 | 03/11 | JSON de la Fase 2 | ⬜ |
-| 1.5 | Firma de `EventPublisher` | 1 | 03/11 | Fases 1 y 2 | ⬜ |
+| 1.5 | Quién publica los eventos y con qué firma | 1 | 03/11 | Fases 1 y 2 | ✅ |
 | 1.6 | Resumen en palabras de cada evento | 1 (con la 4) | 03/11 | `DomainEvent` y la Fase 4 | ⬜ |
 | 2.1 | Serializador y Jackson en `app` | 2 | 05/11 | PR 2b | ⬜ |
 | 2.2 | Tipo de la columna `payload` | 2 | 05/11 | PR 2b | ⬜ |

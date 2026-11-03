@@ -773,6 +773,7 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
   - Que la entidad acumule los eventos y el repositorio los despache al guardar — hoy no existe ese "guardar" (D38).
 - **Consecuencia:** no hay transacción ni reintentos. Si el suscriptor falla, la excepción llega a quien registró el incidente, pero el incidente ya quedó registrado en la expedición. Con persistencia real, registrar y proponer tienen que ir en la misma transacción o pasar a un outbox. Queda como deuda técnica de F3.
 - **Revisado en D68:** el incidente y la propuesta corren en la misma transacción, así que si el suscriptor falla el incidente se deshace y no queda registrado sin propuesta. Sigue sin haber reintentos.
+- **Revisado en D70:** la expedición guarda sus eventos pendientes y un decorador del repositorio los publica al guardarla.
 
 ### D46 — La propuesta ofrece varias opciones, una por generador, y solo las que se pueden armar (Entrega 2, F3, revisa D25, D33 y D40)
 
@@ -1374,6 +1375,34 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
   - La pantalla ofrece iniciar y finalizar en todas las actividades mientras la expedición está en ejecución, porque la respuesta del itinerario no trae el seguimiento. Si la acción no corresponde, el dominio la rechaza y se muestra el motivo.
   - Las fechas de seguimiento son las del momento de la acción.
   - Los tests verifican que los archivos se sirven, pero no recorren la pantalla con un navegador: ese recorrido se probó a mano.
+
+### D70 — La expedición guarda sus eventos y se publican al guardarla (Entrega 3, propuesta de valor, revisa D45)
+
+- **Origen:** la propuesta de valor de la Entrega 3 pide modelar los hechos del dominio como eventos y publicarlos sin que quien los produce conozca a sus consumidores. D45 publicaba desde el caso de uso y descartaba que la entidad acumulara sus eventos, porque no había un "guardar" (D38). Desde D66 los casos de uso guardan lo que cambian, así que ese motivo ya no existe.
+- **Patrón / principio:** eventos de dominio acumulados por el agregado + Decorator sobre el puerto `ExpeditionRepository`, que publica al guardar.
+- **Dónde:**
+  - `Expedition` guarda sus eventos pendientes, y `pullEvents` los devuelve y los vacía.
+  - `PublishingExpeditionRepository` (en `business.services`) guarda con el repositorio que decora y después publica cada evento pendiente con `EventPublisher`.
+  - `FieldOpsConfig` (en `web`) lo expone como el `ExpeditionRepository` de la aplicación (`@Primary`), sobre `JpaExpeditionRepository`.
+- **Por qué:**
+  - **Nadie se puede olvidar de publicar.** Toda expedición que se guarda publica lo que registró, sea cual sea el caso de uso que la modificó, incluidos los que guardan más de una expedición. Si cada caso de uso tuviera que publicar después de guardar, uno nuevo que no lo hiciera perdería los eventos sin ningún error.
+  - **El caso de uso no tiene que saber que hay eventos.** Modifica la expedición y la guarda.
+  - **El adaptador de persistencia no cambia.** `JpaExpeditionRepository` sigue haciendo solo persistencia. Publicar es una capa encima, que se prueba sola.
+  - **Primero se guarda y después se publica**, como en D45 y D66, ahora en un solo lugar. Si guardar falla, los eventos no se toman ni se publican. Como el repositorio se llama adentro del caso de uso, la publicación corre en la misma transacción (D68).
+  - **Los pendientes no se guardan.** No entran en el `snapshot()`, así que una expedición restaurada arranca sin eventos.
+  - **`EventPublisher` sigue publicando de a un evento.** El único que recorre los pendientes es el decorador.
+- **Alternativas descartadas:**
+  - Que el caso de uso arme y publique el evento (lo que hacía D45) — la regla de cuándo ocurre el hecho quedaría fuera del modelo, y cada caso de uso tendría que acordarse de publicar.
+  - Que la entidad acumule los eventos y cada caso de uso los publique después de guardar — nadie garantiza que un caso de uso nuevo lo haga.
+  - Que publique `JpaExpeditionRepository` — el adaptador de persistencia tendría dos responsabilidades, y cada adaptador de repositorio tendría que repetirlo.
+  - `@DomainEvents` de Spring Data — resuelve lo mismo, pero mete Spring en el dominio (D36, D37).
+  - Que la entidad publique directo — la entidad dependería de un puerto de salida.
+  - `publish(List<DomainEvent>)` — cambiaría el puerto y su adaptador sin ganar nada, porque el único que recorre la lista es el decorador.
+- **Consecuencia:**
+  - Leyendo un caso de uso no se ve que se publique algo: se publica al guardar. Esta entrada es la que lo explica.
+  - En `web` sigue habiendo un solo bean `expeditionRepository`. Arma el `JpaExpeditionRepository` con `new` adentro del decorador, así que la anotación `@Transactional` del adaptador ya no aplica, porque Spring solo la aplica a sus beans. Por eso el decorado se envuelve con `TransactionalUseCases.writing`, el mismo mecanismo de los casos de uso (D68): cada operación del repositorio corre en una transacción, o se suma a la del caso de uso que la llamó.
+  - El bean recibe el `EventPublisher` con `@Lazy`, porque el publicador necesita a sus suscriptores y `ProposeReplan` necesita el repositorio.
+  - Los tests de los casos de uso con un repositorio simulado no ven la publicación: está probada en `PublishingExpeditionRepositoryTest`.
 
 ## Funcionalidades nuevas de la Entrega 2
 

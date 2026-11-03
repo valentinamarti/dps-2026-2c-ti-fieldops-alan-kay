@@ -28,12 +28,14 @@ import ar.edu.itba.dps.fieldops.business.ports.in.ScheduleBlockPort;
 import ar.edu.itba.dps.fieldops.business.ports.in.TrackActivityPort;
 import ar.edu.itba.dps.fieldops.business.ports.in.TransitionExpeditionPort;
 import ar.edu.itba.dps.fieldops.business.ports.in.ValidateExpeditionPort;
+import ar.edu.itba.dps.fieldops.business.providers.EventPublisher;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionIdProvider;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
 import ar.edu.itba.dps.fieldops.business.replanning.ExpeditionReplanner;
 import ar.edu.itba.dps.fieldops.business.reports.ExpeditionReporter;
 import ar.edu.itba.dps.fieldops.business.rules.ActivityTypeRegistry;
+import ar.edu.itba.dps.fieldops.business.services.PublishingExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
 import ar.edu.itba.dps.fieldops.business.usecases.ApproveExpedition;
 import ar.edu.itba.dps.fieldops.business.usecases.AssignResources;
@@ -57,6 +59,7 @@ import ar.edu.itba.dps.fieldops.business.usecases.TransitionExpedition;
 import ar.edu.itba.dps.fieldops.business.usecases.ValidateExpedition;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import java.util.List;
@@ -76,8 +79,10 @@ public class FieldOpsConfig {
 
     @Bean
     ExpeditionRepository expeditionRepository(ExpeditionJpaRepository expeditions, ZoneRepository zones, ResourceCatalog catalog,
-                                              ActivityTypeRegistry types, LoadedAggregates loaded) {
-        return new JpaExpeditionRepository(expeditions, zones, catalog, types, loaded);
+                                              ActivityTypeRegistry types, LoadedAggregates loaded,
+                                              @Lazy EventPublisher publisher, TransactionalUseCases transactional) {
+        final var stored = new JpaExpeditionRepository(expeditions, zones, catalog, types, loaded);
+        return transactional.writing(ExpeditionRepository.class, new PublishingExpeditionRepository(stored, publisher));
     }
 
     @Bean

@@ -10,6 +10,7 @@ import ar.edu.itba.dps.fieldops.business.exceptions.InvalidTrackingException;
 import ar.edu.itba.dps.fieldops.business.exceptions.NotAResponsibleException;
 import ar.edu.itba.dps.fieldops.business.exceptions.StaleAlternativeException;
 import ar.edu.itba.dps.fieldops.business.exceptions.UnacceptedWarningException;
+import ar.edu.itba.dps.fieldops.business.interfaces.events.DomainEvent;
 import ar.edu.itba.dps.fieldops.business.interfaces.itinerary.ItineraryNode;
 import ar.edu.itba.dps.fieldops.business.interfaces.itinerary.ItineraryNodeVisitor;
 import ar.edu.itba.dps.fieldops.business.interfaces.replanning.ReplanReason;
@@ -80,6 +81,7 @@ public class Expedition {
     @Getter
     private List<AcceptedWarning> acceptedWarnings = List.of();
     private final List<Incident> incidents = new ArrayList<>();
+    private final List<DomainEvent> pendingEvents = new ArrayList<>();
     private final ReplacedPlan replacedPlan;
     private final ReplanReason replanReason;
     private ExpeditionId replacement;
@@ -290,6 +292,12 @@ public class Expedition {
 
     public List<Incident> getIncidents() {
         return Collections.unmodifiableList(incidents);
+    }
+
+    public List<DomainEvent> pullEvents() {
+        final var events = List.copyOf(pendingEvents);
+        pendingEvents.clear();
+        return events;
     }
 
     private void requireAssigned(ItineraryItem item, ResourceId resource) {
