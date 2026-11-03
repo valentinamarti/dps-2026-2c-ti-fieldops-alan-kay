@@ -113,16 +113,16 @@ El repo tiene tres módulos Maven (`domain`, `app` y `web`) con 886 tests: 698 e
 
 Lo que ya existe y se reusa:
 
-| Pieza | Dónde | Para qué sirve en esta entrega |
-| --- | --- | --- |
-| `EventPublisher`, `DomainEvent`, `EventSubscriber` | `business.providers`, `business.interfaces.events` | La base de la Fase 1. No se cambia el nombre de nada |
-| `InMemoryEventPublisher` | `app/.../adapters/driven` | Lo reemplaza el publicador del outbox |
-| `ReplanningConfig.eventPublisher(List<EventSubscriber<?>>)` | `web` | Lo reemplaza una `EventsConfig` |
-| `TransactionalUseCases` | `web` | Transacción por caso de uso. El despachador usa su propia `TransactionTemplate` |
-| `LoadedAggregates` | `app/.../persistence` | Identidad por transacción: el caso de uso toma los eventos de la misma instancia que guardó |
-| `ConcurrentUpdateException` y `@Version` en `ExpeditionEntity` | `domain` y `app` | Sostienen el orden por expedición (Fase 2) |
-| `HexagonalArchitectureTest` (ArchUnit) | `web/src/test` | Los adaptadores driving no pueden depender de `business.usecases` ni de las entidades mutables |
-| Enforcer de `domain` | `domain/pom.xml` | Prohíbe Spring. No prohíbe Jackson, así que eso depende de la disciplina del equipo |
+| Pieza                                                          | Dónde                                              | Para qué sirve en esta entrega                                                                 |
+|----------------------------------------------------------------|----------------------------------------------------|------------------------------------------------------------------------------------------------|
+| `EventPublisher`, `DomainEvent`, `EventSubscriber`             | `business.providers`, `business.interfaces.events` | La base de la Fase 1. No se cambia el nombre de nada                                           |
+| `InMemoryEventPublisher`                                       | `app/.../adapters/driven`                          | Lo reemplaza el publicador del outbox                                                          |
+| `ReplanningConfig.eventPublisher(List<EventSubscriber<?>>)`    | `web`                                              | Lo reemplaza una `EventsConfig`                                                                |
+| `TransactionalUseCases`                                        | `web`                                              | Transacción por caso de uso. El despachador usa su propia `TransactionTemplate`                |
+| `LoadedAggregates`                                             | `app/.../persistence`                              | Identidad por transacción: el caso de uso toma los eventos de la misma instancia que guardó    |
+| `ConcurrentUpdateException` y `@Version` en `ExpeditionEntity` | `domain` y `app`                                   | Sostienen el orden por expedición (Fase 2)                                                     |
+| `HexagonalArchitectureTest` (ArchUnit)                         | `web/src/test`                                     | Los adaptadores driving no pueden depender de `business.usecases` ni de las entidades mutables |
+| Enforcer de `domain`                                           | `domain/pom.xml`                                   | Prohíbe Spring. No prohíbe Jackson, así que eso depende de la disciplina del equipo            |
 
 ## Dependencias y orden de merge
 
