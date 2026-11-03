@@ -38,4 +38,14 @@ public class Zone {
         final var normalized = DomainArguments.requireText(operation, "operation").strip().toLowerCase(Locale.ROOT);
         return new Permit(SPECIAL_PERMIT_NAME.formatted(normalized, id));
     }
+
+    @Override
+    public boolean equals(Object other) {
+        return other instanceof Zone that && id.equals(that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return id.hashCode();
+    }
 }

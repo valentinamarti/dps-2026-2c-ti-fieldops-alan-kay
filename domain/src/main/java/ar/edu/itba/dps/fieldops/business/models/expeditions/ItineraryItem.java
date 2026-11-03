@@ -40,6 +40,10 @@ public class ItineraryItem implements ItineraryNode {
         if (!activity.getTimeWindow().contains(scheduledPeriod)) {
             throw new InvalidScheduleException("%s must be scheduled within its time window".formatted(activity.getName()));
         }
+        if (scheduledPeriod.duration().compareTo(activity.estimatedDuration()) < 0) {
+            throw new InvalidScheduleException("%s is estimated to take %d minutes and cannot be scheduled for %d"
+                    .formatted(activity.getName(), activity.estimatedDuration().toMinutes(), scheduledPeriod.duration().toMinutes()));
+        }
     }
 
     static ItineraryItem finishedCopyOf(ItineraryItem finished) {
@@ -49,6 +53,20 @@ public class ItineraryItem implements ItineraryNode {
         copy.assignedSupplies.addAll(finished.assignedSupplies);
         copy.tracking = finished.finishedTracking().copy();
         return copy;
+    }
+
+    static ItineraryItem restored(ItemSnapshot snapshot) {
+        final var item = new ItineraryItem(snapshot.activity(), snapshot.scheduledPeriod());
+        item.assignedStaff.addAll(snapshot.staff());
+        item.assignedEquipment.addAll(snapshot.equipment());
+        item.assignedSupplies.addAll(snapshot.supplies());
+        item.tracking = snapshot.tracking().map(ActivityTracking::restored).orElse(null);
+        return item;
+    }
+
+    ItemSnapshot snapshot() {
+        return new ItemSnapshot(activity, scheduledPeriod, List.copyOf(assignedStaff), List.copyOf(assignedEquipment),
+                List.copyOf(assignedSupplies), getTracking().map(ActivityTracking::snapshot));
     }
 
     public boolean isFor(Activity activity) {

@@ -3,15 +3,19 @@ package ar.edu.itba.dps.fieldops.business.usecases;
 import ar.edu.itba.dps.fieldops.business.estimations.ExpeditionEstimator;
 import ar.edu.itba.dps.fieldops.business.exceptions.NotFoundException;
 import ar.edu.itba.dps.fieldops.business.exceptions.UnacceptedWarningException;
+import ar.edu.itba.dps.fieldops.business.fixtures.FakeResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
+import ar.edu.itba.dps.fieldops.business.models.commands.WarningAcceptance;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Observation;
-import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
+import ar.edu.itba.dps.fieldops.business.models.responses.ExpeditionReportView;
+import ar.edu.itba.dps.fieldops.business.models.responses.ExpeditionView;
 import ar.edu.itba.dps.fieldops.business.models.validation.RuleId;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
@@ -35,7 +39,6 @@ import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.samp
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -47,7 +50,7 @@ class ExpeditionByIdTest {
 
     private final SequentialExpeditionRepository stored = new SequentialExpeditionRepository();
     private final ExpeditionRepository repository = mock(ExpeditionRepository.class);
-    private final ResourceCatalog catalog = new ResourceCatalog();
+    private final ResourceCatalog catalog = new FakeResourceCatalog();
     private final ResourceReservations reservations = new ResourceReservations();
     private final Zone coast = zone("z-1");
     private final Person leader = person("p-1");
@@ -70,8 +73,8 @@ class ExpeditionByIdTest {
     void getsAnExpeditionByIdAndListsThemAll() {
         final var queries = new QueryExpeditions(repository);
 
-        assertSame(expedition, queries.get(expedition.getId()));
-        assertEquals(List.of(expedition), queries.list());
+        assertEquals(ExpeditionView.of(expedition), queries.get(expedition.getId()));
+        assertEquals(List.of(ExpeditionView.of(expedition)), queries.list());
         assertThrows(NotFoundException.class, () -> queries.get(unknown));
     }
 
@@ -96,7 +99,7 @@ class ExpeditionByIdTest {
         final var reports = new ReportExpedition(repository, new ExpeditionReporter(estimator));
 
         assertEquals(estimator.estimate(expedition), estimates.estimate(expedition.getId()));
-        assertEquals(new ExpeditionReporter(estimator).reportOf(expedition), reports.report(expedition.getId()));
+        assertEquals(ExpeditionReportView.of(new ExpeditionReporter(estimator).reportOf(expedition)), reports.report(expedition.getId()));
         assertThrows(NotFoundException.class, () -> estimates.estimate(unknown));
         assertThrows(NotFoundException.class, () -> reports.report(unknown));
     }
@@ -139,7 +142,7 @@ class ExpeditionByIdTest {
         readyToApprove();
         new ApproveExpedition(List.of(), reservations, repository, catalog).approve(expedition.getId(), List.of());
         expedition.start();
-        final var tracking = new TrackActivity(repository);
+        final var tracking = new TrackActivity(repository, new FakeResourceCatalog());
         final var activity = new ActivityId("a-1");
         final var item = expedition.getItinerary().itemFor(activity).orElseThrow();
         final var at = LocalDateTime.of(2026, 10, 1, 9, 30);
@@ -159,7 +162,7 @@ class ExpeditionByIdTest {
         readyToApprove();
         new ApproveExpedition(List.of(), reservations, repository, catalog).approve(expedition.getId(), List.of());
         expedition.start();
-        final var finish = new FinishExpedition(reservations, repository);
+        final var finish = new FinishExpedition(reservations, repository, new FakeResourceCatalog());
 
         finish.finish(expedition.getId());
 

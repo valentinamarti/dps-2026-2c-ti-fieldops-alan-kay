@@ -7,7 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
-import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
@@ -18,7 +18,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
+@Sql("/clean-database.sql")
 class ExpeditionLifecycleApiTest {
     @Autowired
     private MockMvc api;
@@ -269,7 +269,7 @@ class ExpeditionLifecycleApiTest {
                           "id": "a-1",
                           "name": "Sample collection a-1",
                           "timeWindow": {"start": "2026-10-01T00:00:00", "end": "2026-10-02T00:00:00"},
-                          "scheduledPeriod": {"start": "2026-10-01T08:00:00", "end": "2026-10-01T09:00:00"},
+                          "scheduledPeriod": {"start": "2026-10-01T08:00:00", "end": "2026-10-01T09:30:00"},
                           "zoneId": "z-1",
                           "dependencyIds": [],
                           "type": "Sample collection",
@@ -299,7 +299,7 @@ class ExpeditionLifecycleApiTest {
                           "id": "a-1",
                           "name": "Sample collection a-1",
                           "timeWindow": {"start": "2026-10-01T00:00:00", "end": "2026-10-02T00:00:00"},
-                          "scheduledPeriod": {"start": "2026-10-01T08:00:00", "end": "2026-10-01T09:00:00"},
+                          "scheduledPeriod": {"start": "2026-10-01T08:00:00", "end": "2026-10-01T09:30:00"},
                           "zoneId": "z-1",
                           "dependencyIds": [],
                           "type": "Sample collection",
@@ -331,7 +331,7 @@ class ExpeditionLifecycleApiTest {
                           "id": "a-1",
                           "name": "Drone survey a-1",
                           "timeWindow": {"start": "2026-10-01T00:00:00", "end": "2026-10-02T00:00:00"},
-                          "scheduledPeriod": {"start": "2026-10-01T08:00:00", "end": "2026-10-01T09:00:00"},
+                          "scheduledPeriod": {"start": "2026-10-01T08:00:00", "end": "2026-10-01T11:30:00"},
                           "zoneId": "z-1",
                           "dependencyIds": [],
                           "type": "Drone survey",

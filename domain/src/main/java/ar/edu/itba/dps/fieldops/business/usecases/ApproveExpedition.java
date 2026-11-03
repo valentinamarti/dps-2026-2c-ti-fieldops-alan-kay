@@ -1,12 +1,14 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
 import ar.edu.itba.dps.fieldops.business.interfaces.validation.ValidationRule;
+import ar.edu.itba.dps.fieldops.business.models.commands.WarningAcceptance;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.exceptions.NotFoundException;
-import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.validation.AcceptedWarning;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
+import ar.edu.itba.dps.fieldops.business.ports.in.ApproveExpeditionPort;
 import ar.edu.itba.dps.fieldops.business.validations.ApprovalPolicy;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
@@ -14,7 +16,7 @@ import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
 import java.util.List;
 import java.util.Objects;
 
-public class ApproveExpedition {
+public class ApproveExpedition implements ApproveExpeditionPort {
     private final List<ValidationRule> additionalRules;
     private final ResourceReservations reservations;
     private final ExpeditionRepository repository;
@@ -28,6 +30,7 @@ public class ApproveExpedition {
         this.catalog = Objects.requireNonNull(catalog, "catalog is required");
     }
 
+    @Override
     public void approve(ExpeditionId id, List<WarningAcceptance> acceptances) {
         final var expedition = Lookups.expedition(repository, id);
         final var current = new ApprovalPolicy(additionalRules).validate(expedition).warnings();
@@ -42,14 +45,22 @@ public class ApproveExpedition {
         return new AcceptedWarning(warning, Lookups.staff(catalog, acceptance.responsibleId()), acceptance.justification());
     }
 
-    public void approve(Expedition expedition, List<AcceptedWarning> acceptances) {
+    void approve(Expedition expedition, List<AcceptedWarning> acceptances) {
         final var replaced = expedition.getReplacedExpedition().map(this::findReplaced);
         replaced.ifPresent(Expedition::requireReplaceable);
+        replaced.ifPresent(expedition::requireBuiltOnCurrentPlanOf);
         reservations.requireReservable(expedition);
         expedition.approve(additionalRules, acceptances);
         replaced.ifPresent(reservations::releaseFor);
         reservations.reserveFor(expedition);
         replaced.ifPresent(original -> original.markReplacedBy(expedition.getId()));
+        saveWithItsResources(expedition);
+        replaced.ifPresent(this::saveWithItsResources);
+    }
+
+    private void saveWithItsResources(Expedition expedition) {
+        repository.save(expedition);
+        expedition.assignedResources().forEach(catalog::save);
     }
 
     private Expedition findReplaced(ExpeditionId id) {

@@ -1,6 +1,7 @@
 package ar.edu.itba.dps.fieldops.business.rules;
 
 import ar.edu.itba.dps.fieldops.business.interfaces.activities.ActivityRules;
+import ar.edu.itba.dps.fieldops.business.models.activities.ActivityDefinition;
 import ar.edu.itba.dps.fieldops.business.models.activities.ReusableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
 import ar.edu.itba.dps.fieldops.business.models.resources.Certification;
@@ -21,6 +22,11 @@ public class NightOperationRules extends ActivityRulesDecorator {
 
     public NightOperationRules(ActivityRules base) {
         super(base);
+    }
+
+    @Override
+    public ActivityDefinition definition() {
+        return super.definition().asNightOperation();
     }
 
     @Override

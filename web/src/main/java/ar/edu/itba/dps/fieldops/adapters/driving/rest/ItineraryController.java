@@ -5,8 +5,8 @@ import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.ItineraryResponse;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.ScheduleBlockRequest;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.mappers.ItineraryMapper;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
-import ar.edu.itba.dps.fieldops.business.usecases.QueryExpeditions;
-import ar.edu.itba.dps.fieldops.business.usecases.ScheduleBlock;
+import ar.edu.itba.dps.fieldops.business.ports.in.QueryExpeditionsPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.ScheduleBlockPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,10 +24,10 @@ import java.util.Objects;
 @RequestMapping("/api/expeditions/{expeditionId}")
 @Tag(name = "Itinerary", description = "The activities scheduled in an expedition")
 public class ItineraryController {
-    private final ScheduleBlock scheduleBlock;
-    private final QueryExpeditions queryExpeditions;
+    private final ScheduleBlockPort scheduleBlock;
+    private final QueryExpeditionsPort queryExpeditions;
 
-    public ItineraryController(ScheduleBlock scheduleBlock, QueryExpeditions queryExpeditions) {
+    public ItineraryController(ScheduleBlockPort scheduleBlock, QueryExpeditionsPort queryExpeditions) {
         this.scheduleBlock = Objects.requireNonNull(scheduleBlock, "scheduleBlock is required");
         this.queryExpeditions = Objects.requireNonNull(queryExpeditions, "queryExpeditions is required");
     }
@@ -55,6 +55,6 @@ public class ItineraryController {
     }
 
     private ItineraryResponse itinerary(String expeditionId) {
-        return ItineraryMapper.toResponse(queryExpeditions.get(new ExpeditionId(expeditionId)));
+        return ItineraryMapper.toResponse(queryExpeditions.itinerary(new ExpeditionId(expeditionId)));
     }
 }

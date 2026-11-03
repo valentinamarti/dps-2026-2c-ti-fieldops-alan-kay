@@ -1,6 +1,7 @@
 package ar.edu.itba.dps.fieldops.business.fixtures;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.DuplicateZoneException;
+import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -8,10 +9,10 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -26,11 +27,14 @@ public abstract class ZoneRepositoryContract {
     }
 
     @Test
-    void findsTheVeryZoneThatWasAdded() {
-        final Zone reef = zone("z-1");
+    void findsTheZoneThatWasAddedWithItsData() {
+        final var reef = new Zone("z-1", "Coastal reef", Set.of(new Permit("Marine reserve")));
         repository.add(reef);
 
-        assertSame(reef, repository.findById("z-1").orElseThrow());
+        final var found = repository.findById("z-1").orElseThrow();
+        assertEquals(reef, found);
+        assertEquals("Coastal reef", found.getName());
+        assertEquals(Set.of(new Permit("Marine reserve")), found.getRequiredPermits());
     }
 
     @Test

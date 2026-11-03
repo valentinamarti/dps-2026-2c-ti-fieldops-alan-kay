@@ -1,14 +1,17 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
+import ar.edu.itba.dps.fieldops.business.models.commands.CreateExpeditionCommand;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionBuilder;
-import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.models.responses.ExpeditionView;
+import ar.edu.itba.dps.fieldops.business.ports.in.CreateExpeditionPort;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
 
 import java.util.Objects;
 
-public class CreateExpedition {
+public class CreateExpedition implements CreateExpeditionPort {
 
     private final ExpeditionRepository repository;
     private final ZoneRepository zones;
@@ -20,7 +23,8 @@ public class CreateExpedition {
         this.catalog = Objects.requireNonNull(catalog, "catalog is required");
     }
 
-    public Expedition create(CreateExpeditionCommand command) {
+    @Override
+    public ExpeditionView create(CreateExpeditionCommand command) {
         final var draft = new ExpeditionBuilder()
                 .withName(command.name())
                 .withPeriod(command.period())
@@ -29,10 +33,10 @@ public class CreateExpedition {
         command.zoneIds().forEach(id -> draft.addZone(Lookups.zone(zones, id)));
         command.responsibleIds().forEach(id -> draft.addResponsible(Lookups.staff(catalog, id)));
         command.grantedPermits().forEach(draft::addPermit);
-        return create(draft);
+        return ExpeditionView.of(create(draft));
     }
 
-    public Expedition create(ExpeditionBuilder draft) {
+    Expedition create(ExpeditionBuilder draft) {
         final var expedition = draft.build(repository);
         repository.add(expedition);
         return expedition;

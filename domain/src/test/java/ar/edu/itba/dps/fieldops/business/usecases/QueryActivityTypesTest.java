@@ -1,7 +1,7 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
-import ar.edu.itba.dps.fieldops.business.interfaces.activities.ActivityType;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityTypeName;
+import ar.edu.itba.dps.fieldops.business.models.responses.ActivityTypeView;
 import ar.edu.itba.dps.fieldops.business.rules.ActivityTypeRegistry;
 import ar.edu.itba.dps.fieldops.business.rules.DivingRules;
 import ar.edu.itba.dps.fieldops.business.rules.TransferRules;
@@ -19,9 +19,9 @@ class QueryActivityTypesTest {
         final var types = new QueryActivityTypes(new ActivityTypeRegistry(List.of(DivingRules.TYPE, TransferRules.TYPE))).list();
 
         assertEquals(List.of(new ActivityTypeName("diving"), new ActivityTypeName("transfer")),
-                types.stream().map(ActivityType::name).toList());
+                types.stream().map(ActivityTypeView::name).toList());
         assertEquals(List.of(List.of("maxDepthMeters"), List.of("distanceKilometers")),
-                types.stream().map(ActivityType::parameterNames).toList());
+                types.stream().map(ActivityTypeView::parameterNames).toList());
     }
 
     @Test

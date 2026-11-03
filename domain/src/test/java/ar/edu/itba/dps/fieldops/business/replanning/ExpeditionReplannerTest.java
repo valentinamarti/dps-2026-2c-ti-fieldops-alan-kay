@@ -5,6 +5,7 @@ import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
 import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.IncidentReport;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
@@ -19,10 +20,12 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.completeAssignments;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.oneHourSampling;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.sampling;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
@@ -79,10 +82,10 @@ class ExpeditionReplannerTest {
 
     @Test
     void cancellingAnActivityAlsoCancelsWhatDependsOnItDirectlyOrNot() {
-        final var dependency = sampling("a-1", coast, hours(8, 18));
-        final var dependent = sampling("a-2", coast, hours(8, 18), dependency);
-        final var indirect = sampling("a-3", coast, hours(8, 18), dependent);
-        final var unrelated = sampling("a-4", coast, hours(8, 18));
+        final var dependency = oneHourSampling("a-1", coast, hours(8, 18));
+        final var dependent = oneHourSampling("a-2", coast, hours(8, 18), dependency);
+        final var indirect = oneHourSampling("a-3", coast, hours(8, 18), dependent);
+        final var unrelated = oneHourSampling("a-4", coast, hours(8, 18));
         final var affectedItem = expedition.schedule(dependency, hours(9, 10));
         expedition.schedule(dependent, hours(10, 11));
         expedition.schedule(indirect, hours(11, 12));
@@ -292,13 +295,13 @@ class ExpeditionReplannerTest {
 
     @Test
     void theAlternativeKeepsTheBlocksOfTheOriginal() {
-        final var landing = sampling("a-1", coast, hours(0, 24));
-        final var dive = sampling("a-2", coast, hours(0, 24));
-        final var transect = sampling("a-3", coast, hours(0, 24));
+        final var landing = oneHourSampling("a-1", coast, hours(0, 24));
+        final var dive = oneHourSampling("a-2", coast, hours(0, 24));
+        final var transect = oneHourSampling("a-3", coast, hours(0, 24));
         expedition.schedule(sequential(
                 activity(landing, hours(8, 9)),
                 parallel(activity(dive, hours(9, 11)), activity(transect, hours(9, 11)))));
-        final var affectedItem = expedition.schedule(sampling("a-4", coast, hours(0, 24)), hours(12, 14));
+        final var affectedItem = expedition.schedule(oneHourSampling("a-4", coast, hours(0, 24)), hours(12, 14));
         final var worker = person("p-2");
         expedition.assignStaff(expedition.getItinerary().itemFor(dive).orElseThrow(), worker);
         approve();
@@ -312,7 +315,7 @@ class ExpeditionReplannerTest {
         assertEquals(3, itinerary.getItems().size());
         assertTrue(itinerary.runInParallel(keptDive, itinerary.itemFor(transect).orElseThrow()));
         assertFalse(itinerary.runInParallel(itinerary.itemFor(landing).orElseThrow(), keptDive));
-        assertEquals(Duration.ofHours(4), itinerary.getNodes().getFirst().estimatedDuration());
+        assertEquals(Duration.ofHours(2), itinerary.getNodes().getFirst().estimatedDuration());
         assertEquals(Set.of(worker), keptDive.getAssignedStaff());
     }
 
@@ -390,10 +393,10 @@ class ExpeditionReplannerTest {
 
     @Test
     void aDelayMovesTheRestOfItsSequentialBlockByTheSameAmount() {
-        final var affected = sampling("a-1", coast, hours(0, 24));
-        final var next = sampling("a-2", coast, hours(0, 24));
-        final var parallelBranch = sampling("a-3", coast, hours(0, 24));
-        final var last = sampling("a-4", coast, hours(0, 24));
+        final var affected = oneHourSampling("a-1", coast, hours(0, 24));
+        final var next = oneHourSampling("a-2", coast, hours(0, 24));
+        final var parallelBranch = oneHourSampling("a-3", coast, hours(0, 24));
+        final var last = oneHourSampling("a-4", coast, hours(0, 24));
         expedition.schedule(sequential(
                 activity(affected, hours(9, 11)),
                 parallel(activity(next, hours(11, 13)), activity(parallelBranch, hours(11, 12))),
@@ -412,9 +415,9 @@ class ExpeditionReplannerTest {
 
     @Test
     void aDelayInsideAnInnerBlockMovesWhatComesAfterItInTheOuterSequentialBlock() {
-        final var affected = sampling("a-1", coast, hours(0, 24));
-        final var sibling = sampling("a-2", coast, hours(0, 24));
-        final var after = sampling("a-3", coast, hours(0, 24));
+        final var affected = oneHourSampling("a-1", coast, hours(0, 24));
+        final var sibling = oneHourSampling("a-2", coast, hours(0, 24));
+        final var after = oneHourSampling("a-3", coast, hours(0, 24));
         expedition.schedule(sequential(
                 parallel(activity(affected, hours(9, 11)), activity(sibling, hours(9, 11))),
                 activity(after, hours(11, 12))));
@@ -430,10 +433,10 @@ class ExpeditionReplannerTest {
 
     @Test
     void aDelayMovesWhatDependsOnTheActivityAndWhatComesAfterThoseDependents() {
-        final var affected = sampling("a-1", coast, hours(0, 24));
-        final var dependent = sampling("a-2", coast, hours(0, 24), affected);
-        final var afterDependent = sampling("a-3", coast, hours(0, 24));
-        final var unrelated = sampling("a-4", coast, hours(0, 24));
+        final var affected = oneHourSampling("a-1", coast, hours(0, 24));
+        final var dependent = oneHourSampling("a-2", coast, hours(0, 24), affected);
+        final var afterDependent = oneHourSampling("a-3", coast, hours(0, 24));
+        final var unrelated = oneHourSampling("a-4", coast, hours(0, 24));
         final var affectedItem = expedition.schedule(affected, hours(9, 10));
         expedition.schedule(sequential(activity(dependent, hours(10, 11)), activity(afterDependent, hours(11, 12))));
         expedition.schedule(unrelated, hours(10, 11));
@@ -462,8 +465,8 @@ class ExpeditionReplannerTest {
 
     @Test
     void aDelayCannotMoveAFollowerThatAlreadyStarted() {
-        final var affected = sampling("a-1", coast, hours(0, 24));
-        final var follower = sampling("a-2", coast, hours(0, 24));
+        final var affected = oneHourSampling("a-1", coast, hours(0, 24));
+        final var follower = oneHourSampling("a-2", coast, hours(0, 24));
         expedition.schedule(sequential(activity(affected, hours(12, 13)), activity(follower, hours(13, 14))));
         approve();
         expedition.start();
@@ -535,5 +538,29 @@ class ExpeditionReplannerTest {
 
         assertEquals(2, alternative.getItinerary().getNodes().size());
         assertTrue(alternative.getItinerary().itemFor(dependent).isPresent());
+    }
+
+    @Test
+    void takesTheIdOfTheAlternativeFromItsProvider() {
+        final var affectedItem = expedition.schedule(sampling("a-1", coast, hours(8, 18)), hours(9, 11));
+        approve();
+        final var alternativeId = new ExpeditionId("alternative");
+
+        final var alternative = new ExpeditionReplanner(() -> alternativeId)
+                .planAlternative(expedition, affectedItem, new Cancellation());
+
+        assertEquals(alternativeId, alternative.getId());
+    }
+
+    @Test
+    void canPlanDoesNotSpendAnIdOfItsProvider() {
+        final var affectedItem = expedition.schedule(sampling("a-1", coast, hours(8, 18)), hours(9, 11));
+        approve();
+        final var spentIds = new AtomicInteger();
+        final var counting = new ExpeditionReplanner(() -> new ExpeditionId("e-" + spentIds.incrementAndGet()));
+
+        assertTrue(counting.canPlan(expedition, affectedItem, new Cancellation()));
+
+        assertEquals(0, spentIds.get());
     }
 }

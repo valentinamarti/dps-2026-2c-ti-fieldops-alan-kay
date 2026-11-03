@@ -3,7 +3,7 @@ package ar.edu.itba.dps.fieldops.adapters.driving.rest;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.EquipmentCatalogResponse;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.mappers.InstrumentMapper;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.mappers.VehicleMapper;
-import ar.edu.itba.dps.fieldops.business.usecases.QueryCatalog;
+import ar.edu.itba.dps.fieldops.business.ports.in.QueryCatalogPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -17,9 +17,9 @@ import java.util.Objects;
 @RequestMapping("/api/equipment")
 @Tag(name = "Equipment", description = "The vehicles and the instruments of the catalog, together")
 public class EquipmentController {
-    private final QueryCatalog queryCatalog;
+    private final QueryCatalogPort queryCatalog;
 
-    public EquipmentController(QueryCatalog queryCatalog) {
+    public EquipmentController(QueryCatalogPort queryCatalog) {
         this.queryCatalog = Objects.requireNonNull(queryCatalog, "queryCatalog is required");
     }
 

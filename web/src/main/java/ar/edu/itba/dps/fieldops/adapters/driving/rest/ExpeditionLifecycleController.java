@@ -5,10 +5,10 @@ import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.ExpeditionReportRespo
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.mappers.ApprovalMapper;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.mappers.ReportMapper;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
-import ar.edu.itba.dps.fieldops.business.usecases.ApproveExpedition;
-import ar.edu.itba.dps.fieldops.business.usecases.FinishExpedition;
-import ar.edu.itba.dps.fieldops.business.usecases.ReportExpedition;
-import ar.edu.itba.dps.fieldops.business.usecases.TransitionExpedition;
+import ar.edu.itba.dps.fieldops.business.ports.in.ApproveExpeditionPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.FinishExpeditionPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.ReportExpeditionPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.TransitionExpeditionPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,13 +27,13 @@ import java.util.Objects;
 @RequestMapping("/api/expeditions/{expeditionId}")
 @Tag(name = "Lifecycle", description = "Moving an expedition through its states, approving it, closing it and reporting on it")
 public class ExpeditionLifecycleController {
-    private final TransitionExpedition transitionExpedition;
-    private final ApproveExpedition approveExpedition;
-    private final FinishExpedition finishExpedition;
-    private final ReportExpedition reportExpedition;
+    private final TransitionExpeditionPort transitionExpedition;
+    private final ApproveExpeditionPort approveExpedition;
+    private final FinishExpeditionPort finishExpedition;
+    private final ReportExpeditionPort reportExpedition;
 
-    public ExpeditionLifecycleController(TransitionExpedition transitionExpedition, ApproveExpedition approveExpedition,
-                                         FinishExpedition finishExpedition, ReportExpedition reportExpedition) {
+    public ExpeditionLifecycleController(TransitionExpeditionPort transitionExpedition, ApproveExpeditionPort approveExpedition,
+                                         FinishExpeditionPort finishExpedition, ReportExpeditionPort reportExpedition) {
         this.transitionExpedition = Objects.requireNonNull(transitionExpedition, "transitionExpedition is required");
         this.approveExpedition = Objects.requireNonNull(approveExpedition, "approveExpedition is required");
         this.finishExpedition = Objects.requireNonNull(finishExpedition, "finishExpedition is required");
@@ -65,7 +65,8 @@ public class ExpeditionLifecycleController {
     @Operation(summary = "Approves an expedition in review, accepting the warnings a responsible takes on")
     @ApiResponse(responseCode = "204", description = "Approved")
     @ApiResponse(responseCode = "404", description = "The expedition, a responsible or an accepted warning does not exist")
-    @ApiResponse(responseCode = "409", description = "The expedition is not in review")
+    @ApiResponse(responseCode = "409", description = "The expedition is not in review, or it is an alternative "
+            + "built on a plan of the original that kept running since then")
     @ApiResponse(responseCode = "422",
             description = "A critical is still open, or a warning the expedition raises was not accepted")
     public void approve(@PathVariable String expeditionId, @RequestBody ApprovalRequest request) {

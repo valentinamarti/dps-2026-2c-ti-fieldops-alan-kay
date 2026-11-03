@@ -3,7 +3,7 @@ package ar.edu.itba.dps.fieldops.adapters.driving.rest;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.ScheduleActivityRequest;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.ScheduledActivityResponse;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.mappers.ActivityMapper;
-import ar.edu.itba.dps.fieldops.business.usecases.ScheduleActivity;
+import ar.edu.itba.dps.fieldops.business.ports.in.ScheduleActivityPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -20,9 +20,9 @@ import java.util.Objects;
 @RequestMapping("/api/expeditions/{expeditionId}/activities")
 @Tag(name = "Itinerary", description = "The activities scheduled in an expedition")
 public class ActivityController {
-    private final ScheduleActivity scheduleActivity;
+    private final ScheduleActivityPort scheduleActivity;
 
-    public ActivityController(ScheduleActivity scheduleActivity) {
+    public ActivityController(ScheduleActivityPort scheduleActivity) {
         this.scheduleActivity = Objects.requireNonNull(scheduleActivity, "scheduleActivity is required");
     }
 

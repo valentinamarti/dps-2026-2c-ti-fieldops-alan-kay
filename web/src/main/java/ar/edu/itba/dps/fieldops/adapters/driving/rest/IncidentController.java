@@ -3,7 +3,7 @@ package ar.edu.itba.dps.fieldops.adapters.driving.rest;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.RegisterIncidentRequest;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.ReplanProposalResponse;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.mappers.ReplanningMapper;
-import ar.edu.itba.dps.fieldops.business.usecases.RegisterIncident;
+import ar.edu.itba.dps.fieldops.business.ports.in.RegisterIncidentPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -20,9 +20,9 @@ import java.util.Objects;
 @RequestMapping("/api/expeditions/{expeditionId}/incidents")
 @Tag(name = "Incidents", description = "Registering what went wrong with a scheduled activity, which proposes a replanning")
 public class IncidentController {
-    private final RegisterIncident registerIncident;
+    private final RegisterIncidentPort registerIncident;
 
-    public IncidentController(RegisterIncident registerIncident) {
+    public IncidentController(RegisterIncidentPort registerIncident) {
         this.registerIncident = Objects.requireNonNull(registerIncident, "registerIncident is required");
     }
 
@@ -37,7 +37,7 @@ public class IncidentController {
     public ResponseEntity<ReplanProposalResponse> register(@PathVariable String expeditionId,
                                                            @RequestBody RegisterIncidentRequest request) {
         final var proposal = registerIncident.register(ReplanningMapper.toCommand(expeditionId, request));
-        return ResponseEntity.created(Locations.replanProposal(proposal.getId().value()))
+        return ResponseEntity.created(Locations.replanProposal(proposal.id().value()))
                 .body(ReplanningMapper.toResponse(proposal));
     }
 }

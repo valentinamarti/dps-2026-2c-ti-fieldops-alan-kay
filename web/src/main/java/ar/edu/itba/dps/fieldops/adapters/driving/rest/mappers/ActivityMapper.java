@@ -5,17 +5,17 @@ import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.ScheduleActivityReque
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.ScheduledActivityResponse;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.StaffRequirementDto;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.SupplyRequirementDto;
-import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.activities.DepletableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.ReusableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.StaffRequirement;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
-import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.resources.Certification;
+import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
+import ar.edu.itba.dps.fieldops.business.models.responses.ScheduledActivityView;
 import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
-import ar.edu.itba.dps.fieldops.business.usecases.PlannedActivityCommand;
-import ar.edu.itba.dps.fieldops.business.usecases.ScheduleActivityCommand;
+import ar.edu.itba.dps.fieldops.business.models.commands.PlannedActivityCommand;
+import ar.edu.itba.dps.fieldops.business.models.commands.ScheduleActivityCommand;
 
 import java.util.List;
 import java.util.Map;
@@ -42,26 +42,23 @@ public final class ActivityMapper {
                 request.atNight());
     }
 
-    public static ScheduledActivityResponse toResponse(ItineraryItem item) {
-        final var activity = item.getActivity();
+    public static ScheduledActivityResponse toResponse(ScheduledActivityView activity) {
         return new ScheduledActivityResponse(
-                activity.getId().value(),
-                activity.getName(),
-                activity.getZone().getId(),
-                Mappings.toDto(activity.getTimeWindow()),
-                Mappings.toDto(item.getScheduledPeriod()),
-
-                activity.getDependencies().stream().map(dependency -> dependency.getId().value()).toList(),
+                activity.id().value(),
+                activity.name(),
+                activity.zoneId(),
+                Mappings.toDto(activity.timeWindow()),
+                Mappings.toDto(activity.scheduledPeriod()),
+                activity.dependencyIds().stream().map(ActivityId::value).toList(),
                 activity.estimatedDuration().toMinutes(),
                 activity.estimatedRisk(),
                 activity.requiredStaff().stream().map(ActivityMapper::toDto).toList(),
-
-                item.getAssignedStaff().stream().map(person -> person.getId().value()).toList(),
+                activity.assignedStaffIds().stream().map(ResourceId::value).toList(),
                 activity.requiredEquipment().stream().map(ActivityMapper::toDto).toList(),
-                item.getAssignedEquipment().stream().map(equipment -> equipment.getId().value()).toList(),
+                activity.assignedEquipmentIds().stream().map(ResourceId::value).toList(),
                 activity.requiredSupplies().stream().map(ActivityMapper::toDto).toList(),
-                item.getAssignedSupplies().stream().map(supply -> supply.getId().value()).toList(),
-                Mappings.sorted(activity.requiredCertificationsForAllStaff().stream().map(Certification::name)),
+                activity.assignedSupplyIds().stream().map(ResourceId::value).toList(),
+                Mappings.sorted(activity.requiredCertifications().stream().map(Certification::name)),
                 Mappings.sorted(activity.requiredPermits().stream().map(Permit::name)));
     }
 

@@ -22,13 +22,14 @@ import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.resources.Unavailability;
-import ar.edu.itba.dps.fieldops.business.usecases.AssignResources;
-import ar.edu.itba.dps.fieldops.business.usecases.CreateExpedition;
-import ar.edu.itba.dps.fieldops.business.usecases.MarkResourceUnavailable;
-import ar.edu.itba.dps.fieldops.business.usecases.RegisterResources;
-import ar.edu.itba.dps.fieldops.business.usecases.RegisterZone;
-import ar.edu.itba.dps.fieldops.business.usecases.ScheduleActivity;
-import ar.edu.itba.dps.fieldops.business.usecases.ScheduleBlock;
+import ar.edu.itba.dps.fieldops.business.ports.in.AssignResourcesPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.CreateExpeditionPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.MarkResourceUnavailablePort;
+import ar.edu.itba.dps.fieldops.business.ports.in.QueryZonesPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.RegisterResourcesPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.RegisterZonePort;
+import ar.edu.itba.dps.fieldops.business.ports.in.ScheduleActivityPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.ScheduleBlockPort;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
@@ -39,19 +40,21 @@ import java.util.Objects;
 import java.util.function.BiConsumer;
 
 public class DemoDataLoader {
-    private final RegisterZone registerZone;
-    private final RegisterResources registerResources;
-    private final MarkResourceUnavailable markResourceUnavailable;
-    private final CreateExpedition createExpedition;
-    private final ScheduleActivity scheduleActivity;
-    private final ScheduleBlock scheduleBlock;
-    private final AssignResources assignResources;
+    private final QueryZonesPort queryZones;
+    private final RegisterZonePort registerZone;
+    private final RegisterResourcesPort registerResources;
+    private final MarkResourceUnavailablePort markResourceUnavailable;
+    private final CreateExpeditionPort createExpedition;
+    private final ScheduleActivityPort scheduleActivity;
+    private final ScheduleBlockPort scheduleBlock;
+    private final AssignResourcesPort assignResources;
     private final ObjectMapper json;
 
-    public DemoDataLoader(RegisterZone registerZone, RegisterResources registerResources,
-                          MarkResourceUnavailable markResourceUnavailable, CreateExpedition createExpedition,
-                          ScheduleActivity scheduleActivity, ScheduleBlock scheduleBlock,
-                          AssignResources assignResources, ObjectMapper json) {
+    public DemoDataLoader(QueryZonesPort queryZones, RegisterZonePort registerZone, RegisterResourcesPort registerResources,
+                          MarkResourceUnavailablePort markResourceUnavailable, CreateExpeditionPort createExpedition,
+                          ScheduleActivityPort scheduleActivity, ScheduleBlockPort scheduleBlock,
+                          AssignResourcesPort assignResources, ObjectMapper json) {
+        this.queryZones = Objects.requireNonNull(queryZones, "queryZones is required");
         this.registerZone = Objects.requireNonNull(registerZone, "registerZone is required");
         this.registerResources = Objects.requireNonNull(registerResources, "registerResources is required");
         this.markResourceUnavailable =
@@ -61,6 +64,10 @@ public class DemoDataLoader {
         this.scheduleBlock = Objects.requireNonNull(scheduleBlock, "scheduleBlock is required");
         this.assignResources = Objects.requireNonNull(assignResources, "assignResources is required");
         this.json = Objects.requireNonNull(json, "json is required");
+    }
+
+    public List<ExpeditionId> loadIfEmpty(InputStream catalog, InputStream expeditions) {
+        return queryZones.list().isEmpty() ? load(catalog, expeditions) : List.of();
     }
 
     public List<ExpeditionId> load(InputStream catalog, InputStream expeditions) {
@@ -81,7 +88,7 @@ public class DemoDataLoader {
     }
 
     private ExpeditionId load(PlannedExpedition planned) {
-        final var id = createExpedition.create(ExpeditionMapper.toCommand(planned.expedition())).getId();
+        final var id = createExpedition.create(ExpeditionMapper.toCommand(planned.expedition())).id();
         planned.itinerary().forEach(node -> schedule(id, node));
         planned.assignments().forEach(assignment -> assign(id, assignment));
         return id;

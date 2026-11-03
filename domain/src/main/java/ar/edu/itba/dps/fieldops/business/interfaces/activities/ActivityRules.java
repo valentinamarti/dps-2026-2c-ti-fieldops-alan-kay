@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 
+import ar.edu.itba.dps.fieldops.business.models.activities.ActivityDefinition;
 import ar.edu.itba.dps.fieldops.business.models.activities.DepletableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.ReusableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
@@ -13,6 +14,8 @@ import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 
 public interface ActivityRules {
+
+    ActivityDefinition definition();
 
     Duration estimatedDuration();
 

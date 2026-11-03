@@ -8,11 +8,14 @@ import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidTrackingException;
 import ar.edu.itba.dps.fieldops.business.exceptions.NotAResponsibleException;
+import ar.edu.itba.dps.fieldops.business.exceptions.StaleAlternativeException;
 import ar.edu.itba.dps.fieldops.business.exceptions.UnacceptedWarningException;
 import ar.edu.itba.dps.fieldops.business.interfaces.itinerary.ItineraryNode;
+import ar.edu.itba.dps.fieldops.business.interfaces.itinerary.ItineraryNodeVisitor;
 import ar.edu.itba.dps.fieldops.business.interfaces.replanning.ReplanReason;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.DepletableResource;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.Equipment;
+import ar.edu.itba.dps.fieldops.business.interfaces.resources.Resource;
 import ar.edu.itba.dps.fieldops.business.interfaces.validation.ValidationRule;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
@@ -37,6 +40,23 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class Expedition {
+    private static final ItineraryNodeVisitor<NodeSnapshot> AS_SNAPSHOT = new ItineraryNodeVisitor<>() {
+        @Override
+        public NodeSnapshot activity(ItineraryItem item) {
+            return item.snapshot();
+        }
+
+        @Override
+        public NodeSnapshot sequence(ItineraryNode block, List<NodeSnapshot> parts) {
+            return new BlockSnapshot(BlockKind.SEQUENTIAL, parts);
+        }
+
+        @Override
+        public NodeSnapshot parallel(ItineraryNode block, List<NodeSnapshot> branches) {
+            return new BlockSnapshot(BlockKind.PARALLEL, branches);
+        }
+    };
+
     @Getter
     private final ExpeditionId id;
     @Getter
@@ -60,13 +80,14 @@ public class Expedition {
     @Getter
     private List<AcceptedWarning> acceptedWarnings = List.of();
     private final List<Incident> incidents = new ArrayList<>();
-    private final ExpeditionId replacedExpedition;
+    private final ReplacedPlan replacedPlan;
     private final ReplanReason replanReason;
     private ExpeditionId replacement;
+    private int executionRevision;
 
     Expedition(ExpeditionId id, String name, TimePeriod period, List<String> objectives, Set<Zone> zones,
                Set<Person> responsibles, ExpeditionRestrictions restrictions, Set<Permit> grantedPermits,
-               ExpeditionId replacedExpedition, ReplanReason replanReason, List<Incident> inheritedIncidents) {
+               ReplacedPlan replacedPlan, ReplanReason replanReason, List<Incident> inheritedIncidents) {
         this.id = Objects.requireNonNull(id, "id is required");
         this.name = DomainArguments.requireText(name, "name");
         this.period = Objects.requireNonNull(period, "period is required");
@@ -76,9 +97,34 @@ public class Expedition {
         this.responsibles = DomainArguments.requireNonEmptySet(responsibles, "responsibles");
         this.restrictions = Objects.requireNonNull(restrictions, "restrictions are required");
         this.grantedPermits = DomainArguments.requireSet(grantedPermits, "grantedPermits");
-        this.replacedExpedition = replacedExpedition;
+        this.replacedPlan = replacedPlan;
         this.replanReason = replanReason;
         this.incidents.addAll(DomainArguments.requireList(inheritedIncidents, "inheritedIncidents"));
+    }
+
+    public static Expedition restore(ExpeditionSnapshot snapshot) {
+        final var expedition = new Expedition(snapshot.id(), snapshot.name(), snapshot.period(), snapshot.objectives(),
+                snapshot.zones(), snapshot.responsibles(), snapshot.restrictions(), snapshot.grantedPermits(),
+                snapshot.replacedPlan().orElse(null), snapshot.replanReason().orElse(null), snapshot.incidents());
+        expedition.status = snapshot.status();
+        expedition.acceptedWarnings = snapshot.acceptedWarnings();
+        expedition.replacement = snapshot.replacement().orElse(null);
+        expedition.executionRevision = snapshot.executionRevision();
+        snapshot.roots().forEach(root -> expedition.itinerary.restore(nodeOf(root)));
+        return expedition;
+    }
+
+    private static ItineraryNode nodeOf(NodeSnapshot snapshot) {
+        return switch (snapshot) {
+            case ItemSnapshot item -> ItineraryItem.restored(item);
+            case BlockSnapshot block -> block.kind().assemble(block.children().stream().map(Expedition::nodeOf).toList());
+        };
+    }
+
+    public ExpeditionSnapshot snapshot() {
+        return new ExpeditionSnapshot(id, name, period, objectives, zones, responsibles, restrictions, grantedPermits,
+                status, acceptedWarnings, incidents, Optional.ofNullable(replacedPlan), getReplanReason(), getReplacement(),
+                executionRevision, itinerary.roots().stream().map(root -> root.accept(AS_SNAPSHOT)).toList());
     }
 
     public ItineraryItem schedule(Activity activity, TimePeriod scheduledPeriod) {
@@ -108,6 +154,12 @@ public class Expedition {
     public Set<Person> participants() {
         return itinerary.getItems().stream()
                 .flatMap(item -> item.getAssignedStaff().stream())
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
+    public Set<Resource> assignedResources() {
+        return itinerary.getItems().stream()
+                .<Resource>flatMap(item -> Stream.concat(item.getAssignedReusableResources().stream(), item.getAssignedSupplies().stream()))
                 .collect(Collectors.toUnmodifiableSet());
     }
 
@@ -147,7 +199,7 @@ public class Expedition {
     }
 
     public Optional<ExpeditionId> getReplacedExpedition() {
-        return Optional.ofNullable(replacedExpedition);
+        return Optional.ofNullable(replacedPlan).map(ReplacedPlan::expedition);
     }
 
     public Set<ExpeditionId> reservationsItTakesOver() {
@@ -185,6 +237,20 @@ public class Expedition {
         requireCanTransitionTo(ExpeditionStatus.REPLACED);
     }
 
+    public boolean isBuiltOnCurrentPlanOf(Expedition original) {
+        return replacedPlan != null && replacedPlan.isCurrentFor(original.id, original.executionRevision);
+    }
+
+    public void requireBuiltOnCurrentPlanOf(Expedition original) {
+        if (!isBuiltOnCurrentPlanOf(original)) {
+            throw new StaleAlternativeException(id, original.id);
+        }
+    }
+
+    ReplacedPlan currentPlan() {
+        return new ReplacedPlan(id, executionRevision);
+    }
+
     public void requireResponsible(Person person) {
         if (!responsibles.contains(person)) {
             throw new NotAResponsibleException(person.getId(), id);
@@ -193,6 +259,7 @@ public class Expedition {
 
     public void startActivity(ItineraryItem item, LocalDateTime at) {
         inExecution(item).start(at);
+        executionRevision++;
     }
 
     public void finishActivity(ItineraryItem item, LocalDateTime at, String result) {
@@ -200,10 +267,12 @@ public class Expedition {
         tracking.requireCanFinish(at, result);
         consumeAssignedSupplies(item);
         tracking.finish(at, result);
+        executionRevision++;
     }
 
     public void recordObservation(ItineraryItem item, Observation observation) {
         inExecution(item).startedTracking().record(observation);
+        executionRevision++;
     }
 
     public Incident registerIncident(ItineraryItem item, IncidentReport report) {
@@ -215,6 +284,7 @@ public class Expedition {
         report.resource().ifPresent(resource -> requireAssigned(affected, resource));
         final var incident = Incident.registered(new IncidentId(id, incidents.size() + 1), affected.getActivity().getId(), report);
         incidents.add(incident);
+        executionRevision++;
         return incident;
     }
 
@@ -317,5 +387,15 @@ public class Expedition {
         if (!period.contains(scheduledPeriod)) {
             throw new InvalidScheduleException("%s is scheduled outside the expedition period".formatted(activity.getName()));
         }
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        return other instanceof Expedition that && id.equals(that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return id.hashCode();
     }
 }

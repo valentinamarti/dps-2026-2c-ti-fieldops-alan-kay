@@ -1,6 +1,7 @@
 package ar.edu.itba.dps.fieldops.business.rules;
 
 import ar.edu.itba.dps.fieldops.business.interfaces.activities.ActivityRules;
+import ar.edu.itba.dps.fieldops.business.models.activities.ActivityDefinition;
 import ar.edu.itba.dps.fieldops.business.models.activities.DepletableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.ReusableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
@@ -20,6 +21,11 @@ public abstract class ActivityRulesDecorator implements ActivityRules {
 
     protected ActivityRulesDecorator(ActivityRules base) {
         this.base = Objects.requireNonNull(base, "base rules are required");
+    }
+
+    @Override
+    public ActivityDefinition definition() {
+        return base.definition();
     }
 
     @Override

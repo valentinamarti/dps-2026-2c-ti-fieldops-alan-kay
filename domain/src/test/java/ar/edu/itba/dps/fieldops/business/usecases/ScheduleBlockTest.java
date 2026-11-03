@@ -4,14 +4,18 @@ import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
 import ar.edu.itba.dps.fieldops.business.exceptions.NotFoundException;
 import ar.edu.itba.dps.fieldops.business.exceptions.UnknownActivityTypeException;
 import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
-import ar.edu.itba.dps.fieldops.business.interfaces.itinerary.ItineraryNode;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.activities.ReusableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
+import ar.edu.itba.dps.fieldops.business.models.commands.PlannedActivityCommand;
+import ar.edu.itba.dps.fieldops.business.models.commands.PlannedNodeCommand;
+import ar.edu.itba.dps.fieldops.business.models.commands.ScheduleActivityCommand;
+import ar.edu.itba.dps.fieldops.business.models.commands.ScheduleBlockCommand;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
+import ar.edu.itba.dps.fieldops.business.models.responses.ItineraryNodeView;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
@@ -71,9 +75,9 @@ class ScheduleBlockTest {
                         droneSurvey("a-3", 10, 12))));
 
         final var itinerary = expedition.getItinerary();
-        assertEquals(List.of(block), itinerary.getNodes());
+        assertEquals(List.of(block), itinerary.getNodes().stream().map(ItineraryNodeView::of).toList());
         assertEquals(List.of(item("a-1"), item("a-2"), item("a-3")), itinerary.getItems());
-        assertEquals(hours(8, 12), block.getScheduledPeriod());
+        assertEquals(hours(8, 12), block.scheduledPeriod());
         assertEquals(SAMPLING.plus(DRONE_SURVEY), block.estimatedDuration());
         assertNotEquals(SAMPLING.plus(TRANSFER).plus(DRONE_SURVEY), block.estimatedDuration());
         assertTrue(itinerary.runInParallel(item("a-2"), item("a-3")));
@@ -214,7 +218,7 @@ class ScheduleBlockTest {
         assertTrue(expedition.getItinerary().getNodes().isEmpty());
     }
 
-    private ItineraryNode schedule(PlannedNodeCommand block) {
+    private ItineraryNodeView schedule(PlannedNodeCommand block) {
         return scheduleBlock.schedule(new ScheduleBlockCommand(expedition.getId(), block));
     }
 

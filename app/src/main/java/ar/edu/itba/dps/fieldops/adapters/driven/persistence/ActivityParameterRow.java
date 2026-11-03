@@ -1,0 +1,20 @@
+package ar.edu.itba.dps.fieldops.adapters.driven.persistence;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+@Embeddable
+@Getter
+@NoArgsConstructor
+@AllArgsConstructor
+public class ActivityParameterRow {
+    @Column(name = "activity_id")
+    private String activityId;
+    @Column(name = "name")
+    private String name;
+    @Column(name = "value")
+    private int value;
+}

@@ -62,7 +62,7 @@ class ExpeditionEstimatorTest {
     @Test
     void theRiskOfTheExpeditionIsTheRiskOfItsRiskiestActivity() {
         expedition.schedule(sampling("a-1", coast, hours(0, 24)), hours(8, 11));
-        expedition.schedule(diving("a-2", coast, hours(0, 24), 40), hours(12, 14));
+        expedition.schedule(diving("a-2", coast, hours(0, 24), 40), hours(12, 15));
 
         assertEquals(RiskLevel.HIGH, estimator.estimate(expedition).overallRisk());
     }

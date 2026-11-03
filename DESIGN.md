@@ -12,6 +12,8 @@ Antes de poder aprobarse, una expedición se corre contra un conjunto de reglas 
 
 Durante la ejecución se registra el comienzo, la finalización, las observaciones y los **incidentes** de cada actividad. Un incidente publica un evento de dominio y, del otro lado, una **propuesta de replanificación** (`ReplanProposal`) ofrece las opciones que se pueden armar —reprogramar, reemplazar un recurso, cancelar—, cada una con el motivo (`ReplanReason`) con el que el replanificador construiría la alternativa. Un responsable acepta una opción o la rechaza, y la propuesta queda como el registro de la auditoría: el incidente que la motivó, las opciones que se ofrecieron y la decisión que se tomó. Aceptar no modifica el plan original: construye **otra expedición** en borrador que lo reemplaza, y la original sigue siendo consultable tal como estaba (D45, D46, D47, D48).
 
+La persistencia no aparece en el modelo: los casos de uso hablan con puertos de salida (`business.providers`), y el adaptador JPA guarda el estado en PostgreSQL con sus propias entidades (D65 a D68). Cada caso de uso es una transacción, y dos escrituras en conflicto terminan en un 409.
+
 ## Patrones y principios aplicados
 
 ### D1 — Tipos de actividad: composición en vez de herencia (Strategy)
@@ -47,8 +49,8 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
 - **Dónde:** `ExpeditionBuilder` + `Expedition` (en `business.models.expeditions`).
 - **Por qué:**
   - `Expedition` tiene muchos datos y colecciones (objetivos, zonas, responsables, permisos otorgados, restricciones, actividades), lo que hace ilegible un constructor tradicional. El constructor de `Expedition` es package-private: desde afuera del paquete, la única forma de crear una expedición es el builder.
-  - El builder no elige la identidad de la expedición: `build(ExpeditionRepository)` le pide el id al repositorio con `nextId()`, así que quien arma la expedición no lo inventa (D26).
-  - El builder no repite validaciones. `build(ExpeditionRepository)` llama al constructor, que aplica los guards de D16 (textos obligatorios, colecciones obligatorias y no vacías), y agenda las actividades con el mismo `Expedition.schedule` que se usa después de crear la expedición. Así las reglas para agendar (D21) viven en un solo lugar, se agende desde el builder o después.
+  - El builder no elige la identidad de la expedición: `build(ExpeditionIdProvider)` le pide el id a su proveedor con `nextId()`, así que quien arma la expedición no lo inventa (D26).
+  - El builder no repite validaciones. `build(ExpeditionIdProvider)` llama al constructor, que aplica los guards de D16 (textos obligatorios, colecciones obligatorias y no vacías), y agenda las actividades con el mismo `Expedition.schedule` que se usa después de crear la expedición. Así las reglas para agendar (D21) viven en un solo lugar, se agende desde el builder o después.
   - La validación de negocio pesada corre aparte, en `Expedition.approve` con la `ApprovalPolicy` (D22, D31), antes de permitir el paso a "Approved" — así el builder no termina siendo responsable de todo.
 - **Alternativas descartadas:**
   - Builder + Director — más estructura de la que hace falta para este caso.
@@ -63,6 +65,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
 - **Dónde:** `ExpeditionEstimator` (en `business.estimations`) y su resultado `ExpeditionEstimate` (en `business.models.estimation`); el informe (`ExpeditionReporter` + `ExpeditionReport`) reutiliza este servicio.
 - **Por qué:** la estimación no calcula nada propio: recorre el itinerario y le pregunta a cada actividad, que a su vez delega en su `ActivityRules` (D1), así que agregar un tipo de actividad no toca al estimador. Las tres agregaciones tienen reglas distintas: la duración se suma, el riesgo global es el más alto de sus actividades (`RiskLevel.isAbove`) y el consumo se acumula por categoría sumando `Quantity`, que es la aritmética que ya existe (D8). Estimar no cambia nada ni exige un estado, así que se puede estimar un borrador, que es cuando más sirve para decidir. El equipamiento no se agrega: sumar "1 bote" de tres actividades daría 3 botes cuando puede ser el mismo reutilizado, y lo que hace falta por actividad ya lo verifica `MissingResourcesValidation` (D2).
 - **Alternativas descartadas:** calcular el resumen de riesgos del informe con lógica propia, independiente de `ExpeditionEstimator` — duplicaría reglas de cálculo. Builder para `ExpeditionEstimate` — no tiene invariantes que proteger, es una proyección de datos. Que la duración total sea el lapso entre el primer inicio y el último fin del itinerario — eso mide cuánto dura el plan en el calendario y no cuánto trabajo hay, porque los huecos entre actividades no son esfuerzo estimado.
+- **Revisado en D62:** la estimación mide cuánto tarda en ejecutarse, sin contar huecos, y no cuánto trabajo hay: esa formulación explicaba la suma pero no el máximo de un paralelo.
 - **Revisado en D39:** la duración ya no es una suma plana de todas las actividades. El estimador agrega sobre los nodos raíz del itinerario, y cada bloque combina a sus hijos: suma en secuencial y máximo en paralelo. Un itinerario sin bloques da el mismo resultado que antes. El riesgo y el consumo se siguen combinando igual (el más alto y la suma).
 
 
@@ -196,6 +199,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
 - **Caso aparte — `Depletable.getStock()`:** este sí se expone. `stock` es un campo mutable (se reasigna al consumir) pero el `Quantity` que devuelve es inmutable (D8), así que entrega una foto del estado actual y no una referencia con la que romper invariantes. El informe de expedición (D4) necesita leer el consumo real, y no hay forma de obtenerlo preguntando `hasStockFor`.
 - **Nota de build:** desde JDK 23 `javac` no corre los annotation processors que encuentra en el classpath. Lombok tiene que declararse explícitamente en el `<annotationProcessorPaths>` del `maven-compiler-plugin`; si falta, `@Getter` no genera nada y el proyecto no compila. El plugin ya activa el procesamiento por su cuenta al ver esa lista, así que no hace falta agregar `<proc>full</proc>`.
 - **Alternativas descartadas:** `equals`/`hashCode` por `id` en las entidades — dos instancias con el mismo `id` pero distinto estado (distintas reservas, distinto stock) se tratarían como la misma. Hacer `record` todas las clases — los recursos son mutables por definición (se reservan, se consumen) y `Activity` referencia otras `Activity`, donde la identidad es justamente lo que importa. El caso menos obvio es `Zone`, que es inmutable y técnicamente podría ser un `record`: se deja como entidad porque pertenece a un catálogo y las expediciones la referencian por identidad — dos zonas con el mismo nombre son dos zonas distintas, no la misma.
+- **Revisado en D65:** las entidades ahora se comparan por id. Con persistencia real, dos cargas de la misma entidad dan dos instancias, y la identidad de instancia dejó de coincidir con la identidad de negocio. `ItineraryItem` sigue por instancia.
 - **Revisado en D46 y D48:** suma la entidad `ReplanProposal` y los `record` `Incident`, `IncidentId`, `IncidentReport`, `IncidentRegistered`, `ReplanProposalId`, `ReplanOption`, `ReplanDecision` y `ResourceReplaced`. `ResourceAssignment` es un value object que no es `record` porque guarda la forma de asignar su recurso; compara por el recurso.
 
 
@@ -234,7 +238,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
 - **Dónde:** `ResourceCatalog` (`addStaff`, `addEquipment`, `addSupply`, `availableStaffFor`, `availableEquipmentFor`, `suppliesCovering`) y `DuplicateResourceException`.
 - **Por qué:**
   - El enunciado nombra los "recursos duplicados" como uno de los problemas a resolver. El catálogo rechaza un segundo recurso con un `ResourceId` ya registrado (D32), con un único espacio de ids para todos los tipos: una asignación o un informe que nombra un `id` nunca es ambiguo.
-  - Es lo que hace seguro comparar entidades por instancia (D15): con una sola instancia por `id`, la identidad de instancia coincide con la identidad de negocio y no puede haber dos calendarios para el mismo recurso real.
+  - **Revisado en D65:** las entidades se comparan por id, y el catálogo sigue garantizando un único recurso por id. Era lo que hacía seguro comparar entidades por instancia (D15): con una sola instancia por `id`, la identidad de instancia coincide con la identidad de negocio y no puede haber dos calendarios para el mismo recurso real.
   - Las consultas devuelven **candidatos**, no asignaciones: el catálogo responde "quién puede" (cumple el requisito y está libre, o tiene stock); "quién va" es trabajo de la asignación. Si cambia el criterio para elegir entre candidatos, el catálogo no cambia.
   - Mismo criterio que D14: registrar es un comando y falla con excepción; consultar devuelve una lista, posiblemente vacía.
 - **Alternativas descartadas:**
@@ -242,6 +246,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - Un catálogo por tipo de recurso: repetiría la regla de unicidad y permitiría repetir un `id` entre tipos.
   - Exponer las listas con getters y filtrar afuera: cada cliente reimplementaría "cumple el requisito y está libre".
 - **Consecuencia:** es una clase concreta en memoria. Si más adelante hay persistencia, el contrato se extrae a `business/providers` con estas mismas consultas y esta clase pasa a ser un detalle, como ya se hizo con las expediciones (D26).
+- **Resuelto en D66 y D67:** el contrato pasó a `business.providers` y `JpaResourceCatalog` lo implementa.
 
 
 ### D19 — La expedición es la única puerta para modificar su itinerario
@@ -282,7 +287,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
 - **Patrón / principio:** fail fast para planes mal formados + separación entre "está bien formado" y "es válido para operar" (mismo criterio que D3).
 - **Dónde:** `Expedition.schedule`, `Itinerary.add` e `ItineraryItem` lanzan `InvalidScheduleException`; `TimePeriod.contains`.
 - **Por qué:**
-  - Al agendar se rechaza lo que no tiene sentido como plan, sin importar qué recursos haya: una actividad en una zona que no es de la expedición, un horario fuera del período de la expedición o fuera de la ventana de la actividad, la misma actividad dos veces, o una actividad cuya dependencia no está agendada o todavía no terminó. Tampoco se reasigna un ítem que ya ocurrió (D33). Son errores de quien arma el itinerario y conviene enterarse en el momento.
+  - Al agendar se rechaza lo que no tiene sentido como plan, sin importar qué recursos haya: una actividad en una zona que no es de la expedición, un horario fuera del período de la expedición o fuera de la ventana de la actividad, un horario más corto que la duración estimada de la actividad (D62), la misma actividad dos veces, o una actividad cuya dependencia no está agendada o todavía no terminó. Tampoco se reasigna un ítem que ya ocurrió (D33). Son errores de quien arma el itinerario y conviene enterarse en el momento.
   - En cambio, la superposición de recursos, la falta de recursos, las certificaciones, los permisos y la capacidad dependen de asignaciones y del catálogo, que cambian mientras se planifica. Esos problemas se juntan todos con la validación (D2) en vez de frenar en el primero, porque un borrador puede estar incompleto a propósito.
   - Exigir que las dependencias ya estén agendadas obliga a armar el itinerario en orden, y a cambio garantiza que ninguna actividad queda antes de algo que necesita.
   - La contención de períodos vive en `TimePeriod.contains`, junto a `overlapsWith` y con el mismo intervalo semiabierto de D8: una actividad puede empezar justo cuando termina su dependencia.
@@ -329,7 +334,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
 ### D25 — Replanificación: reutilizar el builder para construir una alternativa en borrador
 
 - **Patrón / principio:** reutilización de Builder (D3) y de las puertas ya existentes (D19, D21) en vez de una regla nueva.
-- **Dónde:** `ExpeditionReplanner` (en `business.replanning`), único método `planAlternative(Expedition original, ItineraryItem affectedItem, ReplanReason reason)`. Recibe el `ExpeditionRepository` por constructor y arma la alternativa con `build(repository)`, así que el id lo da el sistema y no quien llama (D26). Lo invoca el caso de uso `ReplanExpedition`, que solo guarda la alternativa (D28). Solo replanifica una original que puede pasar a reemplazada (D33).
+- **Dónde:** `ExpeditionReplanner` (en `business.replanning`), único método `planAlternative(Expedition original, ItineraryItem affectedItem, ReplanReason reason)`. Recibe el proveedor de ids por constructor y arma la alternativa con `build(ExpeditionIdProvider)` (D60), así que el id lo da el sistema y no quien llama (D26). Lo invoca el caso de uso `ReplanExpedition`, que solo guarda la alternativa (D28). Solo replanifica una original que puede pasar a reemplazada (D33).
 - **Por qué:**
   - D20 ya había decidido que una expedición aprobada no vuelve a borrador: si hay que cambiarla, se construye una alternativa. Esta clase es esa construcción: arma un `ExpeditionBuilder` con los datos generales de la original (objetivos, zonas, responsables, restricciones, permisos), mantiene como ítems cerrados los que la original ya terminó, agenda de nuevo cada ítem que no empezó, salvo el afectado, y copia sus asignaciones (D33). El resultado es una `Expedition` nueva en borrador.
   - **Revisado en D33:** en la primera versión los tres motivos (cancelación, indisponibilidad y retraso) se resolvían con el mismo primitivo, "sacar el ítem afectado", y el motivo no se guardaba. El informe señaló que los tres se tratan distinto y que, sin motivo, no queda registrado por qué existe una alternativa. Hoy el motivo es un Strategy (`ReplanReason`) que decide qué pasa con la actividad afectada, y la alternativa lo guarda.
@@ -346,16 +351,16 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
 
 - **Origen:** corrección de la Entrega 1, punto 5 (el id de la expedición lo inventa el cliente). Se construían dos expediciones con el mismo id sin ningún error. Evaluamos la sugerencia del informe (que la expedición obtenga su id de un `nextId()` en un repositorio) y la seguimos.
 - **Patrón / principio:** value object (D8) + Dependency Inversion (el negocio define el contrato del repositorio y la implementación es un detalle).
-- **Dónde:** `ExpeditionId`; interfaz `ExpeditionRepository` (en `business.providers`: `nextId`, `add`, `findById`) e implementación `InMemoryExpeditionRepository` (en `providers`); `DuplicateExpeditionException`; `ExpeditionBuilder.build(ExpeditionRepository)`; el caso de uso `CreateExpedition` (D28) y `ExpeditionReplanner`, que recibe el repositorio por constructor (D25).
+- **Dónde:** `ExpeditionId`; interfaz `ExpeditionRepository` (en `business.providers`: `nextId`, que hereda de `ExpeditionIdProvider`, `add`, `save`, `findById`) e implementación `JpaExpeditionRepository` (en `app`, D67); `DuplicateExpeditionException`; `ExpeditionBuilder.build(ExpeditionIdProvider)`; el caso de uso `CreateExpedition` (D28) y `ExpeditionReplanner`, que recibe el proveedor de ids por constructor (D25, D60).
 - **Por qué:**
   - Las reservas y el stock reservado usan este id para saber de qué expedición son (D27, D30). Si el id pudiera repetirse, "liberar lo de e-1" sería ambiguo.
-  - No es el mismo caso que los recursos: el id de un recurso es **natural** (una patente, un documento), viene de afuera y el catálogo garantiza que no se repita (D18). El de una expedición es **sustituto**: no significa nada fuera del sistema, así que lo genera el sistema. El builder le pide el id al repositorio al construir (`build(repository)`): `CreateExpedition` construye la expedición y la guarda, y `ExpeditionReplanner` (que tiene el repositorio por constructor) construye así la alternativa de una replanificación, que `ReplanExpedition` guarda. Ningún cliente le pone el id a una expedición. Dos `build` seguidos con el mismo repositorio dan ids distintos. `add` rechaza un id que ya existe, con el mismo criterio que el catálogo.
-  - El builder ya no tiene `withId` ni un `build` que reciba un id: recibe el repositorio en `build(ExpeditionRepository)` y de ahí saca el id. Arma la expedición con los datos de negocio, pero no permite inventarle la identidad. Para tener ids predecibles, los tests usan un repositorio de prueba que los da en secuencia (`e-1`, `e-2`).
-  - El repositorio es una interfaz de `business.providers` porque dónde se guardan las expediciones es un detalle (Clase 3). La implementación en memoria usa UUID, así que dos ids generados no coinciden aunque haya expediciones cargadas de otro lado.
+  - No es el mismo caso que los recursos: el id de un recurso es **natural** (una patente, un documento), viene de afuera y el catálogo garantiza que no se repita (D18). El de una expedición es **sustituto**: no significa nada fuera del sistema, así que lo genera el sistema. El builder le pide el id a un proveedor al construir (`build(ExpeditionIdProvider)`), que en producción es el repositorio: `CreateExpedition` construye la expedición y la guarda, y `ExpeditionReplanner` (que tiene el proveedor de ids por constructor, D60) construye así la alternativa de una replanificación, que `ReplanExpedition` guarda. Ningún cliente le pone el id a una expedición. Dos `build` seguidos con el repositorio como proveedor dan ids distintos. `add` rechaza un id que ya existe, con el mismo criterio que el catálogo.
+  - El builder ya no tiene `withId` ni un `build` que reciba un id: recibe un proveedor en `build(ExpeditionIdProvider)` y de ahí saca el id; en producción ese proveedor es el repositorio (D60). Arma la expedición con los datos de negocio, pero no permite inventarle la identidad. Para tener ids predecibles, los tests usan un repositorio de prueba que los da en secuencia (`e-1`, `e-2`).
+  - El repositorio es una interfaz de `business.providers` porque dónde se guardan las expediciones es un detalle (Clase 3). `JpaExpeditionRepository` usa UUID (D67), así que dos ids generados no coinciden aunque haya expediciones cargadas de otro lado.
   - Como value object, `ExpeditionId` compara por valor (D15), falla en blanco o nulo con la división de D16 y su `toString()` devuelve solo el valor.
 - **Alternativas descartadas:**
   - Dejar el `String` y controlar solo la unicidad — no evita confundirlo con otro id.
-  - Un `IdGenerator` aparte del repositorio — generar el id y garantizar que no se repita quedarían en lugares distintos, y la unicidad depende de lo que ya está guardado.
+  - Un `IdGenerator` aparte del repositorio — generar el id y garantizar que no se repita quedarían en lugares distintos, y la unicidad depende de lo que ya está guardado. **Revisado en D60:** el contrato de generar se separó, pero el repositorio lo sigue cumpliendo, así que las dos responsabilidades siguen juntas en producción.
   - Dejar `withId` y validar la unicidad recién al guardar — el builder seguiría invitando a inventar el id.
 
 
@@ -389,7 +394,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - El orden importa: primero `requireReservable` (verifica sin reservar), después `Expedition.approve` (valida, exige las advertencias aceptadas y pasa a aprobada) y recién al final `reserveFor`. Si falla la verificación o la validación, no cambió nada. Si se aprobara antes de verificar, una reserva fallida dejaría una expedición aprobada sin recursos. Si la expedición reemplaza a otra, `ApproveExpedition` la busca en el repositorio y, en la misma operación, libera sus reservas y la pasa a reemplazada (D33).
   - Las reglas adicionales y el servicio llegan por constructor: quien aprueba no elige con qué validar en cada llamada, y las reglas obligatorias las pone la entidad (D31).
   - Terminar también cambia la expedición y los calendarios de sus recursos. `FinishExpedition` primero termina la expedición y después libera: si la transición no es válida, falla antes de liberar nada, y liberar no puede fallar.
-  - Crear una expedición necesita algo de afuera: su id, que lo da el repositorio (D26). `CreateExpedition` es el dueño de esa decisión, como pide el informe: construye con `build(repository)` y guarda. `ReplanExpedition` le pide la alternativa al replanificador (que tiene el repositorio y arma la alternativa con `build(repository)`) y solo la guarda.
+  - Crear una expedición necesita algo de afuera: su id, que lo da el repositorio (D26). `CreateExpedition` es el dueño de esa decisión, como pide el informe: construye con `build(ExpeditionIdProvider)`, con el repositorio como proveedor (D60), y guarda. `ReplanExpedition` le pide la alternativa al replanificador (que tiene el proveedor de ids y arma la alternativa con `build(ExpeditionIdProvider)`) y solo la guarda.
 - **Alternativas descartadas:** que el caso de uso reserve primero y libere si la validación falla — es la vuelta atrás que D27 ya descartó.
   - Alguien tiene que armar el grafo: `Main.wire()` (en el paquete raíz) crea el repositorio en memoria, el servicio de reservas, el replanificador y los casos de uso, y los entrega juntos en `FieldOps`. Es el único lugar que conoce las implementaciones concretas, como `InMemoryExpeditionRepository`; el negocio solo conoce la interfaz `ExpeditionRepository`. Como esta entrega no tiene interfaz de usuario, `main` solo arma el grafo.
   - El test de integración usa `Main.wire()` y recorre el ciclo a través de los casos de uso: crear, aprobar, ejecutar y terminar; y también replanificar en el campo (suspender, replanificar con un retraso, aprobar la alternativa y terminarla).
@@ -462,7 +467,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
 - **Por qué:**
   - Solo se replanifica una expedición aprobada o suspendida. Un borrador se corrige directamente, y una en ejecución primero se suspende. La regla es "se puede replanificar si la expedición puede pasar a reemplazada", así que vive en la misma tabla de transiciones que los demás estados y no en un `if` aparte.
   - Tampoco se replanifica con actividades en curso: primero se cierran, igual que para terminar (D29). Si no, la actividad en curso no quedaría ni en la original ni en la alternativa.
-  - `ExpeditionReplanner` arma la alternativa con `build(repository)` y `ReplanExpedition` la guarda (D26), así que el id de la alternativa tampoco lo inventa quien llama.
+  - `ExpeditionReplanner` arma la alternativa con `build(ExpeditionIdProvider)` y `ReplanExpedition` la guarda (D26), así que el id de la alternativa tampoco lo inventa quien llama.
   - El nuevo plan es la expedición completa: lo que ya pasó se mantiene. Los ítems que la original ya terminó pasan a la alternativa como ítems cerrados, con su horario, sus asignaciones y su seguimiento (inicio, fin, resultado, observaciones e incidentes). Así el informe de la alternativa muestra la salida entera, y una actividad pendiente que dependía de una ya hecha se agenda sin problemas.
   - Lo único que se puede cambiar es lo pendiente. Un ítem que ya ocurrió no se reasigna, y la misma actividad no se puede volver a agendar. Lo ya hecho tampoco se vuelve a reservar, a pedir de stock ni a validar como riesgo: la reserva de recursos, la demanda de consumibles, la superposición y la tolerancia de riesgo miran solo `pendingItems()`. Esto cubre lo que el informe quería evitar ("volvería a agendar actividades hechas y a pedir sus insumos") manteniendo lo hecho en el plan.
   - Las dos expediciones quedan vinculadas en los dos sentidos: la alternativa sabe a cuál reemplaza (`getReplacedExpedition`, lo pone el replanificador) y la original sabe por cuál fue reemplazada (`getReplacement`, se registra al aprobar la alternativa). Un estado reemplazada sin saber por cuál dejaría la mitad de la historia.
@@ -484,6 +489,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - Elegir automáticamente el reemplazo del recurso indisponible — haría falta un criterio de selección que el enunciado no define; el catálogo ya ofrece candidatos (D18).
 - **Revisado en D39:** la alternativa conserva los bloques de la original. El replanificador ya no pasa los terminados con `ExpeditionBuilder.addFinishedItem` y el resto con `addActivity` ordenados por inicio: le pide al itinerario un plan con su misma estructura (`Itinerary.planKeepingStructure`) y decide por actividad (la terminada va como `PlannedNode.finished`, la afectada como diga el motivo, el resto con su horario). La alternativa se agenda en el orden en que se agendó la original. `addFinishedItem` sigue existiendo como atajo; `addFinishedCopyOf` ya no.
 - **Revisado en D46 y D47:** la actividad afectada ya no tiene que estar pendiente. Si había empezado (un incidente sobre una actividad en curso, que se cierra antes de aceptar), la alternativa la rehace cuando el motivo la devuelve y la deja cerrada cuando la cancela. El replanificador saca las consecuencias del motivo para el resto del itinerario: lo que vuelve más tarde corre lo que viene después en sus secuenciales y lo que depende de ella; lo que no vuelve se lleva lo que depende de ella. Hay un motivo más, `ResourceReplaced` (reemplazo elegido entre candidatos del catálogo), y `canPlan` responde si una alternativa se puede armar sin mirar el estado de la original. El reemplazo automático sigue descartado: las propuestas ofrecen candidatos y decide un responsable. La alternativa hereda la bitácora de incidentes de la original (D48).
+- **Revisado en D61:** lo ya hecho no se vuelve a reservar también cuando la original siguió ejecutándose después de armar la alternativa: esa alternativa ya no se puede aprobar.
 - **Revisado en D59:** `reservationsItTakesOver()` sigue siendo solo la expedición reemplazada, y el servicio de reservas y la validación de consumibles siguen preguntando por ella. La validación de superposición pasó a preguntar por `reservationsItDoesNotCompeteWith()`, que le suma el propio id: una expedición tampoco compite con las reservas que creó su propia aprobación.
 
 ### D34 — Las categorías y las certificaciones se normalizan al construirse (corrección de la Entrega 1)
@@ -520,7 +526,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
 - **Alternativas descartadas:**
   - Clean Architecture — sumaría anillos (entidades, casos de uso, adaptadores, frameworks) que para este tamaño de dominio no se distinguen del hexágono; ver la tabla de patrones no aplicados.
   - DDD táctico completo (agregados, eventos, módulos por contexto) — el dominio es un solo contexto y los conceptos que sirven ya están (entidades, value objects, servicios); ver la tabla de patrones no aplicados.
-  - Separar la interfaz de cada caso de uso (puerto de entrada) de su implementación — en este PR los casos de uso siguen siendo clases concretas en `domain`. Una interfaz por caso de uso con una sola implementación no agrega nada hoy; el adaptador REST depende de la clase.
+  - **Revisado en D63, ya no se descarta:** Separar la interfaz de cada caso de uso (puerto de entrada) de su implementación — en este PR los casos de uso siguen siendo clases concretas en `domain`. Una interfaz por caso de uso con una sola implementación no agrega nada hoy; el adaptador REST depende de la clase.
 - **Consecuencia:** si aparece un segundo adaptador driving que necesite sustituir un caso de uso (por ejemplo para mockearlo), la salida es extraer la interfaz de ese caso de uso y mover la implementación a `app`.
 
 ### D36 — Multi-módulo Maven para que el compilador haga cumplir la dependencia (Entrega 2)
@@ -568,17 +574,20 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - Una aceptación de advertencia por id se arma contra las advertencias que la expedición levanta en ese momento. Si no existe esa advertencia, falla con `NotFoundException` en vez de ignorarse: una aceptación vieja no debería quedar como si hubiera cubierto algo.
   - Cada caso de uso depende de los puertos que usa (D35). Los tests unitarios usan Mockito para el repositorio y entidades reales.
   - Los repositorios tienen un test de contrato (`ExpeditionRepositoryContract`, `ZoneRepositoryContract`) que hoy corre contra el adaptador en memoria y después correrá contra JPA.
+    **Resuelto en D67:** los contratos corren contra los adaptadores JPA, sobre PostgreSQL.
 - **Alternativas descartadas:**
   - Una clase por transición de estado — cinco clases de una línea cada una; `TransitionExpedition` las agrupa porque todas hacen lo mismo (buscar y llamar a la entidad).
   - Que el adaptador REST busque la expedición y llame a la entidad — duplicaría en cada adaptador la resolución de ids y los errores de "no existe".
   - Reemplazar las variantes que reciben el objeto — rompería los tests y el uso de la Entrega 1 sin necesidad.
   - Un método `save` en el repositorio — con el repositorio en memoria las entidades se modifican en el lugar. Cuando haya persistencia real hará falta.
+    **Revisado en D66:** con persistencia real hizo falta, y los casos de uso guardan lo que cambian.
 - **Consecuencia:**
   - ~~`ScheduleActivityCommand` recibe la `Activity` ya armada: crearla requiere elegir su `ActivityRules` por tipo y parámetros, y eso lo resuelve el registro de tipos de la Fase 3. Hasta entonces el adaptador que agenda una actividad la construye.~~ **Resuelto en D53:** el comando recibe el id de la actividad, su nombre, su ventana, el horario, el id de la zona, los ids de las dependencias, el nombre del tipo, sus parámetros y el indicador de nocturna, y `ScheduleActivity` resuelve las tres cosas (zona, dependencias y reglas). Ningún adaptador arma una `Activity`.
   - `ValidateExpedition` y `ApproveExpedition` reciben cada uno su lista de reglas adicionales; hoy ambas están vacías en `FieldOpsConfig`.
   - Los tests del repositorio se podrán reutilizar contra el adaptador JPA cuando exista.
 - **Ampliado en D52:** el alta del catálogo y de las zonas, que no tenía caso de uso, lo tiene con el mismo esquema (`RegisterResources`, `QueryCatalog`, `MarkResourceUnavailable`, `RegisterZone`, `QueryZones`). `Lookups` resuelve además la zona por id, el equipo por tipo y el consumible.
 - **Revisado en D53:** el comando de agendar una actividad pasa a recibir ids, tipo y parámetros, que es el pendiente que esta entrada tenía anotado. La variante que recibe la `Activity` armada se conserva, como las de esta misma decisión.
+- **Revisado en D63:** los comandos pasaron a `business.models.commands`, los casos de uso se exponen por interfaces de `business.ports.in`, y las variantes que reciben objetos pasaron a ser package-private.
 
 ### D39 — El itinerario es un árbol de actividades y bloques (Composite) (Entrega 2, F2)
 
@@ -615,7 +624,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
 - **Patrón / principio:** fail fast para planes mal formados, con cada invariante en el objeto que lo puede garantizar (mismo criterio que D21).
 - **Dónde:** constructores de `ItineraryBlock` y `SequentialBlock`; `Expedition.schedule(PlannedNode)`; `Itinerary.add`. Todos lanzan `InvalidScheduleException`.
 - **Por qué:**
-  - Se rechaza al agendar, sin importar qué recursos haya: un bloque vacío; un secuencial donde un hijo empieza antes de que termine el anterior; una actividad del bloque fuera de las zonas o del período de la expedición, o fuera de su ventana; una actividad que ya está agendada o que aparece dos veces en el bloque; una dependencia sin agendar o que termina después; y una dependencia entre ramas paralelas.
+  - Se rechaza al agendar, sin importar qué recursos haya: un bloque vacío; un secuencial donde un hijo empieza antes de que termine el anterior; una actividad del bloque fuera de las zonas o del período de la expedición, fuera de su ventana o con un horario más corto que su estimación (D62); una actividad que ya está agendada o que aparece dos veces en el bloque; una dependencia sin agendar o que termina después; y una dependencia entre ramas paralelas.
   - En un secuencial, "cada hijo empieza cuando terminó el anterior" significa que no empieza antes, con huecos permitidos. Es la misma comparación que usan las dependencias (D21), con el borde compartido válido (D8): un plan real tiene traslados y esperas entre una actividad y la siguiente.
   - El orden de un secuencial es el declarado y no se reordena por horario: si se declara `[A, B]` y B está agendada antes que A, el bloque se rechaza. Un hijo que es un bloque ocupa su lugar con su período completo.
   - Un paralelo no exige nada a los horarios de sus ramas: pueden pisarse o no.
@@ -755,6 +764,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - Cada suscriptor declara el tipo de evento que atiende (`eventType()`). El publicador en memoria se lo entrega a los que corresponden, en el orden en que los recibió. La comparación de tipos queda en el adaptador, no en el dominio.
   - El evento lleva el id de la expedición y el incidente completo (un `record` inmutable), así el suscriptor no depende de volver a leer el incidente.
   - La entidad no publica eventos ni guarda una lista de pendientes: con el repositorio en memoria las entidades se modifican en el lugar (D38) y no hay un "al guardar" donde despacharlos. Publicar desde el caso de uso deja el orden explícito: primero registra, después avisa.
+    **Revisado en D66:** los casos de uso guardan lo que cambian, y el orden sigue explícito: primero guarda, después avisa.
 - **Alternativas descartadas:**
   - Que `RegisterIncident` llame directo al replanificador — acopla el registro con la replanificación; cada reacción nueva a un incidente obligaría a modificarlo.
   - Usar el `ApplicationEventPublisher` de Spring dentro del dominio — rompe D36 y D37: `domain` no puede depender de Spring, y el enforcer lo prohíbe.
@@ -762,6 +772,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - Un puerto por evento (`IncidentListener`) — cada evento nuevo sería un puerto nuevo con su adaptador.
   - Que la entidad acumule los eventos y el repositorio los despache al guardar — hoy no existe ese "guardar" (D38).
 - **Consecuencia:** no hay transacción ni reintentos. Si el suscriptor falla, la excepción llega a quien registró el incidente, pero el incidente ya quedó registrado en la expedición. Con persistencia real, registrar y proponer tienen que ir en la misma transacción o pasar a un outbox. Queda como deuda técnica de F3.
+- **Revisado en D68:** el incidente y la propuesta corren en la misma transacción, así que si el suscriptor falla el incidente se deshace y no queda registrado sin propuesta. Sigue sin haber reintentos.
 
 ### D46 — La propuesta ofrece varias opciones, una por generador, y solo las que se pueden armar (Entrega 2, F3, revisa D25, D33 y D40)
 
@@ -812,6 +823,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - Dejar pendientes las demás propuestas — aceptar otra crearía una segunda alternativa de la misma original, y la que se aprobara segunda fallaría.
   - Que la fecha de la decisión la ponga un `Clock` inyectado — sería el único lugar del dominio que toma la hora del sistema.
 - **Consecuencia:** entre aceptar y aprobar la alternativa, la expedición no registra seguimiento (está suspendida) ni nuevos incidentes (D23). Si hace falta seguir trabajando, se reanuda la original y la alternativa queda sin aprobar.
+- **Revisado en D61:** "queda sin aprobar" no estaba garantizado por el código, y una alternativa armada antes de seguir ejecutando se aprobaba igual. Ahora la aprobación la rechaza. Reanudar y registrar un incidente nuevo también puede generar una segunda alternativa de la misma original, y la que queda vigente es la armada sobre lo último ejecutado.
 
 ### D48 — Auditoría: la propuesta es el registro, el plan original sigue siendo la expedición original (Entrega 2, F3, revisa D23)
 
@@ -923,11 +935,12 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - **Mocks como prueba de persistencia** — es exactamente lo que la consigna descarta. Un repositorio mockeado prueba que el caso de uso lo llama, no que el repositorio cumpla su contrato.
   - **Un repositorio por entidad, con el catálogo incluido** — `ResourceCatalog` quedó como clase del modelo y no como puerto, que es la deuda que D52 ya tiene anotada y la primera cosa a resolver cuando aparezca la persistencia real.
   - **Guardar el estado en un archivo entre arranques** — daría una falsa sensación de persistencia sin ninguna de sus propiedades (transacciones, concurrencia, consultas) y escondería el problema real.
+- **Resuelto en D67 y D68:** la persistencia ya es real, sobre PostgreSQL. Lo que sigue describe cómo quedó esta entrada al momento de la entrega.
 - **Consecuencia:**
   - **Queda registrado como deuda técnica de la entrega.** Nada de lo que la aplicación guarda sobrevive a un reinicio, no hay transacciones y no hay concurrencia: dos pedidos simultáneos sobre la misma expedición se pisan, porque los adaptadores usan `LinkedHashMap` sin sincronizar y las entidades se mutan en el lugar. Alcanza para la entrega y para la demostración, que son de un solo usuario y de un solo proceso.
   - **Qué habría que hacer:** un adaptador JPA por puerto en un módulo propio (o en `app`), entidades de persistencia separadas del modelo con sus mappers para no anotar `domain` (D36), un `ResourceRepository` que le dé puerto al catálogo (D52), decidir si el puerto gana un `save`, y las subclases de los tres contratos corriendo contra la base real. El escenario de `demo/` pasa a ser una migración (D50).
   - **El riesgo está asumido y conviene consultarlo con el docente:** la consigna pide pruebas reales de persistencia y un adaptador en memoria puede leerse como insuficiente, aunque los tres contratos de repositorio corran contra implementaciones reales y no contra mocks.
-  - El frontend mínimo queda pendiente del grupo por la misma clase de decisión, y está anotado en el README: la Fase 5 entrega API, Swagger y guion, y Swagger UI no reemplaza un frontend.
+  - **Resuelto en D69.** El frontend mínimo queda pendiente del grupo por la misma clase de decisión, y está anotado en el README: la Fase 5 entrega API, Swagger y guion, y Swagger UI no reemplaza un frontend.
 
 ### D52 — Casos de uso de alta y consulta del catálogo y de las zonas (Entrega 2, F5, extiende D38)
 
@@ -961,6 +974,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - Validar en los DTOs con Bean Validation para que el id o el nombre vacío no lleguen al dominio — ya está descartado en D49 y en la tabla de patrones no aplicados.
 - **Consecuencia:**
   - **El catálogo sigue sin puerto de salida y es deuda.** `ResourceCatalog` es una clase del modelo, no una interfaz de `business.providers`, y en `FieldOpsConfig` es un único bean compartido: registrar un recurso muta estado compartido del contexto, que es el precedente que ya usaba `CreateExpedition` al leerlo. Mientras la persistencia sea en memoria funciona y los tests de API lo acotan levantando un contexto nuevo por test (`@DirtiesContext`, D37). Cuando llegue la persistencia real hace falta un puerto propio (un `ResourceRepository` en `business.providers`, con el catálogo como la vista en memoria que arman las consultas, o un catálogo que reciba el repositorio), porque hoy no hay dónde enganchar la escritura ni la transacción. La señal es el primer adaptador que no sea en memoria.
+    **Resuelto en D66 y D67:** `ResourceCatalog` es un puerto de salida, con `JpaResourceCatalog` como adaptador.
   - Agregar un tipo de recurso nuevo es un método en `RegisterResources`, su comando, dos métodos en `QueryCatalog` y un controller con sus DTOs y su mapper.
   - Las traducciones que comparten los mappers (período, cantidad, certificaciones y listas ordenadas) quedaron en `Mappings`, package-private en `rest.mappers`, en vez de repetidas en cada uno; `ExpeditionMapper` pasó a usarlo y no cambió de comportamiento.
   - El `amount` de una cantidad viaja como texto (`"10"`): `Quantity` guarda el decimal exacto con los ceros al final removidos, así que un stock de diez unidades serializado como número saldría `1E+1`.
@@ -1182,6 +1196,185 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - `InsufficientSuppliesValidation` tiene el mismo defecto latente y **no se arregló acá**: usa `reservationsItTakesOver()`, así que el stock que una expedición aprobada tiene reservado para sí misma se descuenta de lo que tiene disponible, y un consumible con stock de menos del doble de lo que el plan pide se reportaría como insuficiente después de aprobar. La demo no lo muestra porque el seed deja justo el doble (20 contenedores para 10, 12 reactivos para 6, 200 litros para 56), y arreglarlo es un cambio de dominio que este tramo no tenía en alcance. Queda anotado en el plan: la corrección es que esa regla pregunte por `reservationsItDoesNotCompeteWith()`, la misma línea que acá.
   - Validar un plan aprobado ahora dice la verdad, y eso es lo que hace útil al endpoint: las críticas que aparezcan son recursos que se cayeron después de aprobar, que es cuando conviene replanificar (D46, D47).
 
+### D60 — El id de una expedición sale de un proveedor y no de todo el repositorio (corrección de la Entrega 2, revisa D26)
+
+- **Origen:** observación de la corrección de la Entrega 2. Para armar la alternativa de prueba de `canPlan`, `ExpeditionReplanner` implementaba un `ExpeditionRepository` entero (`PreviewIds`) que no cumplía el contrato: `nextId()` devolvía siempre `preview` y `add` lanzaba `UnsupportedOperationException`. La causa era que `ExpeditionBuilder.build` recibía todo el repositorio y solo usaba `nextId()`.
+- **Patrón / principio:** Interface Segregation y Liskov Substitution: el builder y el replanificador dependen solo de lo que usan, y ninguna clase promete un contrato que no cumple.
+- **Dónde:** interfaz `ExpeditionIdProvider` (en `business.providers`), que `ExpeditionRepository` extiende; `ExpeditionBuilder.build(ExpeditionIdProvider)`; `ExpeditionReplanner`, cuyo constructor recibe el proveedor y cuya vista previa es una lambda; `FieldOpsConfig`.
+- **Por qué:**
+  - La vista previa de `canPlan` necesita un id y nada más, y nunca se guarda. Con un proveedor alcanza una lambda.
+  - `ExpeditionRepository` extiende el proveedor, así que quien genera un id en producción sigue siendo el repositorio, y `add` sigue garantizando la unicidad que D26 quiere junto a él.
+  - Agregar `save` al puerto para la persistencia real habría obligado a `PreviewIds` a implementar otro método que tampoco cumplía.
+- **Alternativas descartadas:**
+  - Mantener `PreviewIds` — seguiría siendo una implementación del puerto que no respeta su contrato.
+  - Validar el plan sin construir la expedición — duplicaría las reglas de armado que hoy aplica el builder.
+  - Recibir un `Supplier<ExpeditionId>` — no nombra el concepto en el lenguaje del dominio, y `ExpeditionRepository` no podría extenderlo con la misma claridad.
+- **Consecuencia:** un id de vista previa no sale del replanificador, porque `canPlan` descarta la alternativa que arma. Las llamadas a `build` con un repositorio siguen compilando sin cambios.
+
+### D61 — Una alternativa solo se aprueba si la original no siguió ejecutándose (corrección de la Entrega 2, F3, revisa D33 y D47)
+
+- **Origen:** corrección de la Entrega 2. Al aceptar una propuesta se suspende la original y se arma la alternativa en borrador. Si después se reanudaba la original y seguía ejecutándose, la alternativa vieja se aprobaba igual: volvía a agendar actividades hechas y a reservar sus insumos. Con un incidente nuevo, además, aprobar la primera dejaba la segunda sin poder aprobarse y sin ese incidente en la que quedaba vigente.
+- **Patrón / principio:** Information Expert: la expedición sabe qué ejecutó y si una alternativa se armó sobre su plan vigente. El chequeo va en el único punto por donde pasa cualquier reemplazo (`ApproveExpedition`), con el criterio de todo o nada de D27.
+- **Dónde:** `Expedition.executionRevision`, `isBuiltOnCurrentPlanOf` y `requireBuiltOnCurrentPlanOf`; value object `ReplacedPlan`, que reemplaza al id suelto de la expedición reemplazada; `ExpeditionBuilder.withReplacedExpedition(Expedition)`; `StaleAlternativeException`, que responde 409; `ApproveExpedition`; `QueryExpeditions.isStaleAlternative` y el campo `staleAlternative` de `ExpeditionResponse`.
+- **Por qué:**
+  - La revisión aumenta con lo que cambia lo que la alternativa copió de la original: iniciar o finalizar una actividad, registrar una observación y registrar un incidente. Reanudar y suspender no la cambian, así que reanudar sin ejecutar nada no invalida una alternativa que sigue siendo correcta.
+  - El chequeo corre antes de mutar nada, junto a `requireReplaceable`: si falla, la original, la alternativa, las reservas y el stock quedan como estaban.
+  - Vive en la aprobación y no en `resume`, así que también cubre una alternativa creada sin propuesta y un segundo incidente, sin que `TransitionExpedition` tenga que conocer las propuestas.
+  - La respuesta de la expedición dice si la alternativa está vencida (`staleAlternative`), para saberlo antes de intentar aprobarla. La propuesta sigue `ACCEPTED`, porque la decisión se tomó y queda auditada tal como fue.
+- **Alternativas descartadas:**
+  - Que reanudar descarte la alternativa y lo registre en la propuesta — no cubre la alternativa sin propuesta, pierde una alternativa válida cuando no se ejecutó nada y hace que las transiciones dependan de las propuestas.
+  - Comparar la alternativa con la original ítem por ítem — repite en otro lugar lo que la revisión ya responde, y las observaciones y los incidentes también cuentan.
+  - Usar la versión de la base de datos — cambia con cualquier modificación, incluso reanudar, y el dominio no debe conocerla.
+- **Consecuencia:** una alternativa vencida queda en borrador o en revisión como registro, sin poder aprobarse. Si todavía hace falta replanificar, se registra un incidente nuevo sobre la original en ejecución y se decide su propuesta. El consumo real y las reservas de la original no se tocan al rechazar la aprobación.
+
+### D62 — Una actividad no se agenda por menos que su estimación (corrección de la Entrega 2, F2, revisa D4, D21, D39 y D40)
+
+- **Origen:** corrección de la Entrega 2. Una recolección estimada en 2 h se podía agendar de 9 a 10, seguida de otra de 10 a 12 con la misma persona, y la validación no reportaba superposición aunque según la estimación esa persona seguía ocupada. D21 y D40 no decían qué pasaba con ese caso, y la justificación "cuánto trabajo hay" no explicaba el máximo de un bloque paralelo.
+- **Patrón / principio:** fail fast para un plan mal formado, con el mismo criterio de D21: el dato depende solo de la actividad y del horario, no de recursos ni del catálogo. La invariante vive en el objeto que la puede garantizar, el constructor de `ItineraryItem`.
+- **Dónde:** `ItineraryItem`, junto a la verificación de la ventana. Lanza `InvalidScheduleException`, que la API responde con 400.
+- **Por qué:**
+  - Al estar en el constructor del ítem cubre todos los caminos: actividad suelta, bloque, builder y replanificación. Un retraso corre el horario sin acortarlo, así que una alternativa no puede violarla.
+  - Un período más largo que la estimación sigue siendo válido: un plan real tiene márgenes.
+  - La superposición sigue comparando períodos agendados. Con esta regla, ningún período esconde tiempo estimado, y no hace falta una segunda definición de cuándo está ocupado un recurso.
+  - El período de un bloque nunca dura menos que su estimación: cada hoja dura al menos lo estimado, un secuencial no solapa a sus hijos y un paralelo dura al menos lo que su rama más larga.
+  - **La duración estimada mide cuánto tarda en ejecutarse, sin contar huecos.** Por eso en paralelo se toma el máximo, porque los tiempos se solapan, y no la suma, que sería el trabajo total.
+  - **El estimador sigue sumando los nodos raíz aunque se pisen en el calendario.** Queda como definición: dos raíces no declaran que corran a la vez, y quien quiera ese máximo lo expresa con un bloque paralelo. No es el lapso del plan, que D4 ya descartó.
+- **Alternativas descartadas:**
+  - Una advertencia aceptable con regla propia — permitiría comprimir un plan con justificación, pero obligaría a definir contra qué período comparan la superposición, el orden del secuencial y las reservas.
+  - Hacer que la superposición compare contra la estimación además del período — el mismo problema repartido en varias validaciones, y las reservas seguirían usando el período agendado.
+  - Rechazar en `Expedition.schedule` — no cubriría los ítems que se arman desde un `PlannedNode`.
+- **Consecuencia:** quien agenda se entera en el momento si el horario no alcanza. Si la operación real se va a hacer más rápido, hay que cambiar los parámetros de la actividad, porque la estimación es lo que declara cuánto tarda. El seed y `demo.http` ya cumplían la regla y no cambiaron. Los tests cuyo punto no es la duración usan `oneHourSampling`, un fixture con una estimación de 1 h, porque ninguna regla real baja de ese tiempo con la asignación que esos tests necesitan.
+
+### D63 — Los casos de uso se exponen por puertos de entrada (corrección de la Entrega 2, revisa D35 y D38)
+
+- **Origen:** corrección de la Entrega 2. Respecto del esquema hexagonal visto en clase faltaban los puertos de entrada: los controllers dependían de las clases de `business.usecases`, y los comandos estaban junto a los casos de uso y no en el modelo. D35 había descartado separar la interfaz porque tenía una sola implementación.
+- **Patrón / principio:** puertos de entrada (Clase 7) + Dependency Inversion: el adaptador driving y la implementación dependen de una interfaz del dominio. Interface Segregation por caso de uso.
+- **Dónde:** interfaces `*Port` en `business.ports.in`, una por cada uno de los 22 casos de uso que un adaptador invoca; implementaciones en `business.usecases`; comandos y `WarningAcceptance` en `business.models.commands`; `AssignmentCandidates` en `business.models.responses`; `FieldOpsConfig`, `ReplanningConfig` y `DemoDataConfig` exponen e inyectan los puertos; `HexagonalArchitectureTest`.
+- **Por qué:**
+  - El adaptador REST y el cargador de la demo conocen solo lo que pueden pedir, y no cómo se implementa. ArchUnit lo hace cumplir, porque el compilador no puede: `web` necesita ver las implementaciones para armarlas en la configuración.
+  - Hay un motivo concreto que D35 no tenía: la transacción. El dominio no puede tener `@Transactional`, y con una interfaz se puede envolver cada caso de uso desde la configuración sin tocarlo.
+  - Una interfaz por clase actual, sin partir las que agrupan operaciones cohesivas (`TransitionExpedition`, `RegisterResources`), con el criterio de D52.
+  - Las implementaciones conservan su nombre, y las interfaces llevan el sufijo `Port`, así los tests de los casos de uso siguen nombrando lo que prueban.
+  - Las variantes que reciben objetos (`approve(Expedition, ...)`, `create(ExpeditionBuilder)`, `finish(Expedition)` y las de `ScheduleActivity` y `ScheduleBlock`) no forman parte de los puertos y pasan a ser package-private.
+  - `PlannedNodeCommand` deja de conocer a `PlannedActivities`, que es interna de los casos de uso: recibe la función que traduce una actividad planificada.
+  - `ReplanExpedition` y `ProposeReplan` no tienen puerto: ningún adaptador driving los invoca. Los usan `DecideReplanProposal` y el publicador de eventos.
+- **Alternativas descartadas:**
+  - Mover las implementaciones a `app`, como anticipaba D35 — el informe las ubica en `business.usecases`, y moverlas no agrega ninguna garantía que no dé ArchUnit.
+  - Una interfaz por operación — unas 60 interfaces para los mismos 22 conceptos.
+  - Renombrar las implementaciones (`ApproveExpeditionUseCase`) y dejarles el nombre a las interfaces — mismo resultado con todos los tests renombrados.
+- **Consecuencia:** los tests de integración de `web` entran por los puertos y por ids, igual que un adaptador. Los puertos todavía devuelven entidades: las respuestas propias en el modelo llegan en D64.
+
+### D64 — Los puertos de entrada devuelven respuestas propias y no entidades (corrección de la Entrega 2, revisa D49, D54 y D63)
+
+- **Origen:** corrección de la Entrega 2: el esquema visto en clase pide una interfaz por caso de uso con su comando y su respuesta en el modelo. Los puertos devolvían entidades mutables, que el adaptador REST podía modificar y que atan a `web` a la forma interna del dominio.
+- **Patrón / principio:** `Response` del esquema hexagonal (Clase 7) + Encapsulation: lo que sale del hexágono es un dato de solo lectura, inmutable.
+- **Dónde:** `record` en `business.models.responses`: `ExpeditionView`, `ItineraryView`, `ItineraryNodeView`, `ScheduledActivityView`, `ReplanProposalView`, `ReplanOptionView`, `ReplanDecisionView`, `PersonView`, `VehicleView`, `InstrumentView`, `SupplyView`, `ZoneView`, `ActivityTypeView`, `ExpeditionReportView`, `AcceptedWarningView` y `AssignmentCandidates`; `QueryExpeditionsPort.itinerary`; los mappers de `web`; `HexagonalArchitectureTest`.
+- **Por qué:**
+  - Se llaman `View` para no chocar con los `*Response` de `web`, que siguen siendo el contrato HTTP. El mapper traduce `View` a DTO, y el JSON no cambió: los tests de API siguen igual.
+  - `ExpeditionEstimate` y `ApprovalResult` se devuelven tal cual: ya son `record` sin entidades adentro. `ExpeditionReport` tenía una `Person` en cada advertencia aceptada, y por eso tiene su vista.
+  - El visitor que arma el árbol (D54) pasó del mapper al dominio, en `ItineraryNodeView`, porque `web` ya no conoce `ItineraryNode`.
+  - `staleAlternative` lo calcula la consulta al armar la vista, y deja de ser un método aparte del puerto.
+  - ArchUnit ahora también prohíbe que los adaptadores driving conozcan las entidades.
+- **Alternativas descartadas:**
+  - Seguir devolviendo entidades — menos trabajo, pero no cumple lo que pide el esquema, y el adaptador podría mutar el dominio fuera de un caso de uso.
+  - Interfaces de solo lectura implementadas por las entidades — evitan copiar, pero con la persistencia real expondrían objetos atados a una transacción ya cerrada.
+- **Consecuencia:** cada campo nuevo que se quiera exponer pasa por la vista y por el mapper. Los tests de los casos de uso buscan la entidad en el repositorio cuando necesitan seguir operando sobre ella. La distinción de equipo por tipo en `FindAssignmentCandidates` y `QueryCatalog` sigue filtrando por clase hasta que el equipo tenga su visitor.
+
+### D65 — El dominio se puede guardar y reconstruir (corrección de la Entrega 2, persistencia, revisa D15 y D53)
+
+- **Origen:** corrección de la Entrega 2, que pide persistencia real. Antes del adaptador había cuatro bloqueos en el dominio: las entidades se comparaban por instancia, el estado no se podía fijar desde afuera sin saltear reglas, las reglas de una actividad no se podían guardar y varios tipos solo se distinguían preguntando la clase.
+- **Patrón / principio:** Memento para guardar y restaurar sin abrir el encapsulamiento + Visitor con el criterio de D54 para variantes que hay que traducir.
+- **Dónde:** `equals` y `hashCode` por id en `ScheduledResource`, `Depletable`, `Zone`, `Activity`, `Expedition` y `ReplanProposal`; `ExpeditionSnapshot`, `NodeSnapshot`, `ItemSnapshot`, `BlockSnapshot`, `BlockKind`, `TrackingSnapshot`, `ReplacedPlan`, `ReplanProposalSnapshot` y `CalendarSnapshot`; `Expedition.snapshot/restore`, `ReplanProposal.snapshot/restore`, `Person`, `Vehicle` e `Instrument.restored`, `Depletable.restored` y `reservations`; `ActivityRules.definition`, `ActivityDefinition` y `ActivityTypeRegistry.rulesFor(definition)`; `ResourceVisitor`, `ReplanReasonVisitor` y `ResourceKinds`.
+- **Por qué:**
+  - **Identidad por id.** Al recargar de una base, `responsibles.contains`, `zones.contains`, `dependsOn` y `resource.equals` fallarían con instancias distintas del mismo recurso. La objeción de D15 (dos instancias con distinto estado se tratarían como la misma) se resuelve en la fase de persistencia: una sola instancia por id dentro de cada transacción.
+  - `ItineraryItem` sigue por instancia: no tiene id propio y solo se compara dentro del grafo de su expedición.
+  - **Snapshots con referencias a recursos.** El snapshot es inmutable y solo datos. Un adaptador lo traduce a tablas y de vuelta, sin que los constructores y los mutadores dejen de ser package-private. Referencia a los recursos porque la expedición los usa en memoria: el adaptador resuelve quién es cada uno.
+  - **La restauración no vuelve a aplicar las reglas de agendar:** lo guardado ya las pasó, y una dependencia que ya ocurrió no se puede volver a verificar. Sí se aplican las invariantes de los constructores (ventana, estimación, orden del secuencial).
+  - `Expedition.restore` tiene el único `switch` por tipo, sobre un `sealed` de datos: el compilador verifica que estén todos, y un snapshot no tiene comportamiento donde poner el polimorfismo.
+  - **`definition()` en las reglas, y no en el constructor de `Activity`.** Cada regla ya sabe su tipo y su parámetro, y `NightOperationRules` marca la variante: agregar un tipo sigue siendo agregar una clase (D1).
+  - `ResourceVisitor` abarca todos los recursos porque una opción de reemplazo guarda uno de cualquier tipo. También reemplaza los filtros por clase que quedaban en los casos de uso (D64).
+- **Alternativas descartadas:**
+  - Mantener la identidad por instancia con un mapa por transacción — los recursos seguirían comparándose bien solo dentro de una carga, y cualquier instancia armada por fuera rompería silenciosamente las reglas.
+  - Setters o constructores públicos para rearmar el estado — cualquiera podría saltearse las reglas.
+  - Anotar el dominio con JPA — lo prohíbe D36.
+  - Guardar las reglas serializadas — ataría la base a clases de Java y perdería las reglas nuevas de un tipo existente.
+- **Consecuencia:** un campo nuevo de una entidad hay que agregarlo también a su snapshot, y los tests de ida y vuelta lo detectan si se compara `snapshot()`. El adaptador JPA de D67 trabaja sobre estos snapshots.
+
+### D66 — Los casos de uso guardan lo que cambian y el catálogo es un puerto (corrección de la Entrega 2, persistencia, revisa D38, D45, D51 y D52)
+
+- **Origen:** corrección de la Entrega 2. `ExpeditionRepository` no tenía `save` y los casos de uso mutaban la instancia que devolvía `findById`, el contrato exigía la misma instancia con `assertSame` (algo que un adaptador sobre una base no puede cumplir) y el catálogo no tenía puerto.
+- **Patrón / principio:** repositorio como puerto de salida (D35) + Dependency Inversion: el catálogo pasa a ser una interfaz del dominio.
+- **Dónde:** `ExpeditionRepository.save`, `ReplanProposalRepository.save`; interfaz `ResourceCatalog` en `business.providers` con `save(Resource)`; `JpaResourceCatalog` en `app` (D67); `FakeResourceCatalog` y `ResourceCatalogContract` en los fixtures; `Expedition.assignedResources`; los casos de uso que mutan; `UseCasesSaveTheirChangesTest`.
+- **Por qué:**
+  - Cada caso de uso que cambia algo lo guarda: el comportamiento deja de depender de que los datos estén en memoria.
+  - **Los recursos se guardan explícitamente.** Aprobar, finalizar y consumir mutan recursos a través de la expedición, y el caso de uso sabe qué tocó. Que `save(expedition)` los guardara por detrás escondería una escritura sobre otro agregado.
+  - **`RegisterIncident` guarda antes de publicar el evento,** porque `ProposeReplan` vuelve a buscar la expedición y tiene que encontrar el incidente.
+  - `ZoneRepository` no tiene `save`: `Zone` es inmutable.
+  - Las consultas por requisito del catálogo son métodos `default` del puerto: son reglas de dominio (quién califica y está libre) sobre los recursos que el adaptador trae, y no se repiten en cada adaptador.
+  - Los contratos comparan por id y estado (`snapshot()`), y `ResourceCatalogContract` es un cuarto contrato, con los tests que antes eran de la clase.
+- **Alternativas descartadas:**
+  - Que el adaptador detecte los cambios (dirty checking) y el puerto no tenga `save` — ataría los casos de uso a una sesión abierta, y el informe pide agregar `save`.
+  - Filtrar los requisitos en la base — duplicaría en SQL reglas que el dominio ya tiene.
+  - Pasar el catálogo a `TrackActivity` y `FinishExpedition` por otro servicio — son los casos de uso los que cambian los consumibles, así que reciben el puerto.
+- **Consecuencia:** `TrackActivity` y `FinishExpedition` reciben el catálogo. `save` guarda el último estado, también si no existía: `add` es quien rechaza los duplicados. Cada `save` tiene su test con Mockito, para que olvidarlo falle en `domain` sin necesitar la base; los contratos y los tests de API prueban, contra PostgreSQL, que lo guardado vuelve.
+
+### D67 — Adaptador JPA sobre PostgreSQL, con entidades propias y una instancia por transacción (corrección de la Entrega 2, persistencia, revisa D36, D37 y D51)
+
+- **Origen:** corrección de la Entrega 2: el enunciado exige persistencia real y pruebas de repositorio contra una base. D51 lo había postergado.
+- **Patrón / principio:** adaptador driven (D35) + Data Mapper: el dominio no sabe que hay una base, y las entidades JPA no salen del adaptador. Identity Map por transacción.
+- **Dónde:** en `app`, paquete `adapters.driven.persistence`: `JpaExpeditionRepository`, `JpaReplanProposalRepository`, `JpaZoneRepository`, `JpaResourceCatalog`; `ExpeditionEntity`, `ReplanProposalEntity`, `ZoneEntity`, `ResourceEntity` y sus filas `@Embeddable`; `ExpeditionMapper`, `ReplanReasonMapper`, `IncidentMapper`; `LoadedAggregates`; `db/migration/V1__create_schema.sql`; `docker-compose.yml`. En los tests: `PersistenceTestApplication` con Testcontainers, subclases de los cuatro contratos y `PersistedStateRoundTripTest`.
+- **Por qué:**
+  - **PostgreSQL con Testcontainers** para que los tests corran contra la misma base que la aplicación, sin diferencias de dialecto.
+  - **Entidades separadas del modelo:** D36 prohíbe anotar `domain`. Los mappers trabajan sobre los snapshots de D65, sin saltear reglas.
+  - **Las colecciones de la expedición son filas `@ElementCollection` con orden,** y se reemplazan al guardar. El árbol es una tabla plana con la posición del padre, en orden de recorrido. Una expedición tiene decenas de filas, así que reescribirlas no es un problema real, y evita sincronizar diferencias a mano.
+  - **Una sola instancia por id en cada transacción (`LoadedAggregates`).** Es lo que resuelve la objeción de D15: dentro de una operación, la expedición y el catálogo ven el mismo recurso, y un `save` no puede pisar lo que otra instancia cambió.
+  - **Sin claves foráneas entre agregados.** Una expedición referencia recursos y zonas por id, y una propuesta a su expedición por id: cada agregado se guarda por separado.
+  - Las actividades se guardan con sus dependencias aunque ya no estén agendadas: en una alternativa, una actividad terminada puede depender de una cancelada.
+  - `JpaResourceCatalog` redefine las consultas `default` del puerto solo para delegarlas: `@Transactional` sobre la clase no alcanza a un método heredado de una interfaz, y sin transacción Hibernate no puede leer las colecciones.
+  - `@Version` en las raíces que cambian. Hibernate solo valida el esquema: lo crea Flyway.
+  - `app` ahora conoce Spring Data, y el enforcer sigue protegiendo a `domain`. Revisa "Spring solo en `web`" de D37.
+- **Alternativas descartadas:**
+  - Guardar la expedición como un documento JSON — ahorra tablas y mapeo, pero esconde el esquema, y no se aprovecha lo que PostgreSQL verifica.
+  - Una entidad JPA por nodo con relaciones — más clases y más cascadas para un árbol que siempre se lee y se escribe entero.
+  - H2 para los tests — otra base distinta de la de producción, con otras diferencias.
+- **Consecuencia:** los adaptadores pasan los contratos contra PostgreSQL, y desde D68 la aplicación corre sobre ellos. Correr los tests de `app` requiere Docker.
+
+### D68 — La aplicación corre sobre la base, con la transacción en el borde del caso de uso (corrección de la Entrega 2, persistencia, cierra D51, revisa D37, D45 y D50)
+
+- **Origen:** corrección de la Entrega 2. La aplicación seguía en memoria, y D51 anotaba que no había transacciones ni concurrencia.
+- **Patrón / principio:** Decorator con un proxy sobre cada puerto de entrada + composition root (D37): el dominio sigue sin anotaciones de Spring.
+- **Dónde:** `TransactionalUseCases` en `web`; `FieldOpsConfig` y `ReplanningConfig`; `ConcurrentUpdateException`; `application.yml`; `DemoDataLoader.loadIfEmpty`. Se eliminan los repositorios en memoria; queda `InMemoryEventPublisher`.
+- **Por qué:**
+  - Cada caso de uso es una transacción: todo lo que guarda se confirma junto o no se guarda. El proxy se apoya en los puertos de D63, y distingue escrituras de consultas.
+  - **`ProposeReplan` corre en la misma transacción que el incidente**, por la entrega síncrona de D45: si falla, el incidente se deshace. Revisa la consecuencia de D45, que decía que no había transacción.
+  - **Concurrencia:** `@Version` detecta dos escrituras en conflicto. El proxy traduce el error a `ConcurrentUpdateException`, que la API responde con 409: el dominio no conoce la excepción de Spring.
+  - **El seed solo carga si no hay zonas.** Antes se cargaba en cada arranque, y con datos que sobreviven fallaría por duplicados. Para repetir la demo se borra el volumen con `docker compose down -v`. Revisa D50: el escenario sigue en JSON y no pasa a ser una migración, para no ensuciar una base sin el perfil `demo`.
+  - **Los tests de API limpian la base antes de cada test** con `@Sql`, en vez de levantar un contexto nuevo con `@DirtiesContext`. Comparten un solo contenedor y un solo contexto.
+- **Alternativas descartadas:**
+  - `@Transactional` en los casos de uso — metería Spring en el dominio, y el enforcer lo prohíbe.
+  - Una clase decoradora por puerto — 22 clases iguales.
+  - `@Transactional` en los controllers — la transacción quedaría atada a HTTP, y el cargador de la demo no la tendría.
+  - Mantener los adaptadores en memoria para los tests de dominio — los tests usan dobles propios, y el código de producción no debe tener una segunda implementación sin uso.
+- **Consecuencia:** correr la aplicación y los tests de `web` y `app` requiere Docker. La deuda de D51 queda resuelta.
+
+### D69 — Frontend mínimo con páginas estáticas que consumen la API (corrección de la Entrega 2, cierra el pendiente de D51)
+
+- **Origen:** el enunciado pide un frontend con lo mínimo indispensable para llevar a cabo las funcionalidades, y la corrección de la Entrega 2 señala que no hay. Swagger UI no lo reemplaza.
+- **Patrón / principio:** el frontend es un cliente más de la API (separación cliente-servidor): no agrega lógica de negocio, y lo que rechaza el dominio se muestra tal cual lo devuelve el `ProblemDetail`.
+- **Dónde:** `web/src/main/resources/static`: `index.html`, `styles.css` y módulos JavaScript: `api`, `dom`, `messages`, `catalog`, `expedition-list`, `expedition`, `itinerary`, `planning`, `approval` y `proposals`. `FrontendPagesTest`.
+- **Por qué:**
+  - Cubre el mismo recorrido del guion: administrar el catálogo y las zonas, crear una expedición, agendar actividades (también nocturnas) y bloques, asignar recursos, validar, aceptar advertencias y aprobar, ejecutar, seguir actividades, registrar incidentes, decidir propuestas y ver el informe.
+  - El estado de cada pantalla sale siempre de la API: después de cada acción se vuelve a pedir, así no hay reglas ni estado duplicados en el navegador.
+  - **Sin framework ni build:** los archivos los sirve `web`, así que se levanta con el mismo comando, y no suma Node a la CI.
+  - Un bloque se carga como JSON: construir un árbol con formularios es mucho código para lo que pide el enunciado, y el contrato ya es ese.
+- **Alternativas descartadas:**
+  - Thymeleaf — la opción anotada en octubre; metería la presentación en el servidor con un segundo camino hacia los casos de uso, además de la API.
+  - React u otra SPA con build — un proceso de compilación y dependencias para un frontend mínimo.
+- **Consecuencia:**
+  - La pantalla ofrece iniciar y finalizar en todas las actividades mientras la expedición está en ejecución, porque la respuesta del itinerario no trae el seguimiento. Si la acción no corresponde, el dominio la rechaza y se muestra el motivo.
+  - Las fechas de seguimiento son las del momento de la acción.
+  - Los tests verifican que los archivos se sirven, pero no recorren la pantalla con un navegador: ese recorrido se probó a mano.
+
 ## Funcionalidades nuevas de la Entrega 2
 
 ### F1 — Actividades nocturnas
@@ -1266,7 +1459,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - `business.models.expeditions.ParallelBlock` — bloque cuyas ramas pueden correr a la vez; su duración es el máximo.
   - `business.models.expeditions.PlannedNode` — declaración de lo que se agenda: actividad con horario, bloque o ítem terminado.
   - `business.usecases.ScheduleBlock` y `ScheduleBlockCommand` — agendar un bloque por id de expedición.
-  - `business.usecases.PlannedActivityCommand` y `PlannedNodeCommand` — la descripción de una hoja y del árbol que trae el comando de alta de bloque, por ids, tipo y parámetros (D55).
+  - `business.models.commands.PlannedActivityCommand` y `PlannedNodeCommand` — la descripción de una hoja y del árbol que trae el comando de alta de bloque, por ids, tipo y parámetros (D55).
   - `business.usecases.PlannedActivities` — el resolver de zona, dependencias y reglas, compartido entre `ScheduleActivity` y `ScheduleBlock` (D55).
   - `adapters.driving.rest.ItineraryController` (módulo `web`) — `POST /api/expeditions/{id}/blocks` y `GET /api/expeditions/{id}/itinerary`.
   - `adapters.driving.rest.ExpeditionPlanController` (módulo `web`) — `GET /api/expeditions/{id}/validation` y `/estimate`.
@@ -1342,10 +1535,12 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - `business.usecases.QueryReplanProposals` — consultar una propuesta o las de una expedición.
   - `business.exceptions.NotAResponsibleException`, `ProposalAlreadyDecidedException` y `DuplicateReplanProposalException`.
   - `adapters.driven.InMemoryEventPublisher` e `InMemoryReplanProposalRepository` (módulo `app`).
+    **Revisado en D67 y D68:** `JpaReplanProposalRepository` reemplazó al repositorio en memoria; el publicador sigue.
   - `ReplanningConfig` (módulo `web`) — los beans de F3 en su propia `@Configuration` (D37).
   - `adapters.driving.rest.IncidentController` (módulo `web`) — `POST /api/expeditions/{id}/incidents`, que responde con la propuesta que generó (D58).
   - `adapters.driving.rest.ReplanProposalController` (módulo `web`) — las dos lecturas de propuestas y los dos sub-recursos de decisión (D58).
   - `rest.dtos.RegisterIncidentRequest`, `ReplanProposalResponse`, `ReplanOptionDto`, `ReplanDecisionDto`, `AcceptReplanOptionRequest`, `ReplanDecisionRequest` y `rest.mappers.ReplanningMapper` (módulo `web`) — D58. `IncidentDto` se reusa tal cual del informe (D57).
+  - `business.exceptions.StaleAlternativeException` y `business.models.expeditions.ReplacedPlan` — la alternativa vencida y la revisión de la original sobre la que se armó, agregadas en la corrección de la Entrega 2 (D61).
 - **Clases modificadas:**
   - `Incident` — suma id, actividad afectada, recurso y retraso informados.
   - `Expedition` — `registerIncident` reemplaza a `reportIncident` y guarda la bitácora (`getIncidents`); suma `suspendToReplan` y `requireResponsible`; el constructor recibe los incidentes heredados.
@@ -1355,6 +1550,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - `Itinerary` — suma `dependentsOf` y `movingWith`.
   - `ReplannedActivity` — suma los recursos que la actividad gana (`additions`).
   - `ExpeditionReplanner` — suma `canPlan`; aplica la cascada de cancelación y el arrastre de un retraso; rehace una actividad afectada que ya empezó; copia la bitácora de incidentes a la alternativa.
+  - `Expedition`, `ExpeditionBuilder`, `ApproveExpedition`, `QueryExpeditions` y `ExpeditionResponse` — llevan la revisión de ejecución y rechazan o informan una alternativa vencida (D61).
   - `ExpeditionReporter` — toma los incidentes de la expedición.
   - `Lookups` — suma la búsqueda de una propuesta.
   - `FieldOpsConfig` (módulo `web`) — el `ExpeditionReplanner` pasa a ser un bean compartido.
@@ -1371,6 +1567,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - `ExpeditionLifecycleApiTest.approvingWithACriticalStillOpenFailsAndTheBodyListsIt` pasó a verificar el arreglo de `criticals` además del `detail`. Al escribirlo quedó a la vista que las críticas de ese escenario son tres y no dos: la tercera (`insufficient-supplies`) ya estaba en el mensaje, pero el test solo buscaba dos subcadenas. Es justamente lo que la lista estructurada hace fácil de ver (D58).
 - **Deuda técnica que se decidió no resolver:**
   - **Entrega sin transacción ni reintentos.** Si el suscriptor falla, el incidente queda registrado sin propuesta. Se aceptó porque todo está en memoria y en el mismo hilo; con persistencia real hace falta una transacción o un outbox (D45).
+    **Resuelto en D68:** el incidente y la propuesta se confirman o se deshacen juntos. Sigue sin haber reintentos, y un suscriptor externo seguiría necesitando un outbox.
   - **Un incidente por propuesta.** Dos incidentes sobre la misma actividad generan dos propuestas, y aceptar una deja sin efecto a la otra. Habría que agruparlos si los incidentes encadenados se vuelven frecuentes.
   - **El reemplazo es de a un recurso.** Un incidente nombra a lo sumo un recurso. Si se rompen dos cosas, son dos incidentes.
   - **El retraso lo informa una persona.** El sistema no calcula cuánto correr una actividad; sin retraso informado no hay reprogramación.
@@ -1390,6 +1587,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
   - Reglas de la decisión (solo un responsable, una vez, todo o nada, actividad en curso, propuestas que quedan sin efecto) — `DecideReplanProposalTest`.
   - `RegisterIncident` publica el evento y el suscriptor guarda la propuesta, con Mockito — `RegisterIncidentTest`; el publicador en memoria, `InMemoryEventPublisherTest`.
   - Contrato del repositorio de propuestas — `ReplanProposalRepositoryContract`, que corre `InMemoryReplanProposalRepositoryTest`.
+    **Revisado en D67:** el contrato corre ahora contra `JpaReplanProposalRepositoryTest`.
   - La cascada y el arrastre — `ItineraryCascadeTest` y los tests nuevos de `ExpeditionReplannerTest`; la bitácora de incidentes, `ExpeditionIncidentsTest`.
   - **En la demostración** (D50): el guion registra el incidente sobre la actividad en curso con retraso y recurso afectado, recibe las cinco opciones, cierra la actividad, acepta la reprogramación, aprueba la alternativa —que conserva los bloques y corre lo que depende de la actividad afectada, incluida la nocturna— y recorre la auditoría entera y los dos informes — `DemoScriptApiTest.walksTheScriptOfTheDemoFromTheNightActivityToTheAuditOfTheReplanning`.
 
@@ -1407,8 +1605,8 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
 | Visitor para las operaciones propias del dominio sobre el árbol del itinerario | Lo que el dominio le pregunta a un nodo son pocas operaciones estables (duración, riesgo, consumo, hojas, si dos actividades corren en paralelo, el plan que conserva su forma), y cada una tiene una respuesta natural por tipo de nodo, así que van como métodos de `ItineraryNode` (D39). Un Visitor separaría cada una en una clase aparte y obligaría a tocar todos los visitors al sumar un tipo de bloque, sin que ninguna de ellas lo necesite. **Revisado en D54:** cuando apareció una operación nueva y de afuera del dominio (mostrar el árbol en la respuesta del itinerario), con un motivo distinto (no exponer la estructura a los clientes del dominio, D39), ahí sí se usó un Visitor (`ItineraryNodeVisitor`). Esta fila sigue describiendo por qué las operaciones del propio dominio no lo usan. | Cada operación nueva del dominio sobre el árbol agrega un método a `ItineraryNode` y a sus implementaciones. Cada operación nueva de afuera (otra vista del árbol) agrega un método a `ItineraryNodeVisitor` y a cada visitor existente (D54). Si las operaciones del dominio empezaran a crecer mucho más rápido que los tipos de nodo, convendría reconsiderar también esa parte. |
 | Event Sourcing | La auditoría que pide F3 (plan original, incidente y decisión) ya queda con lo que hay: la expedición original no se reescribe (D25), la alternativa la referencia (D33) y la propuesta guarda el incidente y la decisión (D48). Reconstruir el estado de la expedición desde sus eventos obligaría a modelar cada cambio como evento, versionarlos y guardarlos, para responder lo mismo. | Si hiciera falta reconstruir el estado de una expedición en cualquier momento, o auditar cada asignación y transición y no solo las replanificaciones, habría que reconsiderarlo. |
 | Bean Validation en los DTOs de entrada (`@Valid` y anotaciones de `jakarta.validation`) | Las reglas ya están en el dominio: `DomainArguments` y los constructores rechazan un nombre vacío, una lista de objetivos vacía o un período al revés (D8, D49). Repetirlas en los DTOs daría dos fuentes de verdad que se desincronizan, y la validación de la API quedaría más laxa o más estricta que la del negocio según quién toque cuál. El adaptador no valida: deja pasar lo que llegó y traduce la excepción del dominio a 400. | Los mensajes de error son los del dominio, de a uno por pedido, y no una lista de todos los campos mal a la vez. Si hiciera falta responder todos juntos, la salida es que la validación del dominio devuelva varios resultados (como hace `ApprovalPolicy` con las críticas), no anotar los DTOs. |
-| Entrega asíncrona de eventos (bus o cola) | El criterio de F3 exige que la propuesta exista cuando vuelve el registro del incidente. Con un solo proceso y todo en memoria, la entrega síncrona del `InMemoryEventPublisher` lo garantiza sin reintentos ni orden de entrega que resolver (D45). | Si un suscriptor se vuelve lento o externo (avisar por correo, otro servicio), habría que sumar un adaptador asíncrono detrás del mismo `EventPublisher`, con un outbox para no perder eventos. |
-| JPA (y una base de datos) en esta entrega | El grupo decidió el 11/10 esperar la clase de Spring Data, que cae después de la entrega, en vez de elegir a las apuradas el mapeo y arrastrar esa decisión a todo el proyecto. La persistencia queda en memoria detrás de los mismos puertos de salida, y lo que un repositorio tiene que cumplir está escrito como contrato que corre contra el adaptador real, no contra mocks (D51). | Nada sobrevive a un reinicio, no hay transacciones ni concurrencia, y la consigna pide pruebas reales de persistencia, así que es el riesgo asumido más grande de la entrega. El cambio es un adaptador por puerto con entidades de persistencia separadas y sus mappers (anotar `domain` está prohibido por D36), más un puerto propio para el catálogo (D52); los tres contratos de repositorio pasan a correr también contra la base. Está registrado como deuda técnica en D51. |
+| Entrega asíncrona de eventos (bus o cola) | El criterio de F3 exige que la propuesta exista cuando vuelve el registro del incidente. Con un solo proceso y una transacción por caso de uso, la entrega síncrona del `InMemoryEventPublisher` lo garantiza sin reintentos ni orden de entrega que resolver (D45, D68). | Si un suscriptor se vuelve lento o externo (avisar por correo, otro servicio), habría que sumar un adaptador asíncrono detrás del mismo `EventPublisher`, con un outbox para no perder eventos. |
+| Anotar el dominio con JPA | D36 prohíbe que `domain` dependa de un framework, y el enforcer lo hace cumplir. El adaptador tiene sus propias entidades y mappers, y el dominio solo sabe volcar y reconstruir su estado (D65, D67). | Hay más código de mapeo, y un atributo nuevo se escribe en el modelo, la entidad, el mapper y una migración. `PersistedStateRoundTripTest` avisa si algo se pierde en el camino. |
 | Clases de Java con el escenario de la demostración | Los datos de la demostración son datos: viven en `demo/catalog.json` y `demo/expedition.json`, y el único Java es un cargador genérico que los mete por los casos de uso, igual que el adaptador REST (D50). Una clase que armara el escenario en código lo dejaría en el lenguaje más caro de leer y de cambiar, y haría recompilar para mover un horario. | El esquema de los documentos es el de los cuerpos de la API, así que lo que se puede sembrar es exactamente lo que se puede pedir por HTTP. Un escenario que necesitara un estado que la API no sabe producir no se puede expresar, y eso es a propósito. |
 
 ## Supuestos
@@ -1431,7 +1629,7 @@ Durante la ejecución se registra el comienzo, la finalización, las observacion
 - El enunciado nombra seis estados de una expedición. Agregamos un séptimo, reemplazada (`REPLACED`), para la expedición original cuando se aprueba la alternativa de una replanificación (D33): no es una cancelación ni una finalización, y necesitaba su propio estado terminal.
 - En un bloque secuencial se admiten huecos entre un hijo y el siguiente: el enunciado dice que se ejecutan en secuencia, no que sean contiguos (D40).
 - Un bloque paralelo declara que sus ramas pueden ejecutarse a la vez. Por eso dos ramas no comparten un recurso reutilizable ni tienen dependencias entre sí, aunque sus horarios agendados no se pisen (D40, D41).
-- La duración estimada de un bloque sale de la duración estimada de sus actividades (D4), no de su período agendado: el período dice cuándo ocurre y la estimación, cuánto trabajo hay.
+- La duración estimada de un bloque sale de la duración estimada de sus actividades (D4), no de su período agendado: el período dice cuándo ocurre y la estimación, cuánto tarda en ejecutarse sin contar huecos. En paralelo los tiempos se solapan y por eso se toma el máximo, y en secuencia se suman. Como ninguna actividad se agenda por menos que su estimación (D62), el período de un bloque nunca dura menos que su duración estimada.
 - El consumo estimado de un bloque paralelo es la suma del de sus ramas y no el máximo: los consumibles se gastan aunque las actividades corran a la vez.
 - Los valores de `DroneSurveyRules`, `WildlifeObservationRules`, `WaterQualityMeasurementRules` y `TransferRules` (tiempos, umbrales de riesgo, personal, equipamiento y consumo) son ilustrativos, igual que los de los dos tipos de la Entrega 1: el enunciado no los define.
 - Una actividad nocturna se declara como tal al crearla; no se infiere de su horario. El enunciado la describe como una variante con requisitos propios, y cuándo es de noche depende del lugar y de la época, que el modelo no conoce. Nada verifica que su horario agendado caiga de noche.

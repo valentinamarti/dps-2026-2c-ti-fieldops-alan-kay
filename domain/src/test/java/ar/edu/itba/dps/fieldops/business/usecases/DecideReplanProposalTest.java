@@ -28,7 +28,7 @@ class DecideReplanProposalTest {
     private final IncidentScenario scenario = new IncidentScenario();
 
     private ReplanProposal stormOnTheAfternoon() {
-        return scenario.registerIncident.register(scenario.incidentOn(scenario.afternoon,
+        return scenario.registered(scenario.incidentOn(scenario.afternoon,
                 IncidentReport.of("Storm forecast", TEN).delayingBy(Duration.ofHours(1))));
     }
 
@@ -37,7 +37,7 @@ class DecideReplanProposalTest {
         final var proposal = stormOnTheAfternoon();
 
         assertThrows(NotAResponsibleException.class,
-                () -> scenario.decide.accept(proposal.getId(), 1, scenario.decisionBy(scenario.outsider, "I think so")));
+                () -> scenario.accepted(proposal.getId(), 1, scenario.decisionBy(scenario.outsider, "I think so")));
         assertThrows(NotAResponsibleException.class,
                 () -> scenario.decide.reject(proposal.getId(), scenario.decisionBy(scenario.outsider, "I think not")));
         assertTrue(proposal.isPending());
@@ -59,7 +59,7 @@ class DecideReplanProposalTest {
         scenario.decide.reject(proposal.getId(), scenario.decisionBy(scenario.leader, "We wait"));
 
         assertThrows(ProposalAlreadyDecidedException.class,
-                () -> scenario.decide.accept(proposal.getId(), 1, scenario.decisionBy(scenario.leader, "Changed my mind")));
+                () -> scenario.accepted(proposal.getId(), 1, scenario.decisionBy(scenario.leader, "Changed my mind")));
     }
 
     @Test
@@ -69,7 +69,7 @@ class DecideReplanProposalTest {
         assertThrows(NotFoundException.class,
                 () -> scenario.decide.reject(new ReplanProposalId("rp-99"), scenario.decisionBy(scenario.leader, "No")));
         assertThrows(NotFoundException.class,
-                () -> scenario.decide.accept(proposal.getId(), 9, scenario.decisionBy(scenario.leader, "Yes")));
+                () -> scenario.accepted(proposal.getId(), 9, scenario.decisionBy(scenario.leader, "Yes")));
     }
 
     @Test
@@ -78,7 +78,7 @@ class DecideReplanProposalTest {
         scenario.expedition.startActivity(scenario.itemOf(scenario.expedition, scenario.morning), LocalDateTime.of(2026, 10, 1, 9, 0));
 
         assertThrows(ActivitiesInProgressException.class,
-                () -> scenario.decide.accept(proposal.getId(), 1, scenario.decisionBy(scenario.leader, "Delay it")));
+                () -> scenario.accepted(proposal.getId(), 1, scenario.decisionBy(scenario.leader, "Delay it")));
         assertEquals(ExpeditionStatus.IN_EXECUTION, scenario.expedition.getStatus());
         assertTrue(proposal.isPending());
         assertEquals(1, scenario.expeditions.findAll().size());
@@ -88,11 +88,11 @@ class DecideReplanProposalTest {
     void anIncidentOnAnActivityInProgressIsAcceptedOnceItIsClosedAndTheActivityIsRedone() {
         final var morningItem = scenario.itemOf(scenario.expedition, scenario.morning);
         scenario.expedition.startActivity(morningItem, LocalDateTime.of(2026, 10, 1, 9, 0));
-        final var proposal = scenario.registerIncident.register(scenario.incidentOn(scenario.morning,
+        final var proposal = scenario.registered(scenario.incidentOn(scenario.morning,
                 IncidentReport.of("Current too strong", TEN).delayingBy(Duration.ofHours(2))));
         scenario.expedition.finishActivity(morningItem, TEN, "Aborted after one transect");
 
-        final var alternative = scenario.decide.accept(proposal.getId(), 1, scenario.decisionBy(scenario.leader, "Redo it later"));
+        final var alternative = scenario.accepted(proposal.getId(), 1, scenario.decisionBy(scenario.leader, "Redo it later"));
 
         final var redone = scenario.itemOf(alternative, scenario.morning);
         assertFalse(redone.isStarted());
@@ -108,7 +108,7 @@ class DecideReplanProposalTest {
         scenario.expedition.finishActivity(dependentItem, LocalDateTime.of(2026, 10, 1, 10, 30), "Done ahead of time");
 
         assertThrows(InvalidScheduleException.class,
-                () -> scenario.decide.accept(proposal.getId(), 1, scenario.decisionBy(scenario.leader, "Delay it")));
+                () -> scenario.accepted(proposal.getId(), 1, scenario.decisionBy(scenario.leader, "Delay it")));
         assertEquals(ExpeditionStatus.IN_EXECUTION, scenario.expedition.getStatus());
         assertTrue(proposal.isPending());
     }
@@ -116,20 +116,20 @@ class DecideReplanProposalTest {
     @Test
     void acceptingOneProposalSupersedesTheOtherPendingOnesOfTheExpedition() {
         final var first = stormOnTheAfternoon();
-        final var second = scenario.registerIncident.register(scenario.incidentOn(scenario.morning, IncidentReport.of("Jar broke", TEN)));
+        final var second = scenario.registered(scenario.incidentOn(scenario.morning, IncidentReport.of("Jar broke", TEN)));
 
-        scenario.decide.accept(second.getId(), 1, scenario.decisionBy(scenario.leader, "Skip the morning"));
+        scenario.accepted(second.getId(), 1, scenario.decisionBy(scenario.leader, "Skip the morning"));
 
         assertEquals(ReplanProposalStatus.SUPERSEDED, first.getStatus());
         assertEquals(Optional.of(second.getId()), first.getSupersededBy());
         assertThrows(ProposalAlreadyDecidedException.class,
-                () -> scenario.decide.accept(first.getId(), 1, scenario.decisionBy(scenario.leader, "Also this")));
+                () -> scenario.accepted(first.getId(), 1, scenario.decisionBy(scenario.leader, "Also this")));
     }
 
     @Test
     void anAcceptedAlternativeThatIsNeverApprovedLeavesTheOriginalSuspendedToBeResumed() {
         final var proposal = stormOnTheAfternoon();
-        scenario.decide.accept(proposal.getId(), 1, scenario.decisionBy(scenario.leader, "Delay it"));
+        scenario.accepted(proposal.getId(), 1, scenario.decisionBy(scenario.leader, "Delay it"));
 
         scenario.expedition.resume();
 

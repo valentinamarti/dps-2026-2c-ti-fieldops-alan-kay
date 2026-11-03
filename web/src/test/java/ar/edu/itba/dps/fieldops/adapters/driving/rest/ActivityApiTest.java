@@ -7,7 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
-import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
@@ -17,7 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
+@Sql("/clean-database.sql")
 class ActivityApiTest {
     private static final String NIGHT_SAMPLING = """
             {
@@ -146,6 +146,28 @@ class ActivityApiTest {
         scheduleIn(expedition, NIGHT_SAMPLING.replace("\"start\": \"2026-10-01T20:00:00\"", "\"start\": \"2026-10-01T10:00:00\""))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value("Night sampling must be scheduled within its time window"));
+    }
+
+    @Test
+    void answersBadRequestWhenTheScheduleIsShorterThanTheEstimateOfTheActivity() throws Exception {
+        final var expedition = anExpeditionInTheCoastalReef();
+
+        scheduleIn(expedition, """
+                {
+                  "id": "a-1",
+                  "name": "Reef sampling",
+                  "timeWindow": {"start": "2026-10-01T08:00:00", "end": "2026-10-01T18:00:00"},
+                  "scheduledPeriod": {"start": "2026-10-01T09:00:00", "end": "2026-10-01T10:00:00"},
+                  "zoneId": "z-1",
+                  "dependencyIds": [],
+                  "type": "Sample collection",
+                  "parameters": {"sampleCount": 3},
+                  "atNight": false
+                }
+                """)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(
+                        "Reef sampling is estimated to take 120 minutes and cannot be scheduled for 60"));
     }
 
     private ResultActions scheduleIn(String expeditionId, String body) throws Exception {

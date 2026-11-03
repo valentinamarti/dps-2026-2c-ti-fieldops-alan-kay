@@ -8,4 +8,6 @@ import java.util.Optional;
 public interface ReplanReason {
 
     Optional<ReplannedActivity> replan(ItineraryItem affected);
+
+    <T> T accept(ReplanReasonVisitor<T> visitor);
 }

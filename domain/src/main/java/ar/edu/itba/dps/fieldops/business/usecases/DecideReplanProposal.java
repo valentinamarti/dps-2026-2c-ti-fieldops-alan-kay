@@ -1,18 +1,21 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidScheduleException;
+import ar.edu.itba.dps.fieldops.business.models.commands.ReplanDecisionCommand;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanDecision;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposal;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposalId;
-import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.models.responses.ExpeditionView;
+import ar.edu.itba.dps.fieldops.business.ports.in.DecideReplanProposalPort;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ReplanProposalRepository;
 import ar.edu.itba.dps.fieldops.business.replanning.ExpeditionReplanner;
 
 import java.util.Objects;
 
-public class DecideReplanProposal {
+public class DecideReplanProposal implements DecideReplanProposalPort {
     private final ReplanProposalRepository proposals;
     private final ExpeditionRepository expeditions;
     private final ExpeditionReplanner replanner;
@@ -28,7 +31,8 @@ public class DecideReplanProposal {
         this.catalog = Objects.requireNonNull(catalog, "catalog is required");
     }
 
-    public Expedition accept(ReplanProposalId proposalId, int optionNumber, ReplanDecisionCommand command) {
+    @Override
+    public ExpeditionView accept(ReplanProposalId proposalId, int optionNumber, ReplanDecisionCommand command) {
         final var proposal = Lookups.proposal(proposals, proposalId);
         proposal.requirePending();
         final var option = proposal.option(optionNumber);
@@ -39,18 +43,25 @@ public class DecideReplanProposal {
             throw new InvalidScheduleException("the option %d of the proposal %s can no longer be planned".formatted(optionNumber, proposalId));
         }
         original.suspendToReplan();
+        expeditions.save(original);
         final var alternative = replanExpedition.replan(original, affected, option.reason());
         proposal.accept(optionNumber, decision, alternative.getId());
+        proposals.save(proposal);
         proposals.findByExpedition(original.getId()).stream()
                 .filter(ReplanProposal::isPending)
-                .forEach(other -> other.supersedeBy(proposal.getId()));
-        return alternative;
+                .forEach(other -> {
+                    other.supersedeBy(proposal.getId());
+                    proposals.save(other);
+                });
+        return ExpeditionView.of(alternative);
     }
 
+    @Override
     public void reject(ReplanProposalId proposalId, ReplanDecisionCommand command) {
         final var proposal = Lookups.proposal(proposals, proposalId);
         proposal.requirePending();
         proposal.reject(decisionOf(Lookups.expedition(expeditions, proposal.getOriginalExpedition()), command));
+        proposals.save(proposal);
     }
 
     private ReplanDecision decisionOf(Expedition original, ReplanDecisionCommand command) {

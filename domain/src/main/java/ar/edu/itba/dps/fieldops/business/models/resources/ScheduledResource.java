@@ -10,6 +10,14 @@ public abstract class ScheduledResource implements ReusableResource {
 
     private final AvailabilityCalendar calendar = new AvailabilityCalendar();
 
+    public CalendarSnapshot calendarSnapshot() {
+        return calendar.snapshot();
+    }
+
+    void restoreCalendar(CalendarSnapshot snapshot) {
+        calendar.restore(snapshot);
+    }
+
     @Override
     public boolean isAvailableDuring(TimePeriod period) {
         return calendar.isFreeDuring(period);
@@ -33,5 +41,15 @@ public abstract class ScheduledResource implements ReusableResource {
     @Override
     public void markUnavailable(Unavailability unavailability) {
         calendar.markUnavailable(unavailability);
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        return other instanceof ScheduledResource that && getId().equals(that.getId());
+    }
+
+    @Override
+    public int hashCode() {
+        return getId().hashCode();
     }
 }

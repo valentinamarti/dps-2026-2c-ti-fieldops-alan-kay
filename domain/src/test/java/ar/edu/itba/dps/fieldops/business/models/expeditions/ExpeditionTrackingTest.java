@@ -7,6 +7,7 @@ import ar.edu.itba.dps.fieldops.business.exceptions.InvalidTrackingException;
 import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.interfaces.activities.ActivityRules;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
+import ar.edu.itba.dps.fieldops.business.models.activities.ActivityDefinition;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.activities.DepletableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.ReusableRequirement;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.assignCooler;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
@@ -230,6 +232,11 @@ class ExpeditionTrackingTest {
     }
 
     private static final class FuelAndContainersRules implements ActivityRules {
+        @Override
+        public ActivityDefinition definition() {
+            return new ActivityDefinition("fixed", Map.of(), false);
+        }
+
 
         @Override
         public Duration estimatedDuration() {

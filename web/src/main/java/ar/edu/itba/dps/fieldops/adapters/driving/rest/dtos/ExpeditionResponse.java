@@ -7,5 +7,5 @@ import java.util.List;
 public record ExpeditionResponse(String id, String name, ExpeditionStatus status, PeriodDto period,
                                  List<String> objectives, List<String> zoneIds, List<String> responsibleIds,
                                  List<String> grantedPermits, RestrictionsDto restrictions,
-                                 String replacedExpeditionId, String replacementId) {
+                                 String replacedExpeditionId, String replacementId, boolean staleAlternative) {
 }

@@ -1,9 +1,14 @@
 package ar.edu.itba.dps.fieldops;
 
 import ar.edu.itba.dps.fieldops.adapters.driven.InMemoryEventPublisher;
-import ar.edu.itba.dps.fieldops.adapters.driven.InMemoryReplanProposalRepository;
+import ar.edu.itba.dps.fieldops.adapters.driven.persistence.JpaReplanProposalRepository;
+import ar.edu.itba.dps.fieldops.adapters.driven.persistence.LoadedAggregates;
+import ar.edu.itba.dps.fieldops.adapters.driven.persistence.ReplanProposalJpaRepository;
 import ar.edu.itba.dps.fieldops.business.interfaces.events.EventSubscriber;
-import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.ports.in.DecideReplanProposalPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.QueryReplanProposalsPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.RegisterIncidentPort;
 import ar.edu.itba.dps.fieldops.business.providers.EventPublisher;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ReplanProposalRepository;
@@ -24,8 +29,9 @@ import java.util.List;
 @Configuration
 public class ReplanningConfig {
     @Bean
-    ReplanProposalRepository replanProposalRepository() {
-        return new InMemoryReplanProposalRepository();
+    ReplanProposalRepository replanProposalRepository(ReplanProposalJpaRepository proposals, ResourceCatalog catalog,
+                                                      LoadedAggregates loaded) {
+        return new JpaReplanProposalRepository(proposals, catalog, loaded);
     }
 
     @Bean
@@ -41,19 +47,19 @@ public class ReplanningConfig {
     }
 
     @Bean
-    RegisterIncident registerIncident(ExpeditionRepository expeditions, EventPublisher publisher, ReplanProposalRepository proposals) {
-        return new RegisterIncident(expeditions, publisher, proposals);
+    RegisterIncidentPort registerIncident(ExpeditionRepository expeditions, EventPublisher publisher, ReplanProposalRepository proposals, TransactionalUseCases transactional) {
+        return transactional.writing(RegisterIncidentPort.class, new RegisterIncident(expeditions, publisher, proposals));
     }
 
     @Bean
-    DecideReplanProposal decideReplanProposal(ReplanProposalRepository proposals, ExpeditionRepository expeditions,
+    DecideReplanProposalPort decideReplanProposal(ReplanProposalRepository proposals, ExpeditionRepository expeditions,
                                               ExpeditionReplanner replanner, ReplanExpedition replanExpedition,
-                                              ResourceCatalog catalog) {
-        return new DecideReplanProposal(proposals, expeditions, replanner, replanExpedition, catalog);
+                                              ResourceCatalog catalog, TransactionalUseCases transactional) {
+        return transactional.writing(DecideReplanProposalPort.class, new DecideReplanProposal(proposals, expeditions, replanner, replanExpedition, catalog));
     }
 
     @Bean
-    QueryReplanProposals queryReplanProposals(ReplanProposalRepository proposals, ExpeditionRepository expeditions) {
-        return new QueryReplanProposals(proposals, expeditions);
+    QueryReplanProposalsPort queryReplanProposals(ReplanProposalRepository proposals, ExpeditionRepository expeditions, TransactionalUseCases transactional) {
+        return transactional.reading(QueryReplanProposalsPort.class, new QueryReplanProposals(proposals, expeditions));
     }
 }

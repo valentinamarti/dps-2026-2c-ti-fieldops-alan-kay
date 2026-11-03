@@ -2,11 +2,13 @@ package ar.edu.itba.dps.fieldops.business.usecases;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidTrackingException;
 import ar.edu.itba.dps.fieldops.business.exceptions.NotFoundException;
+import ar.edu.itba.dps.fieldops.business.models.commands.RegisterIncidentCommand;
 import ar.edu.itba.dps.fieldops.business.models.events.IncidentRegistered;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.IncidentReport;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposal;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposalId;
+import ar.edu.itba.dps.fieldops.business.models.responses.ReplanProposalView;
 import ar.edu.itba.dps.fieldops.business.providers.EventPublisher;
 import ar.edu.itba.dps.fieldops.business.providers.ReplanProposalRepository;
 import org.junit.jupiter.api.Test;
@@ -16,9 +18,9 @@ import java.util.Optional;
 
 import static ar.edu.itba.dps.fieldops.business.usecases.IncidentScenario.TEN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -41,7 +43,18 @@ class RegisterIncidentTest {
         final var incident = scenario.expedition.getIncidents().getFirst();
         verify(publisher).publish(new IncidentRegistered(scenario.expedition.getId(), incident));
         verify(proposals).findByIncident(incident.id());
-        assertSame(expected, proposal);
+        assertEquals(ReplanProposalView.of(expected), proposal);
+    }
+
+    @Test
+    void savesTheExpeditionBeforePublishingTheEvent() {
+        when(proposals.findByIncident(any())).thenReturn(Optional.of(mock(ReplanProposal.class)));
+
+        registerIncident.register(scenario.incidentOn(scenario.afternoon, IncidentReport.of("Storm forecast", TEN)));
+
+        final var order = inOrder(scenario.expeditions, publisher);
+        order.verify(scenario.expeditions).save(scenario.expedition);
+        order.verify(publisher).publish(any());
     }
 
     @Test

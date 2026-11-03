@@ -2,10 +2,10 @@ package ar.edu.itba.dps.fieldops.adapters.driving.rest.mappers;
 
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.InstrumentResponse;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.RegisterInstrumentRequest;
-import ar.edu.itba.dps.fieldops.business.models.resources.Instrument;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
-import ar.edu.itba.dps.fieldops.business.usecases.RegisterInstrumentCommand;
+import ar.edu.itba.dps.fieldops.business.models.commands.RegisterInstrumentCommand;
+import ar.edu.itba.dps.fieldops.business.models.responses.InstrumentView;
 
 public final class InstrumentMapper {
     private InstrumentMapper() {
@@ -19,11 +19,11 @@ public final class InstrumentMapper {
                 Mappings.toCertifications(request.certifications()));
     }
 
-    public static InstrumentResponse toResponse(Instrument instrument) {
+    public static InstrumentResponse toResponse(InstrumentView instrument) {
         return new InstrumentResponse(
-                instrument.getId().value(),
-                instrument.getName(),
-                instrument.getCategory().name(),
-                Mappings.certificationNames(instrument.getCertifications()));
+                instrument.id().value(),
+                instrument.name(),
+                instrument.category().name(),
+                Mappings.certificationNames(instrument.certifications()));
     }
 }

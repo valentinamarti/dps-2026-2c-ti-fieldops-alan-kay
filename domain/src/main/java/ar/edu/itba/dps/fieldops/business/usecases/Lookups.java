@@ -3,6 +3,8 @@ package ar.edu.itba.dps.fieldops.business.usecases;
 import ar.edu.itba.dps.fieldops.business.exceptions.NotFoundException;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.DepletableResource;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.Equipment;
+import ar.edu.itba.dps.fieldops.business.interfaces.resources.Resource;
+import ar.edu.itba.dps.fieldops.business.interfaces.resources.ResourceVisitor;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
@@ -10,7 +12,7 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
 import ar.edu.itba.dps.fieldops.business.models.resources.Instrument;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
-import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposal;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposalId;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
@@ -56,18 +58,18 @@ final class Lookups {
     }
 
     static Vehicle vehicle(ResourceCatalog catalog, ResourceId id) {
-        return ofKind(catalog.findEquipment(id), Vehicle.class, "vehicle", id);
+        return ofKind(catalog.findEquipment(id), ResourceKinds.VEHICLES, "vehicle", id);
     }
 
     static Instrument instrument(ResourceCatalog catalog, ResourceId id) {
-        return ofKind(catalog.findEquipment(id), Instrument.class, "instrument", id);
+        return ofKind(catalog.findEquipment(id), ResourceKinds.INSTRUMENTS, "instrument", id);
     }
 
     static Depletable depletable(ResourceCatalog catalog, ResourceId id) {
-        return ofKind(catalog.findSupply(id), Depletable.class, "supply", id);
+        return ofKind(catalog.findSupply(id), ResourceKinds.SUPPLIES, "supply", id);
     }
 
-    private static <T> T ofKind(Optional<?> found, Class<T> kind, String name, ResourceId id) {
-        return found.filter(kind::isInstance).map(kind::cast).orElseThrow(() -> new NotFoundException(name, id));
+    private static <T> T ofKind(Optional<? extends Resource> found, ResourceVisitor<Optional<T>> kind, String name, ResourceId id) {
+        return found.flatMap(resource -> resource.accept(kind)).orElseThrow(() -> new NotFoundException(name, id));
     }
 }

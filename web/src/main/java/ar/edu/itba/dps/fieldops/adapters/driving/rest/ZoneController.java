@@ -3,8 +3,8 @@ package ar.edu.itba.dps.fieldops.adapters.driving.rest;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.RegisterZoneRequest;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.ZoneResponse;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.mappers.ZoneMapper;
-import ar.edu.itba.dps.fieldops.business.usecases.QueryZones;
-import ar.edu.itba.dps.fieldops.business.usecases.RegisterZone;
+import ar.edu.itba.dps.fieldops.business.ports.in.QueryZonesPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.RegisterZonePort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,10 +24,10 @@ import java.util.Objects;
 @RequestMapping("/api/zones")
 @Tag(name = "Zones", description = "Registering and querying the zones")
 public class ZoneController {
-    private final RegisterZone registerZone;
-    private final QueryZones queryZones;
+    private final RegisterZonePort registerZone;
+    private final QueryZonesPort queryZones;
 
-    public ZoneController(RegisterZone registerZone, QueryZones queryZones) {
+    public ZoneController(RegisterZonePort registerZone, QueryZonesPort queryZones) {
         this.registerZone = Objects.requireNonNull(registerZone, "registerZone is required");
         this.queryZones = Objects.requireNonNull(queryZones, "queryZones is required");
     }

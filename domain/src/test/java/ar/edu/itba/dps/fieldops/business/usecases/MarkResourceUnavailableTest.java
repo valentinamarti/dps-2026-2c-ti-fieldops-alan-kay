@@ -1,7 +1,8 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.NotFoundException;
-import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.fixtures.FakeResourceCatalog;
+import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.resources.Unavailability;
 import org.junit.jupiter.api.Test;
@@ -19,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MarkResourceUnavailableTest {
-    private final ResourceCatalog catalog = new ResourceCatalog();
+    private final ResourceCatalog catalog = new FakeResourceCatalog();
     private final MarkResourceUnavailable markUnavailable = new MarkResourceUnavailable(catalog);
     private final Unavailability sickLeave = new Unavailability(hours(8, 12), "Sick leave");
 

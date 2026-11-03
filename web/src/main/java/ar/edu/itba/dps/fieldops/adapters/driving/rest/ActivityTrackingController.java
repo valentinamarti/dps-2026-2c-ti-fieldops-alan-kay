@@ -6,7 +6,7 @@ import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.StartActivityRequest;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Observation;
-import ar.edu.itba.dps.fieldops.business.usecases.TrackActivity;
+import ar.edu.itba.dps.fieldops.business.ports.in.TrackActivityPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,9 +24,9 @@ import java.util.Objects;
 @RequestMapping("/api/expeditions/{expeditionId}/activities/{activityId}")
 @Tag(name = "Tracking", description = "Tracking a scheduled activity while the expedition is in execution")
 public class ActivityTrackingController {
-    private final TrackActivity trackActivity;
+    private final TrackActivityPort trackActivity;
 
-    public ActivityTrackingController(TrackActivity trackActivity) {
+    public ActivityTrackingController(TrackActivityPort trackActivity) {
         this.trackActivity = Objects.requireNonNull(trackActivity, "trackActivity is required");
     }
 

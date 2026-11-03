@@ -2,6 +2,7 @@ package ar.edu.itba.dps.fieldops.business.fixtures;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.DuplicateExpeditionException;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
@@ -17,7 +18,6 @@ import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expe
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -28,9 +28,13 @@ public abstract class ExpeditionRepositoryContract {
 
     protected abstract ExpeditionRepository createRepository();
 
+    protected void registerReferences(Zone zone, Person responsible) {
+    }
+
     @BeforeEach
     void setUpRepository() {
         repository = createRepository();
+        registerReferences(coast, leader);
     }
 
     @Test
@@ -51,11 +55,32 @@ public abstract class ExpeditionRepositoryContract {
     }
 
     @Test
-    void findsTheVeryExpeditionThatWasAdded() {
+    void findsTheExpeditionThatWasAddedWithItsState() {
         final var expedition = expeditionIn(coast, leader).build(repository);
         repository.add(expedition);
 
-        assertSame(expedition, repository.findById(expedition.getId()).orElseThrow());
+        assertEquals(expedition.snapshot(), repository.findById(expedition.getId()).orElseThrow().snapshot());
+    }
+
+    @Test
+    void findsASavedExpeditionWithItsLatestState() {
+        final var expedition = expeditionIn(coast, leader).build(repository);
+        repository.add(expedition);
+
+        expedition.submitForReview();
+        repository.save(expedition);
+
+        assertEquals(ExpeditionStatus.IN_REVIEW, repository.findById(expedition.getId()).orElseThrow().getStatus());
+    }
+
+    @Test
+    void doesNotKeepAChangeThatWasNotSaved() {
+        final var expedition = expeditionIn(coast, leader).build(repository);
+        repository.add(expedition);
+
+        expedition.submitForReview();
+
+        assertEquals(ExpeditionStatus.DRAFT, repository.findById(expedition.getId()).orElseThrow().getStatus());
     }
 
     @Test

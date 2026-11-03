@@ -4,16 +4,7 @@ import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.AssignmentCandidatesR
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.EquipmentCandidatesDto;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.StaffCandidatesDto;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.SupplyCandidatesDto;
-import ar.edu.itba.dps.fieldops.business.interfaces.resources.DepletableResource;
-import ar.edu.itba.dps.fieldops.business.interfaces.resources.Equipment;
-import ar.edu.itba.dps.fieldops.business.models.activities.DepletableRequirement;
-import ar.edu.itba.dps.fieldops.business.models.activities.ReusableRequirement;
-import ar.edu.itba.dps.fieldops.business.models.activities.StaffRequirement;
-import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
-import ar.edu.itba.dps.fieldops.business.models.resources.Instrument;
-import ar.edu.itba.dps.fieldops.business.models.resources.Person;
-import ar.edu.itba.dps.fieldops.business.models.resources.Vehicle;
-import ar.edu.itba.dps.fieldops.business.usecases.AssignmentCandidates;
+import ar.edu.itba.dps.fieldops.business.models.responses.AssignmentCandidates;
 
 public final class AssignmentCandidatesMapper {
     private AssignmentCandidatesMapper() {
@@ -26,25 +17,19 @@ public final class AssignmentCandidatesMapper {
                 candidates.supplies().stream().map(AssignmentCandidatesMapper::toSupplyCandidates).toList());
     }
 
-    private static StaffCandidatesDto toStaffCandidates(AssignmentCandidates.For<StaffRequirement, Person> entry) {
+    private static StaffCandidatesDto toStaffCandidates(AssignmentCandidates.ForStaff entry) {
         return new StaffCandidatesDto(ActivityMapper.toDto(entry.requirement()),
                 entry.candidates().stream().map(StaffMapper::toResponse).toList());
     }
 
-    private static EquipmentCandidatesDto toEquipmentCandidates(
-            AssignmentCandidates.For<ReusableRequirement, Equipment> entry) {
+    private static EquipmentCandidatesDto toEquipmentCandidates(AssignmentCandidates.ForEquipment entry) {
         return new EquipmentCandidatesDto(ActivityMapper.toDto(entry.requirement()),
-                entry.candidates().stream()
-                        .filter(Vehicle.class::isInstance).map(Vehicle.class::cast)
-                        .map(VehicleMapper::toResponse).toList(),
-                entry.candidates().stream()
-                        .filter(Instrument.class::isInstance).map(Instrument.class::cast)
-                        .map(InstrumentMapper::toResponse).toList());
+                entry.vehicles().stream().map(VehicleMapper::toResponse).toList(),
+                entry.instruments().stream().map(InstrumentMapper::toResponse).toList());
     }
 
-    private static SupplyCandidatesDto toSupplyCandidates(
-            AssignmentCandidates.For<DepletableRequirement, DepletableResource> entry) {
+    private static SupplyCandidatesDto toSupplyCandidates(AssignmentCandidates.ForSupplies entry) {
         return new SupplyCandidatesDto(ActivityMapper.toDto(entry.requirement()),
-                entry.candidates().stream().map(Depletable.class::cast).map(SupplyMapper::toResponse).toList());
+                entry.candidates().stream().map(SupplyMapper::toResponse).toList());
     }
 }

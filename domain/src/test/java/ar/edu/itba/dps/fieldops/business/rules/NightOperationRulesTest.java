@@ -1,6 +1,7 @@
 package ar.edu.itba.dps.fieldops.business.rules;
 
 import ar.edu.itba.dps.fieldops.business.interfaces.activities.ActivityRules;
+import ar.edu.itba.dps.fieldops.business.models.activities.ActivityDefinition;
 import ar.edu.itba.dps.fieldops.business.models.activities.DepletableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.ReusableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
@@ -20,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -88,6 +90,11 @@ class NightOperationRulesTest {
     }
 
     private static class FixedRules implements ActivityRules {
+        @Override
+        public ActivityDefinition definition() {
+            return new ActivityDefinition("fixed", Map.of(), false);
+        }
+
         private final RiskLevel risk;
 
         FixedRules(RiskLevel risk) {

@@ -1,11 +1,7 @@
 package ar.edu.itba.dps.fieldops.business.fixtures;
 
+import ar.edu.itba.dps.fieldops.business.interfaces.activities.ActivityRules;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
-import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCatalog;
-import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
-import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
-import ar.edu.itba.dps.fieldops.business.usecases.CreateExpedition;
-import org.mockito.Mockito;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
@@ -18,15 +14,22 @@ import ar.edu.itba.dps.fieldops.business.models.resources.Certification;
 import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
 import ar.edu.itba.dps.fieldops.business.models.resources.Instrument;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
+import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.resources.Vehicle;
 import ar.edu.itba.dps.fieldops.business.models.zones.Permit;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
+import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
+import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
+import ar.edu.itba.dps.fieldops.business.rules.ActivityRulesDecorator;
 import ar.edu.itba.dps.fieldops.business.rules.DivingRules;
 import ar.edu.itba.dps.fieldops.business.rules.NightOperationRules;
 import ar.edu.itba.dps.fieldops.business.rules.SampleCollectionRules;
+import ar.edu.itba.dps.fieldops.business.usecases.CreateExpedition;
+import org.mockito.Mockito;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
@@ -69,6 +72,10 @@ public final class ExpeditionFixtures {
 
     public static Activity sampling(String id, Zone zone, TimePeriod window, Activity... dependencies) {
         return new Activity(new ActivityId(id), "Sampling " + id, window, zone, List.of(dependencies), new SampleCollectionRules(3));
+    }
+
+    public static Activity oneHourSampling(String id, Zone zone, TimePeriod window, Activity... dependencies) {
+        return new Activity(new ActivityId(id), "Sampling " + id, window, zone, List.of(dependencies), new OneHourRules(new SampleCollectionRules(3)));
     }
 
     public static Activity diving(String id, Zone zone, TimePeriod window, int maxDepthMeters) {
@@ -114,7 +121,7 @@ public final class ExpeditionFixtures {
     }
 
     public static CreateExpedition createExpeditionOn(ExpeditionRepository repository) {
-        return new CreateExpedition(repository, Mockito.mock(ZoneRepository.class), new ResourceCatalog());
+        return new CreateExpedition(repository, Mockito.mock(ZoneRepository.class), new FakeResourceCatalog());
     }
 
     public static ExpeditionBuilder expeditionIn(Zone zone, Person responsible) {
@@ -125,5 +132,16 @@ public final class ExpeditionFixtures {
                 .addZone(zone)
                 .addResponsible(responsible)
                 .withRestrictions(new ExpeditionRestrictions(10, RiskLevel.MEDIUM));
+    }
+
+    private static final class OneHourRules extends ActivityRulesDecorator {
+        private OneHourRules(ActivityRules base) {
+            super(base);
+        }
+
+        @Override
+        public Duration estimatedDuration() {
+            return Duration.ofHours(1);
+        }
     }
 }

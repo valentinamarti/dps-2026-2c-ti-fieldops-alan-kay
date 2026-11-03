@@ -4,8 +4,8 @@ import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.CreateExpeditionReque
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.ExpeditionResponse;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.mappers.ExpeditionMapper;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
-import ar.edu.itba.dps.fieldops.business.usecases.CreateExpedition;
-import ar.edu.itba.dps.fieldops.business.usecases.QueryExpeditions;
+import ar.edu.itba.dps.fieldops.business.ports.in.CreateExpeditionPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.QueryExpeditionsPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,10 +24,10 @@ import java.util.Objects;
 @RequestMapping("/api/expeditions")
 @Tag(name = "Expeditions", description = "Creating and querying expeditions")
 public class ExpeditionController {
-    private final CreateExpedition createExpedition;
-    private final QueryExpeditions queryExpeditions;
+    private final CreateExpeditionPort createExpedition;
+    private final QueryExpeditionsPort queryExpeditions;
 
-    public ExpeditionController(CreateExpedition createExpedition, QueryExpeditions queryExpeditions) {
+    public ExpeditionController(CreateExpeditionPort createExpedition, QueryExpeditionsPort queryExpeditions) {
         this.createExpedition = Objects.requireNonNull(createExpedition, "createExpedition is required");
         this.queryExpeditions = Objects.requireNonNull(queryExpeditions, "queryExpeditions is required");
     }

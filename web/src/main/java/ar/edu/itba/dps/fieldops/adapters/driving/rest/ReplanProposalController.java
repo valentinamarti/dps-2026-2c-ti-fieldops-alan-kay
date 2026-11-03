@@ -8,8 +8,8 @@ import ar.edu.itba.dps.fieldops.adapters.driving.rest.mappers.ExpeditionMapper;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.mappers.ReplanningMapper;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposalId;
-import ar.edu.itba.dps.fieldops.business.usecases.DecideReplanProposal;
-import ar.edu.itba.dps.fieldops.business.usecases.QueryReplanProposals;
+import ar.edu.itba.dps.fieldops.business.ports.in.DecideReplanProposalPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.QueryReplanProposalsPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,10 +30,10 @@ import java.util.Objects;
 @RequestMapping("/api")
 @Tag(name = "Replan proposals", description = "Reading the replanning proposed after an incident and deciding on it")
 public class ReplanProposalController {
-    private final QueryReplanProposals queryReplanProposals;
-    private final DecideReplanProposal decideReplanProposal;
+    private final QueryReplanProposalsPort queryReplanProposals;
+    private final DecideReplanProposalPort decideReplanProposal;
 
-    public ReplanProposalController(QueryReplanProposals queryReplanProposals, DecideReplanProposal decideReplanProposal) {
+    public ReplanProposalController(QueryReplanProposalsPort queryReplanProposals, DecideReplanProposalPort decideReplanProposal) {
         this.queryReplanProposals = Objects.requireNonNull(queryReplanProposals, "queryReplanProposals is required");
         this.decideReplanProposal = Objects.requireNonNull(decideReplanProposal, "decideReplanProposal is required");
     }

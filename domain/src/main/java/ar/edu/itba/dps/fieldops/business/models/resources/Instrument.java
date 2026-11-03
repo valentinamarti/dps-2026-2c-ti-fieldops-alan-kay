@@ -2,6 +2,7 @@ package ar.edu.itba.dps.fieldops.business.models.resources;
 
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.Certifiable;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.Equipment;
+import ar.edu.itba.dps.fieldops.business.interfaces.resources.ResourceVisitor;
 import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
 import lombok.Getter;
 
@@ -19,6 +20,12 @@ public class Instrument extends ScheduledResource implements Equipment, Certifia
     @Getter
     private final Certifications certifications;
 
+    public static Instrument restored(ResourceId id, String name, ResourceCategory category, Set<Certification> certifications, CalendarSnapshot calendar) {
+        final var instrument = new Instrument(id, name, category, certifications);
+        instrument.restoreCalendar(calendar);
+        return instrument;
+    }
+
     public Instrument(ResourceId id, String name, ResourceCategory category, Set<Certification> certifications) {
         this.id = Objects.requireNonNull(id, "id is required");
         this.name = DomainArguments.requireText(name, "name");
@@ -34,5 +41,10 @@ public class Instrument extends ScheduledResource implements Equipment, Certifia
     @Override
     public boolean hasCertification(Certification certification) {
         return certifications.includes(certification);
+    }
+
+    @Override
+    public <T> T accept(ResourceVisitor<T> visitor) {
+        return visitor.instrument(this);
     }
 }

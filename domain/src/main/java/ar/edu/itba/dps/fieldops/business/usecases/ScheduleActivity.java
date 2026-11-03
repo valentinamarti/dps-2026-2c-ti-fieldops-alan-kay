@@ -1,16 +1,19 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
+import ar.edu.itba.dps.fieldops.business.models.commands.ScheduleActivityCommand;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
+import ar.edu.itba.dps.fieldops.business.models.responses.ScheduledActivityView;
+import ar.edu.itba.dps.fieldops.business.ports.in.ScheduleActivityPort;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
 import ar.edu.itba.dps.fieldops.business.rules.ActivityTypeRegistry;
 
 import java.util.Objects;
 
-public class ScheduleActivity {
+public class ScheduleActivity implements ScheduleActivityPort {
     private final ExpeditionRepository repository;
     private final ZoneRepository zones;
     private final ActivityTypeRegistry types;
@@ -21,14 +24,17 @@ public class ScheduleActivity {
         this.types = Objects.requireNonNull(types, "types are required");
     }
 
-    public ItineraryItem schedule(ScheduleActivityCommand command) {
+    @Override
+    public ScheduledActivityView schedule(ScheduleActivityCommand command) {
         final var expedition = Lookups.expedition(repository, command.expeditionId());
         final var planned = command.activity();
         final var activity = new PlannedActivities(expedition, zones, types).of(planned);
-        return expedition.schedule(activity, planned.scheduledPeriod());
+        final var item = expedition.schedule(activity, planned.scheduledPeriod());
+        repository.save(expedition);
+        return ScheduledActivityView.of(item);
     }
 
-    public ItineraryItem schedule(ExpeditionId expeditionId, Activity activity, TimePeriod scheduledPeriod) {
+    ItineraryItem schedule(ExpeditionId expeditionId, Activity activity, TimePeriod scheduledPeriod) {
         return Lookups.expedition(repository, expeditionId).schedule(activity, scheduledPeriod);
     }
 }

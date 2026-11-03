@@ -6,8 +6,8 @@ import ar.edu.itba.dps.fieldops.adapters.driving.rest.mappers.AssignmentCandidat
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
-import ar.edu.itba.dps.fieldops.business.usecases.AssignResources;
-import ar.edu.itba.dps.fieldops.business.usecases.FindAssignmentCandidates;
+import ar.edu.itba.dps.fieldops.business.ports.in.AssignResourcesPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.FindAssignmentCandidatesPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,10 +26,10 @@ import java.util.Objects;
 @RequestMapping("/api/expeditions/{expeditionId}/activities/{activityId}")
 @Tag(name = "Assignment", description = "Assigning resources to a scheduled activity and its candidates")
 public class AssignmentController {
-    private final AssignResources assignResources;
-    private final FindAssignmentCandidates findAssignmentCandidates;
+    private final AssignResourcesPort assignResources;
+    private final FindAssignmentCandidatesPort findAssignmentCandidates;
 
-    public AssignmentController(AssignResources assignResources, FindAssignmentCandidates findAssignmentCandidates) {
+    public AssignmentController(AssignResourcesPort assignResources, FindAssignmentCandidatesPort findAssignmentCandidates) {
         this.assignResources = Objects.requireNonNull(assignResources, "assignResources is required");
         this.findAssignmentCandidates =
                 Objects.requireNonNull(findAssignmentCandidates, "findAssignmentCandidates is required");

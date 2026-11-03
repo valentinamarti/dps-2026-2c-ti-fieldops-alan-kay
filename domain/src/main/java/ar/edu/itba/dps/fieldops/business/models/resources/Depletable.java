@@ -2,6 +2,7 @@ package ar.edu.itba.dps.fieldops.business.models.resources;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.InsufficientStockException;
 import ar.edu.itba.dps.fieldops.business.interfaces.resources.DepletableResource;
+import ar.edu.itba.dps.fieldops.business.interfaces.resources.ResourceVisitor;
 import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
 import ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
@@ -30,6 +31,17 @@ public class Depletable implements DepletableResource {
         this.name = DomainArguments.requireText(name, "name");
         this.category = Objects.requireNonNull(category, "category is required");
         this.stock = Objects.requireNonNull(initialStock, "initial stock is required");
+    }
+
+    public static Depletable restored(ResourceId id, String name, ResourceCategory category, Quantity stock,
+                                      Map<ExpeditionId, Quantity> reservations) {
+        final var supply = new Depletable(id, name, category, stock);
+        supply.reserved.putAll(reservations);
+        return supply;
+    }
+
+    public Map<ExpeditionId, Quantity> reservations() {
+        return Map.copyOf(reserved);
     }
 
     @Override
@@ -99,5 +111,20 @@ public class Depletable implements DepletableResource {
 
     private Quantity reservedBy(ExpeditionId owner) {
         return reserved.getOrDefault(owner, Quantity.of("0", unit()));
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        return other instanceof Depletable that && id.equals(that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return id.hashCode();
+    }
+
+    @Override
+    public <T> T accept(ResourceVisitor<T> visitor) {
+        return visitor.supply(this);
     }
 }

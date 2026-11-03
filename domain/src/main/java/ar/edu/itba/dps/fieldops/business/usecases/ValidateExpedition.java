@@ -3,13 +3,14 @@ package ar.edu.itba.dps.fieldops.business.usecases;
 import ar.edu.itba.dps.fieldops.business.interfaces.validation.ValidationRule;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.validation.ApprovalResult;
+import ar.edu.itba.dps.fieldops.business.ports.in.ValidateExpeditionPort;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.validations.ApprovalPolicy;
 
 import java.util.List;
 import java.util.Objects;
 
-public class ValidateExpedition {
+public class ValidateExpedition implements ValidateExpeditionPort {
     private final ExpeditionRepository repository;
     private final List<ValidationRule> additionalRules;
 
@@ -18,6 +19,7 @@ public class ValidateExpedition {
         this.additionalRules = List.copyOf(Objects.requireNonNull(additionalRules, "additionalRules are required"));
     }
 
+    @Override
     public ApprovalResult validate(ExpeditionId id) {
         return new ApprovalPolicy(additionalRules).validate(Lookups.expedition(repository, id));
     }

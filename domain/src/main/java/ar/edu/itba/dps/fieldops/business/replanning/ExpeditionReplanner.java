@@ -11,7 +11,7 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.PlannedNode;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ReplannedActivity;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ResourceAssignment;
-import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
+import ar.edu.itba.dps.fieldops.business.providers.ExpeditionIdProvider;
 
 import java.time.Duration;
 import java.util.LinkedHashMap;
@@ -22,18 +22,18 @@ import java.util.Optional;
 import java.util.function.Predicate;
 
 public class ExpeditionReplanner {
-    private static final ExpeditionRepository PREVIEW_IDS = new PreviewIds();
+    private static final ExpeditionIdProvider PREVIEW_IDS = () -> new ExpeditionId("preview");
 
-    private final ExpeditionRepository repository;
+    private final ExpeditionIdProvider ids;
 
-    public ExpeditionReplanner(ExpeditionRepository repository) {
-        this.repository = Objects.requireNonNull(repository, "repository is required");
+    public ExpeditionReplanner(ExpeditionIdProvider ids) {
+        this.ids = Objects.requireNonNull(ids, "ids are required");
     }
 
     public Expedition planAlternative(Expedition original, ItineraryItem affectedItem, ReplanReason reason) {
         requireArguments(original, affectedItem, reason);
         original.requireReplaceable();
-        return draftOf(original, affectedItem, reason, repository);
+        return draftOf(original, affectedItem, reason, ids);
     }
 
     public boolean canPlan(Expedition original, ItineraryItem affectedItem, ReplanReason reason) {
@@ -53,16 +53,16 @@ public class ExpeditionReplanner {
         requireOwnItem(original, affectedItem);
     }
 
-    private Expedition draftOf(Expedition original, ItineraryItem affectedItem, ReplanReason reason, ExpeditionRepository ids) {
+    private Expedition draftOf(Expedition original, ItineraryItem affectedItem, ReplanReason reason, ExpeditionIdProvider draftIds) {
         final var carried = carriedItemsOf(original, affectedItem, reason);
-        final var alternative = draftReplacing(original, reason, carried).build(ids);
+        final var alternative = draftReplacing(original, reason, carried).build(draftIds);
         carried.values().forEach(item -> copyAssignments(item, alternative));
         return alternative;
     }
 
     private ExpeditionBuilder draftReplacing(Expedition original, ReplanReason reason, Map<ItineraryItem, CarriedItem> carried) {
         final var builder = sameGeneralDataAs(original)
-                .withReplacedExpedition(original.getId())
+                .withReplacedExpedition(original)
                 .withReplanReason(reason);
         original.getIncidents().forEach(builder::addInheritedIncident);
         original.getItinerary().planKeepingStructure(item -> planOf(item, carried)).forEach(builder::addNode);
@@ -139,28 +139,6 @@ public class ExpeditionReplanner {
 
         CarriedItem shiftedBy(Duration shift) {
             return new CarriedItem(source, period.shiftedBy(shift), keeps, additions);
-        }
-    }
-
-    private static final class PreviewIds implements ExpeditionRepository {
-        @Override
-        public ExpeditionId nextId() {
-            return new ExpeditionId("preview");
-        }
-
-        @Override
-        public void add(Expedition expedition) {
-            throw new UnsupportedOperationException("a preview is never stored");
-        }
-
-        @Override
-        public Optional<Expedition> findById(ExpeditionId id) {
-            return Optional.empty();
-        }
-
-        @Override
-        public List<Expedition> findAll() {
-            return List.of();
         }
     }
 }

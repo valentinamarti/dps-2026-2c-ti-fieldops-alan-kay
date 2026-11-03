@@ -22,7 +22,7 @@ import java.util.stream.Stream;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
-import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.sampling;
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.oneHourSampling;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
 import static ar.edu.itba.dps.fieldops.business.models.expeditions.PlannedNode.activity;
 import static ar.edu.itba.dps.fieldops.business.models.expeditions.PlannedNode.parallel;
@@ -40,7 +40,7 @@ class ResourceOverlapValidationTest {
     private final Person worker = person("p-2");
 
     private void scheduleWithWorker(String activityId, TimePeriod period) {
-        final var item = expedition.schedule(sampling(activityId, coast, hours(0, 24)), period);
+        final var item = expedition.schedule(oneHourSampling(activityId, coast, hours(0, 24)), period);
         expedition.assignStaff(item, worker);
     }
 
@@ -91,7 +91,7 @@ class ResourceOverlapValidationTest {
     @Test
     void flagsAResourceReservedByADifferentExpedition() {
         final var other = expeditionIn(coast, person("p-1")).build(repository);
-        other.assignStaff(other.schedule(sampling("a-9", coast, hours(0, 24)), hours(10, 12)), worker);
+        other.assignStaff(other.schedule(oneHourSampling("a-9", coast, hours(0, 24)), hours(10, 12)), worker);
         new ResourceReservations().reserveFor(other);
         scheduleWithWorker("a-1", hours(9, 11));
 
@@ -110,7 +110,7 @@ class ResourceOverlapValidationTest {
     }
 
     private PlannedNode planned(String activityId, TimePeriod period) {
-        return activity(sampling(activityId, coast, hours(0, 24)), period);
+        return activity(oneHourSampling(activityId, coast, hours(0, 24)), period);
     }
 
     private void assignWorkerTo(String... activityIds) {

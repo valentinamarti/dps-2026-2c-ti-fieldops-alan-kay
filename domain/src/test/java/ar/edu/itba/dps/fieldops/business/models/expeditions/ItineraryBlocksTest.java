@@ -29,7 +29,7 @@ import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expe
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.nightDiving;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
-import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.sampling;
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.oneHourSampling;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
 import static ar.edu.itba.dps.fieldops.business.models.expeditions.PlannedNode.activity;
 import static ar.edu.itba.dps.fieldops.business.models.expeditions.PlannedNode.parallel;
@@ -68,7 +68,7 @@ class ItineraryBlocksTest {
     private final Activity wrapUp = survey("a-4");
 
     private Activity survey(String id, Activity... dependencies) {
-        return sampling(id, coast, hours(0, 24), dependencies);
+        return oneHourSampling(id, coast, hours(0, 24), dependencies);
     }
 
     private ItineraryItem itemOf(Activity activity) {
@@ -165,7 +165,7 @@ class ItineraryBlocksTest {
 
     @Test
     void rejectsABlockWithAChildOutsideTheExpeditionPeriod() {
-        final var nightShift = sampling("a-9", coast, hours(20, 30));
+        final var nightShift = oneHourSampling("a-9", coast, hours(20, 30));
 
         assertThrows(InvalidScheduleException.class, () -> expedition.schedule(parallel(
                 activity(dive, hours(9, 11)),
@@ -174,7 +174,7 @@ class ItineraryBlocksTest {
 
     @Test
     void rejectsABlockWithAnActivityOfAZoneThatIsNotPartOfTheExpedition() {
-        final var elsewhere = sampling("a-9", zone("z-2"), hours(0, 24));
+        final var elsewhere = oneHourSampling("a-9", zone("z-2"), hours(0, 24));
 
         assertThrows(InvalidScheduleException.class,
                 () -> expedition.schedule(sequential(activity(dive, hours(9, 11)), activity(elsewhere, hours(11, 13)))));
@@ -316,6 +316,6 @@ class ItineraryBlocksTest {
         assertTrue(findings.contains(ValidationResult.critical(MissingResourcesValidation.ID, ValidationSubject.of(nightDive.getId()), "Night diving a-5 has 0 of the 1 lighting it needs")));
         assertEquals(RiskLevel.EXTREME, block.estimatedRisk());
         assertEquals(new ExpeditionEstimator().estimate(loose).overallRisk(), new ExpeditionEstimator().estimate(expedition).overallRisk());
-        assertEquals(Duration.ofMinutes(120 + 125), block.estimatedDuration());
+        assertEquals(Duration.ofMinutes(60 + 125), block.estimatedDuration());
     }
 }

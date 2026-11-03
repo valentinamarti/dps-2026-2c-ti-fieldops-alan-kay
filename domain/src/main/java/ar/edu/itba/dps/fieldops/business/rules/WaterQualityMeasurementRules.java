@@ -2,6 +2,7 @@ package ar.edu.itba.dps.fieldops.business.rules;
 
 import ar.edu.itba.dps.fieldops.business.interfaces.activities.ActivityRules;
 import ar.edu.itba.dps.fieldops.business.interfaces.activities.ActivityType;
+import ar.edu.itba.dps.fieldops.business.models.activities.ActivityDefinition;
 import ar.edu.itba.dps.fieldops.business.models.activities.DepletableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.ReusableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
@@ -13,6 +14,7 @@ import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.UNITS;
@@ -61,5 +63,10 @@ public class WaterQualityMeasurementRules implements ActivityRules {
     @Override
     public List<StaffRequirement> requiredStaff() {
         return List.of(ONE_ANALYST);
+    }
+
+    @Override
+    public ActivityDefinition definition() {
+        return new ActivityDefinition(TYPE.name().value(), Map.of(TYPE.parameterNames().getFirst(), stationCount), false);
     }
 }
