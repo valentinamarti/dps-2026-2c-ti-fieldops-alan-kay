@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.APPROVED_AT;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.completeAssignments;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
@@ -91,7 +92,7 @@ class ExpeditionBuilderTest {
         final var done = executed.getItinerary().itemFor(survey).orElseThrow();
         completeAssignments(executed);
         executed.submitForReview();
-        executed.approve(List.of(), List.of());
+        executed.approve(List.of(), List.of(), APPROVED_AT);
         executed.start();
         executed.startActivity(done, LocalDateTime.of(2026, 10, 1, 9, 0));
         executed.finishActivity(done, LocalDateTime.of(2026, 10, 1, 11, 0), "Samples taken");

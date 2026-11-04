@@ -1381,7 +1381,7 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
 - **Origen:** la propuesta de valor de la Entrega 3 pide modelar los hechos del dominio como eventos y publicarlos sin que quien los produce conozca a sus consumidores. D45 publicaba desde el caso de uso y descartaba que la entidad acumulara sus eventos, porque no había un "guardar" (D38). Desde D66 los casos de uso guardan lo que cambian, así que ese motivo ya no existe.
 - **Patrón / principio:** eventos de dominio acumulados por el agregado + Decorator sobre el puerto `ExpeditionRepository`, que publica al guardar.
 - **Dónde:**
-  - `Expedition` guarda sus eventos pendientes, y `pullEvents` los devuelve y los vacía. `registerIncident` registra `IncidentRegistered` y `finishActivity` registra `ActivityCompleted`, cada uno al final de su operación. `TrackActivity` no cambió: ya guardaba la expedición después de terminar la actividad.
+  - `Expedition` guarda sus eventos pendientes, y `pullEvents` los devuelve y los vacía. `approve` registra `ExpeditionApproved`, `registerIncident` registra `IncidentRegistered` y `finishActivity` registra `ActivityCompleted`, cada uno al final de su operación. `TrackActivity` no cambió: ya guardaba la expedición después de terminar la actividad. `ApproveExpedition` tampoco publica: guarda la aprobada y, si era una alternativa, también la reemplazada, y el decorador publica los eventos de las dos.
   - `PublishingExpeditionRepository` (en `business.services`) guarda con el repositorio que decora y después publica cada evento pendiente con `EventPublisher`.
   - `FieldOpsConfig` (en `web`) lo expone como el `ExpeditionRepository` de la aplicación, sobre `JpaExpeditionRepository`.
   - `RegisterIncident` ya no conoce a `EventPublisher`: registra el incidente y guarda la expedición.
@@ -1412,11 +1412,13 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
 
 - **Origen:** la consigna pide eventos "como objetos inmutables del dominio". El registro de eventos los va a guardar y mostrar, así que cada uno tiene que identificarse y decir cuándo ocurrió.
 - **Patrón / principio:** value objects inmutables (`record`) + un contrato común (`DomainEvent`) que permite tratar a todos los eventos igual sin preguntar de qué tipo son.
-- **Dónde:** `EventId` (en `business.models.events`); `DomainEvent` (en `business.interfaces.events`) con `id()`, `expeditionId()` y `occurredAt()`; `IncidentRegistered(id, expeditionId, incident)`; `ActivityCompleted(id, expeditionId, activity, occurredAt, result)`.
+- **Dónde:** `EventId` (en `business.models.events`); `DomainEvent` (en `business.interfaces.events`) con `id()`, `expeditionId()` y `occurredAt()`; `ExpeditionApproved(id, expeditionId, occurredAt)`; `IncidentRegistered(id, expeditionId, incident)`; `ActivityCompleted(id, expeditionId, activity, occurredAt, result)`. `Expedition.approve` y `ApproveExpeditionPort.approve` reciben el momento de la aprobación, y `ExpeditionLifecycleController` (en `web`) lo completa con la hora del servidor.
 - **Por qué:**
   - **`EventId` es un value object del dominio:** identifica un hecho que ocurrió una sola vez. Lo genera la expedición al registrar el evento (`EventId.generate()`, un UUID). Un proveedor, como `ExpeditionIdProvider` (D60), sumaría un colaborador sin una variante real que lo justifique.
   - **`occurredAt` sale del hecho y no de un `now()`.** En `IncidentRegistered` es el momento del incidente que informó quien lo registró, y se lee del incidente en vez de guardarse dos veces. El dominio sigue sin fuente de tiempo propia.
   - **`IncidentRegistered` lleva el incidente completo.** `Incident` ya es un `record` inmutable, y el suscriptor lo usa sin volver a buscarlo (D45). Achicarlo a su id obligaría a `ProposeReplan` a releerlo de la expedición, sin un problema real que lo pida.
+  - **Cada momento entra al dominio desde afuera, como un dato.** La expedición no lee la hora: la recibe. Lo que cambia es quién la pone. Los hechos del campo (el inicio y el fin de una actividad, un incidente) traen la hora que informa el cliente, porque pasan en el campo y se cargan después: una actividad que terminó a las 10:50 se puede informar a las 12. La aprobación es un acto del sistema: ocurre cuando el responsable aprueba, así que su momento lo pone el adaptador REST con la hora del servidor al recibir el pedido. El contrato de la API no cambió.
+  - **`ExpeditionApproved` solo lleva la expedición y el momento.** Las advertencias aceptadas ya quedan en la expedición y en su informe (D48).
   - **`ActivityCompleted` lleva el id de la actividad, el momento en que terminó y su resultado.** No lleva el `ItineraryItem` ni la `Activity`, porque son entidades mutables y el evento tiene que ser inmutable. A diferencia de `Incident`, que es un `record`, copiarlas lo dejaría expuesto a cambios posteriores. El resultado va porque es lo que muestran los interesados en que una actividad termine. El momento es el `at` con el que se la terminó, como el del incidente.
   - **El contrato común** deja que quien trate eventos en general los ordene y los muestre sin un condicional por tipo.
   - `IncidentRegistered` es el `IncidentReported` del ejemplo de la consigna: se mantuvo el nombre que ya tenían el código, los tests y D45.
@@ -1424,9 +1426,12 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
   - Ids de tipo `String` o `UUID` sueltos — un concepto del dominio como primitivo (D26).
   - Un proveedor de ids de eventos — ver arriba.
   - Tomar `occurredAt` de un reloj al registrar el evento — sería el momento en que el sistema se enteró y no el del hecho, y metería un reloj en el dominio.
+  - Que el cliente mande el momento de la aprobación en el body — la aprobación ocurre en el sistema, y el cliente podría mandar cualquier fecha. Además cambiaba la API, el frontend y el guion de la demo.
+  - Un `Clock` inyectado en `ApproveExpedition` — el dominio dejaría de recibir el tiempo como dato, solo para este caso.
 - **Consecuencia:**
   - El `occurredAt` de un evento es el que informó el cliente. No sirve para ordenar los eventos en el orden en que el sistema los conoció.
   - Como el id es aleatorio, los tests no comparan un evento entero con `equals`: verifican su tipo y sus datos.
+  - El controller lee la hora con `LocalDateTime.now()`, así que el test de punta a punta (`ApprovalPublishesItsEventTest`) verifica que el momento quedó entre el antes y el después del pedido, en vez de compararlo con un valor exacto.
 
 ### D72 — Los suscriptores síncronos y los asíncronos son dos tipos distintos (Entrega 3, propuesta de valor, completa D45)
 

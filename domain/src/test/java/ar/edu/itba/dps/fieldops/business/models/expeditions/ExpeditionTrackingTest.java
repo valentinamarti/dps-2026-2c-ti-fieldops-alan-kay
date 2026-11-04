@@ -25,6 +25,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.APPROVED_AT;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.assignCooler;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
@@ -57,8 +58,9 @@ class ExpeditionTrackingTest {
         assignCooler(expedition, item);
         expedition.assignSupply(item, jars);
         expedition.submitForReview();
-        expedition.approve(List.of(), List.of());
+        expedition.approve(List.of(), List.of(), APPROVED_AT);
         expedition.start();
+        expedition.pullEvents();
         return expedition;
     }
 
@@ -173,7 +175,7 @@ class ExpeditionTrackingTest {
         assignCooler(expedition, item);
         expedition.assignSupply(item, jars);
         expedition.submitForReview();
-        expedition.approve(List.of(), List.of());
+        expedition.approve(List.of(), List.of(), APPROVED_AT);
 
         assertThrows(InvalidTrackingException.class, () -> expedition.startActivity(item, at(9, 0)));
     }
@@ -227,9 +229,10 @@ class ExpeditionTrackingTest {
         assignCooler(scarceExpedition, scarceItem);
         scarceExpedition.assignSupply(scarceItem, scarceJars);
         scarceExpedition.submitForReview();
-        scarceExpedition.approve(List.of(), List.of());
+        scarceExpedition.approve(List.of(), List.of(), APPROVED_AT);
         scarceJars.consume(repository.nextId(), Quantity.of("1", UNITS));
         scarceExpedition.start();
+        scarceExpedition.pullEvents();
         scarceExpedition.startActivity(scarceItem, at(9, 0));
 
         assertThrows(InsufficientStockException.class,
@@ -250,7 +253,7 @@ class ExpeditionTrackingTest {
         multiSupplyExpedition.assignSupply(multiSupplyItem, fuel);
         multiSupplyExpedition.assignSupply(multiSupplyItem, scarceJars);
         multiSupplyExpedition.submitForReview();
-        multiSupplyExpedition.approve(List.of(), List.of());
+        multiSupplyExpedition.approve(List.of(), List.of(), APPROVED_AT);
         scarceJars.consume(repository.nextId(), Quantity.of("1", UNITS));
         multiSupplyExpedition.start();
         multiSupplyExpedition.startActivity(multiSupplyItem, at(9, 0));

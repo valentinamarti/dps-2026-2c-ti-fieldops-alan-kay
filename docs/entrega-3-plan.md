@@ -167,21 +167,21 @@ La Fase 1 tiene que ser corta, porque bloquea a todos. Hasta que mergee, las fas
 
 ### Archivos que tocan varias fases
 
-| Archivo | Fases | Cómo se evita el conflicto |
-| --- | --- | --- |
-| `Expedition` | 1 | Solo la Fase 1. Las demás leen los eventos por el puerto |
-| `ReplanningConfig`, `FieldOpsConfig` | 1 y 2 | Una `EventsConfig` nueva en `web` para el publicador, el despachador y los suscriptores asíncronos. La Fase 2 saca de `ReplanningConfig` el bean `eventPublisher`, y cada fase agrega sus beans al final de `EventsConfig` |
-| `clean-database.sql` | 2 y 4 | Cada fase agrega sus tablas al `TRUNCATE` |
-| `application.yml` de `web` (main y test) | 3 | Solo la Fase 3 agrega `fieldops.events.*` |
-| `web/pom.xml`, `app/pom.xml` | 2 y 3 | La Fase 2 suma Jackson a `app` y la 3 suma Awaitility a `web` (test) |
-| `ExpeditionReporter`, `ExpeditionReport`, `ExpeditionReportResponse`, `ReportMapper` | 4 | Solo la Fase 4. Se agregan campos al final |
-| `ScheduledActivityResponse`, `ItineraryMapper` | 5 | Solo la Fase 5 |
-| `IncidentController`, `QueryReplanProposalsPort` | 1 | Solo la Fase 1, según la decisión 1.1 |
-| `demo.http`, `DemoScriptApiTest` | 1 y 5 | La Fase 1 solo si cambia el `POST /incidents` (decisión 1.1). Los pasos nuevos son de la Fase 5 |
-| `web/src/main/resources/static/js/*` | 5 (y 1 si se elige `approvedAt`) | La Fase 5 hace todo el frontend, incluido `approval.js` |
-| `DomainExceptionHandler` y su test | Cualquiera | Si una fase suma una excepción del dominio, suma su fila. El parametrizado falla si falta |
-| `DESIGN.md` | Todas | Números reservados. Cada fase edita solo sus entradas, su parte de la sección nueva y sus filas en las tablas compartidas |
-| `README.md` | 2, 3, 4 y 5 | Cada fase agrega sus endpoints a la tabla. La Fase 5 cierra el texto y la cantidad de tests |
+| Archivo                                                                              | Fases       | Cómo se evita el conflicto                                                                                                                                                                                                 |
+|--------------------------------------------------------------------------------------|-------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `Expedition`                                                                         | 1           | Solo la Fase 1. Las demás leen los eventos por el puerto                                                                                                                                                                   |
+| `ReplanningConfig`, `FieldOpsConfig`                                                 | 1 y 2       | Una `EventsConfig` nueva en `web` para el publicador, el despachador y los suscriptores asíncronos. La Fase 2 saca de `ReplanningConfig` el bean `eventPublisher`, y cada fase agrega sus beans al final de `EventsConfig` |
+| `clean-database.sql`                                                                 | 2 y 4       | Cada fase agrega sus tablas al `TRUNCATE`                                                                                                                                                                                  |
+| `application.yml` de `web` (main y test)                                             | 3           | Solo la Fase 3 agrega `fieldops.events.*`                                                                                                                                                                                  |
+| `web/pom.xml`, `app/pom.xml`                                                         | 2 y 3       | La Fase 2 suma Jackson a `app` y la 3 suma Awaitility a `web` (test)                                                                                                                                                       |
+| `ExpeditionReporter`, `ExpeditionReport`, `ExpeditionReportResponse`, `ReportMapper` | 4           | Solo la Fase 4. Se agregan campos al final                                                                                                                                                                                 |
+| `ScheduledActivityResponse`, `ItineraryMapper`                                       | 5           | Solo la Fase 5                                                                                                                                                                                                             |
+| `IncidentController`, `QueryReplanProposalsPort`                                     | 1           | Solo la Fase 1, según la decisión 1.1                                                                                                                                                                                      |
+| `demo.http`, `DemoScriptApiTest`                                                     | 1 y 5       | La Fase 1 solo si cambia el `POST /incidents` (decisión 1.1). Los pasos nuevos son de la Fase 5                                                                                                                            |
+| `web/src/main/resources/static/js/*`                                                 | 5           | La Fase 5 hace todo el frontend, incluido `approval.js`                                                                                                                                                                    |
+| `DomainExceptionHandler` y su test                                                   | Cualquiera  | Si una fase suma una excepción del dominio, suma su fila. El parametrizado falla si falta                                                                                                                                  |
+| `DESIGN.md`                                                                          | Todas       | Números reservados. Cada fase edita solo sus entradas, su parte de la sección nueva y sus filas en las tablas compartidas                                                                                                  |
+| `README.md`                                                                          | 2, 3, 4 y 5 | Cada fase agrega sus endpoints a la tabla. La Fase 5 cierra el texto y la cantidad de tests                                                                                                                                |
 
 ## Fase 1: eventos en el dominio
 
@@ -220,16 +220,22 @@ Todas se cierran el martes 03/11, antes de arrancar, porque la fase bloquea al r
 - **Por qué:** _a completar_
 - **Se registra en:** D73 (revisa D58)
 
-#### 1.2 — De dónde sale el `occurredAt` de la aprobación · 👥 · ⬜ pendiente
+#### 1.2 — De dónde sale el `occurredAt` de la aprobación · 👥 · ✅ decidida
 
 - **Pregunta:** el dominio no tiene ninguna fuente de tiempo (no hay `now()` ni `Clock`). Todos los timestamps los manda el cliente: `StartActivityRequest.at`, `FinishActivityRequest.at` y `RegisterIncidentRequest.occurredAt`. La aprobación no tiene ninguno.
 - **Opciones:**
-  - a) Un `approvedAt` en el comando, como dicen las decisiones. Cambia `ApproveExpeditionPort.approve(id, acceptances)`, `ApprovalRequest(acceptedWarnings)`, `ApprovalMapper`, `approval.js`, los pasos 26 y 39 de `demo.http`, `DemoScriptApiTest` y los tests de API de aprobación.
-  - b) Un puerto de reloj en `business.providers`. No cambia la API, pero mete la primera fuente de tiempo del dominio.
-- **Recomendación:** a), por coherencia con los otros tres timestamps. El frontend y la demo los actualiza la Fase 5.
-- **Decisión:** _a completar_
-- **Quién y cuándo:** _a completar_
-- **Por qué:** _a completar_
+  - a) Un `approvedAt` en el body del request, que manda el cliente. Cambia `ApprovalRequest`, `ApprovalMapper`, `approval.js`, los pasos de aprobación de `demo.http`, `DemoScriptApiTest` y los tests de API de aprobación.
+  - b) Un reloj (`Clock` o un puerto propio) inyectado en `ApproveExpedition`. No cambia la API, pero mete la primera fuente de tiempo del dominio.
+  - c) Un `approvedAt` en el comando de aprobar (`ApproveExpeditionPort`), que el adaptador REST completa con la hora del servidor al recibir el pedido. No cambia la API, y el dominio sigue sin reloj.
+- **Recomendación inicial:** a). Se revisó al ver el código.
+- **Decisión:** c). El controller llama a `LocalDateTime.now()`, sin un bean `Clock`.
+- **Quién y cuándo:** Valentina, 03/11/2026.
+- **Por qué:**
+  - Inicio, fin e incidente son hechos del campo que se informan después, por eso traen la hora del cliente. La aprobación es un acto del sistema: ocurre cuando se aprueba, así que su momento lo pone el servidor y el cliente no lo puede inventar.
+  - El dominio sigue recibiendo el tiempo como dato, igual que en los otros eventos, y no tiene reloj.
+  - La API, `approval.js` y `demo.http` no cambian.
+  - Cumple lo que dicen las decisiones ("un `approvedAt` nuevo en el comando de aprobar").
+  - Costo: la firma de `ApproveExpeditionPort` y de `Expedition.approve` cambia, y los tests suman un momento fijo (`ExpeditionFixtures.APPROVED_AT`). El test de punta a punta verifica un rango de tiempo, no un valor exacto.
 - **Se registra en:** D71
 
 #### 1.3 — Quién genera el `EventId` · ⬜ pendiente
@@ -324,12 +330,12 @@ Todas se cierran el martes 03/11, antes de arrancar, porque la fase bloquea al r
 - Nuevos: `business/models/events/EventId.java`, `ExpeditionApproved.java`, `ActivityCompleted.java`, `business/services/PublishingExpeditionRepository.java`, `business/interfaces/events/AsyncEventSubscriber.java`, `business/models/events/ConsumerName.java` y `business/models/responses/IncidentView.java`.
 - Modificados: `DomainEvent`, `IncidentRegistered`, `Expedition`, `RegisterIncident` (pierde `EventPublisher`), `RegisterIncidentPort`, `ProposeReplan` (por el nombre del campo), `InMemoryEventPublisher` (solo síncronos), `FieldOpsConfig` (el repositorio decorado) y `ReplanningConfig` (el constructor de `RegisterIncident`).
 - Según la decisión 1.1: `IncidentController` y `QueryReplanProposalsPort`/`QueryReplanProposals`.
-- Según la decisión 1.2: `ApproveExpeditionPort`, `ApproveExpedition`, `ApprovalRequest`, `ApprovalMapper` y los tests de API de aprobación.
+- Según la decisión 1.2: `ApproveExpeditionPort`, `ApproveExpedition`, `Expedition.approve`, `ExpeditionLifecycleController` y las llamadas de los tests (`ExpeditionFixtures.APPROVED_AT`).
 
 ### API
 
 - [ ] `POST /api/expeditions/{id}/incidents`: según la decisión 1.1.
-- [ ] Si la decisión 1.2 es `approvedAt` en el comando: `POST .../approval` suma el campo, con su test de API y el 400 si falta.
+- [ ] `POST .../approval` no cambia: el controller completa el momento con la hora del servidor (decisión 1.2). Un test de punta a punta verifica que el evento lleva esa hora.
 
 ### Tests
 
@@ -672,7 +678,6 @@ Integra lo de las otras fases en lo que se muestra en vivo y prepara a los cinco
 - [ ] `itinerary.js`: hoy `trackingView` muestra siempre los formularios de iniciar, terminar, observar e incidente cuando la expedición está `IN_EXECUTION`. Pasa a mostrar un badge de estado y solo los botones que corresponden: iniciar si está pendiente, terminar y observar si está en curso, nada si terminó.
 - [ ] `expedition.js`: secciones "Eventos" (línea de tiempo con el estado de cada consumidor, y el error si quedó `FAILED`) y "Notificaciones". Las dos se recargan después de cada acción, con el mismo `refresh` que ya usa la página.
 - [ ] `expedition.js` (`reportView`): el avance y la línea de tiempo del informe.
-- [ ] Si la Fase 1 eligió `approvedAt`, `approval.js` lo manda.
 - [ ] Consume solo la API, como D69.
 
 ### Demo
@@ -806,7 +811,7 @@ Es un índice. El detalle de cada decisión y su registro están en la sección 
 | --- | --- | --- | --- | --- | --- |
 | — | Reparto de las cinco fases 👥 | — | 03/11 | Todo | ⬜ |
 | 1.1 | Qué responde `POST /incidents` (review 2 y 5) 👥 | 1 | 03/11 | Fase 1 | ⬜ |
-| 1.2 | `occurredAt` de la aprobación 👥 | 1 | 03/11 | Fase 1, y la aprobación en la Fase 5 | ⬜ |
+| 1.2 | `occurredAt` de la aprobación 👥 | 1 | 03/11 | Fase 1 | ✅ |
 | 1.3 | Quién genera el `EventId` | 1 | 03/11 | Fase 1 | ⬜ |
 | 1.4 | Qué lleva `IncidentRegistered` | 1 | 03/11 | JSON de la Fase 2 | ✅ |
 | 1.5 | Quién publica los eventos y con qué firma | 1 | 03/11 | Fases 1 y 2 | ✅ |

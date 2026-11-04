@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.APPROVED_AT;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.completeAssignments;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
@@ -40,8 +41,9 @@ class ExpeditionIncidentsTest {
     private Expedition inExecution() {
         completeAssignments(expedition);
         expedition.submitForReview();
-        expedition.approve(List.of(), List.of());
+        expedition.approve(List.of(), List.of(), APPROVED_AT);
         expedition.start();
+        expedition.pullEvents();
         return expedition;
     }
 

@@ -40,6 +40,7 @@ public final class ExpeditionFixtures {
 
     public static final Certification DIVING = new Certification("Diving");
     public static final Certification NIGHT_OPERATIONS = new Certification("Night operations");
+    public static final LocalDateTime APPROVED_AT = LocalDateTime.of(2026, 9, 30, 18, 0);
 
     private static final LocalDateTime FIRST_DAY = LocalDateTime.of(2026, 10, 1, 0, 0);
 

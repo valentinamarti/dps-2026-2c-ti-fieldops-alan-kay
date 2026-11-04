@@ -18,6 +18,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.APPROVED_AT;
 import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.UNITS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -48,7 +49,7 @@ class StaleAlternativeTest {
         alternative.submitForReview();
 
         assertThrows(StaleAlternativeException.class,
-                () -> scenario.approveExpedition.approve(alternative.getId(), List.of()));
+                () -> scenario.approveExpedition.approve(alternative.getId(), List.of(), APPROVED_AT));
 
         assertEquals(ExpeditionStatus.SUSPENDED, scenario.expedition.getStatus());
         assertEquals(ExpeditionStatus.IN_REVIEW, alternative.getStatus());
@@ -107,7 +108,7 @@ class StaleAlternativeTest {
 
         assertCannotBeApproved(first);
         secondAlternative.submitForReview();
-        scenario.approveExpedition.approve(secondAlternative.getId(), List.of());
+        scenario.approveExpedition.approve(secondAlternative.getId(), List.of(), APPROVED_AT);
 
         assertEquals(ExpeditionStatus.APPROVED, secondAlternative.getStatus());
         assertEquals(ExpeditionStatus.REPLACED, scenario.expedition.getStatus());
@@ -135,7 +136,7 @@ class StaleAlternativeTest {
         scenario.expedition.resume();
         scenario.expedition.suspend();
         alternative.submitForReview();
-        scenario.approveExpedition.approve(alternative.getId(), List.of());
+        scenario.approveExpedition.approve(alternative.getId(), List.of(), APPROVED_AT);
 
         assertEquals(ExpeditionStatus.APPROVED, alternative.getStatus());
         assertEquals(ExpeditionStatus.REPLACED, scenario.expedition.getStatus());

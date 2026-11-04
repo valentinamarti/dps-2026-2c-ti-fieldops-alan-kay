@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.APPROVED_AT;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.completeAssignments;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
@@ -48,7 +49,7 @@ class ExpeditionRestorationTest {
                 parallel(activity(second, hours(10, 12)), activity(third, hours(10, 12)))));
         completeAssignments(running);
         running.submitForReview();
-        running.approve(List.of(), List.of());
+        running.approve(List.of(), List.of(), APPROVED_AT);
         running.start();
         final var item = running.getItinerary().itemFor(first).orElseThrow();
         running.startActivity(item, at(8));

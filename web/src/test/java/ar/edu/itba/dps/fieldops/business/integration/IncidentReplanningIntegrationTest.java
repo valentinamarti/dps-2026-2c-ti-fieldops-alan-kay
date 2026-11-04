@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.APPROVED_AT;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.instrument;
@@ -90,7 +91,7 @@ class IncidentReplanningIntegrationTest {
         expedition.assignSupply(item, jars);
         expedition.submitForReview();
         expeditions.add(expedition);
-        approveExpedition.approve(expedition.getId(), List.of());
+        approveExpedition.approve(expedition.getId(), List.of(), APPROVED_AT);
         transitions.start(expedition.getId());
         return expeditions.findById(expedition.getId()).orElseThrow();
     }
@@ -109,7 +110,7 @@ class IncidentReplanningIntegrationTest {
         final var alternativeId = decideReplanProposal.accept(proposal.getId(), 2,
                 new ReplanDecisionCommand(leader.getId(), "p-3 knows the site", TEN.plusMinutes(15))).id();
         transitions.submitForReview(alternativeId);
-        approveExpedition.approve(alternativeId, List.of());
+        approveExpedition.approve(alternativeId, List.of(), APPROVED_AT);
 
         final var alternative = expeditions.findById(alternativeId).orElseThrow();
         final var audited = queryReplanProposals.get(proposal.getId());

@@ -27,6 +27,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.APPROVED_AT;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.instrument;
@@ -116,7 +117,7 @@ class AsyncSubscribersAreNotDeliveredInProcessTest {
         expedition.assignSupply(item, jars);
         expedition.submitForReview();
         expeditions.add(expedition);
-        approveExpedition.approve(expedition.getId(), List.of());
+        approveExpedition.approve(expedition.getId(), List.of(), APPROVED_AT);
         transitions.start(expedition.getId());
         return expedition.getId();
     }

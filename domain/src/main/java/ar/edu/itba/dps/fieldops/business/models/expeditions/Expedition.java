@@ -23,6 +23,7 @@ import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
 import ar.edu.itba.dps.fieldops.business.models.events.ActivityCompleted;
 import ar.edu.itba.dps.fieldops.business.models.events.EventId;
+import ar.edu.itba.dps.fieldops.business.models.events.ExpeditionApproved;
 import ar.edu.itba.dps.fieldops.business.models.events.IncidentRegistered;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
@@ -176,7 +177,8 @@ public class Expedition {
         transitionTo(ExpeditionStatus.DRAFT);
     }
 
-    public void approve(List<ValidationRule> additionalRules, List<AcceptedWarning> acceptances) {
+    public void approve(List<ValidationRule> additionalRules, List<AcceptedWarning> acceptances, LocalDateTime approvedAt) {
+        Objects.requireNonNull(approvedAt, "approvedAt is required");
         requireCanTransitionTo(ExpeditionStatus.APPROVED);
         final var result = new ApprovalPolicy(additionalRules).validate(this);
         if (!result.canBeApproved()) {
@@ -184,6 +186,7 @@ public class Expedition {
         }
         acceptedWarnings = result.warnings().stream().map(warning -> acceptanceOf(warning, acceptances)).toList();
         status = ExpeditionStatus.APPROVED;
+        pendingEvents.add(new ExpeditionApproved(EventId.generate(), id, approvedAt));
     }
 
     public void start() {

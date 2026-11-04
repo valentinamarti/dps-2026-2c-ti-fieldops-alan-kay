@@ -4,7 +4,9 @@ import ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures;
 import ar.edu.itba.dps.fieldops.business.fixtures.FakeResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.exceptions.InvalidStatusTransitionException;
+import ar.edu.itba.dps.fieldops.business.interfaces.events.DomainEvent;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
+import ar.edu.itba.dps.fieldops.business.models.events.ExpeditionApproved;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionStatus;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ItineraryItem;
@@ -12,13 +14,16 @@ import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.replanning.Cancellation;
 import ar.edu.itba.dps.fieldops.business.replanning.ExpeditionReplanner;
+import ar.edu.itba.dps.fieldops.business.services.PublishingExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
 import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.APPROVED_AT;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.assignContainers;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.assignCooler;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
@@ -54,7 +59,7 @@ class ApproveAlternativeTest {
 
     private Expedition approvedAlternative() {
         original.submitForReview();
-        approveExpedition.approve(original, List.of());
+        approveExpedition.approve(original, List.of(), APPROVED_AT);
         final var alternative = replanExpedition.replan(original, affectedItem, new Cancellation());
         alternative.submitForReview();
         return alternative;
@@ -64,7 +69,7 @@ class ApproveAlternativeTest {
     void anAlternativeCanReuseTheResourcesOfTheExpeditionItReplaces() {
         final var alternative = approvedAlternative();
 
-        approveExpedition.approve(alternative, List.of());
+        approveExpedition.approve(alternative, List.of(), APPROVED_AT);
 
         assertEquals(ExpeditionStatus.APPROVED, alternative.getStatus());
         assertEquals(ExpeditionStatus.REPLACED, original.getStatus());
@@ -75,13 +80,26 @@ class ApproveAlternativeTest {
     }
 
     @Test
+    void approvingAnAlternativeThroughThePublishingRepositoryPublishesItsApproval() {
+        final var alternative = approvedAlternative();
+        final var published = new ArrayList<DomainEvent>();
+        final var publishing = new ApproveExpedition(List.of(), new ResourceReservations(),
+                new PublishingExpeditionRepository(repository, published::add), new FakeResourceCatalog());
+
+        publishing.approve(alternative, List.of(), APPROVED_AT);
+
+        final var approved = published.stream().filter(ExpeditionApproved.class::isInstance).map(DomainEvent::expeditionId).toList();
+        assertTrue(approved.contains(alternative.getId()));
+    }
+
+    @Test
     void anOriginalThatWasAlreadyReplacedCannotBeReplacedAgain() {
         final var first = approvedAlternative();
         final var second = replanExpedition.replan(original, keptItem, new Cancellation());
         second.submitForReview();
-        approveExpedition.approve(first, List.of());
+        approveExpedition.approve(first, List.of(), APPROVED_AT);
 
-        assertThrows(InvalidStatusTransitionException.class, () -> approveExpedition.approve(second, List.of()));
+        assertThrows(InvalidStatusTransitionException.class, () -> approveExpedition.approve(second, List.of(), APPROVED_AT));
         assertEquals(ExpeditionStatus.IN_REVIEW, second.getStatus());
         assertEquals(Optional.of(first.getId()), original.getReplacement());
     }

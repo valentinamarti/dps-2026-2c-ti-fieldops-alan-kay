@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.APPROVED_AT;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.usecases.IncidentScenario.TEN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -69,7 +70,7 @@ class IncidentReplanningTest {
         final var alternative = scenario.accepted(proposal.getId(), 1,
                 scenario.decisionBy(scenario.leader, "No safe window this afternoon"));
         alternative.submitForReview();
-        scenario.approveExpedition.approve(alternative, List.of());
+        scenario.approveExpedition.approve(alternative, List.of(), APPROVED_AT);
 
         final var audited = scenario.proposals.findByExpedition(scenario.expedition.getId()).getFirst();
         final var original = scenario.expeditions.findById(audited.getOriginalExpedition()).orElseThrow();

@@ -31,6 +31,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.APPROVED_AT;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.completeAssignments;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
@@ -111,7 +112,7 @@ class ExpeditionByIdTest {
         final var approve = new ApproveExpedition(List.of(_ -> List.of(RISKY)), reservations, repository, catalog);
         final var acceptance = new WarningAcceptance(RISKY.rule(), RISKY.subject(), new ResourceId("p-1"), "Both divers are instructors");
 
-        approve.approve(expedition.getId(), List.of(acceptance));
+        approve.approve(expedition.getId(), List.of(acceptance), APPROVED_AT);
 
         assertEquals(ExpeditionStatus.APPROVED, expedition.getStatus());
         assertEquals(List.of(RISKY), expedition.getAcceptedWarnings().stream().map(accepted -> accepted.warning()).toList());
@@ -122,7 +123,7 @@ class ExpeditionByIdTest {
         readyToApprove();
         final var approve = new ApproveExpedition(List.of(_ -> List.of(RISKY)), reservations, repository, catalog);
 
-        assertThrows(UnacceptedWarningException.class, () -> approve.approve(expedition.getId(), List.of()));
+        assertThrows(UnacceptedWarningException.class, () -> approve.approve(expedition.getId(), List.of(), APPROVED_AT));
         assertEquals(ExpeditionStatus.IN_REVIEW, expedition.getStatus());
     }
 
@@ -133,14 +134,14 @@ class ExpeditionByIdTest {
         final var approve = new ApproveExpedition(List.of(), reservations, repository, catalog);
         final var stale = new WarningAcceptance(RISKY.rule(), RISKY.subject(), new ResourceId("p-1"), "Both divers are instructors");
 
-        assertThrows(NotFoundException.class, () -> approve.approve(expedition.getId(), List.of(stale)));
-        assertThrows(NotFoundException.class, () -> approve.approve(unknown, List.of()));
+        assertThrows(NotFoundException.class, () -> approve.approve(expedition.getId(), List.of(stale), APPROVED_AT));
+        assertThrows(NotFoundException.class, () -> approve.approve(unknown, List.of(), APPROVED_AT));
     }
 
     @Test
     void trackingAnActivityByIdStartsFinishesAndObserves() {
         readyToApprove();
-        new ApproveExpedition(List.of(), reservations, repository, catalog).approve(expedition.getId(), List.of());
+        new ApproveExpedition(List.of(), reservations, repository, catalog).approve(expedition.getId(), List.of(), APPROVED_AT);
         expedition.start();
         final var tracking = new TrackActivity(repository, new FakeResourceCatalog());
         final var activity = new ActivityId("a-1");
@@ -160,7 +161,7 @@ class ExpeditionByIdTest {
     @Test
     void finishesByIdFreeingTheReservations() {
         readyToApprove();
-        new ApproveExpedition(List.of(), reservations, repository, catalog).approve(expedition.getId(), List.of());
+        new ApproveExpedition(List.of(), reservations, repository, catalog).approve(expedition.getId(), List.of(), APPROVED_AT);
         expedition.start();
         final var finish = new FinishExpedition(reservations, repository, new FakeResourceCatalog());
 
@@ -176,7 +177,7 @@ class ExpeditionByIdTest {
         final var affected = expedition.schedule(sampling("a-2", coast, hours(0, 24)), hours(12, 14));
         completeAssignments(expedition);
         expedition.submitForReview();
-        expedition.approve(List.of(), List.of());
+        expedition.approve(List.of(), List.of(), APPROVED_AT);
         final var replan = new ReplanExpedition(repository, new ExpeditionReplanner(stored));
 
         final var alternative = replan.replan(expedition.getId(), affected.getActivity().getId(), new Cancellation());
