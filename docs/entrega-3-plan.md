@@ -66,21 +66,21 @@ La review del PR de decisiones (MatiSapino, 03/11) aprobó el documento con ocho
 
 Todos los puntos se verificaron contra el código y son correctos.
 
-| # | Tema | Fase | Bloquea | Propuesta | Estado |
-| --- | --- | --- | --- | --- | --- |
-| 1 | Ordenar por `occurredAt` no es el orden en que el sistema conoció los eventos | 2 y 3 | Esquema de la tabla de eventos | Orden por la secuencia de inserción. `occurredAt` queda solo como dato del hecho | Aceptado |
-| 2 | Sin la propuesta, no hay `Location` en el `POST /incidents` | 1 | Contrato de la API | El controller compone `RegisterIncident` y la consulta de la propuesta | Decisión 1.1 |
-| 3 | El cambio revisa D58, no D45 | 1 | `DESIGN.md` | D72 revisa D58 y D64, y D45 recibe la nota | Aceptado |
-| 4 | Por D64, el puerto no devuelve `Incident` | 1 | Firma del puerto | `IncidentView` en `business.models.responses` | Aceptado |
-| 5 | `demo.http` y `DemoScriptApiTest` cambian más de lo que dice el documento | 1 | — | Con la opción a) de la decisión 1.1, no cambian | Decisión 1.1 |
-| 6 | "Por poco tiempo" no se sostiene sin acotar el backoff | 3 | D78 | Fijar los valores concretos | Decisión 3.1 |
-| 7 | Awaitility y `@EnableScheduling` todavía no existen | 3 | — | Se suman en la Fase 3 y se anotan en el costo del cambio | Aceptado |
-| 8 | Cómo se cumple "sin switch" en el JSON | 2 | Formato del registro | Guardar el nombre de la clase junto al JSON | Aceptado |
-| m1 | `docs/entrega-3-plan.md` no existía | — | — | Resuelto con este documento | Resuelto |
-| m2 | `fieldops-entrega-3.md` no termina en newline | 5 | — | Se corrige en el cierre | Aceptado |
-| m3 | Falta el argumento de las dependencias de `RegisterIncident` | 1 | — | Va en D72 | Aceptado |
-| m4 | La fila "Qué lleva cada evento" junta cinco decisiones | 1 | — | Se separan entre D70 y D71 | Aceptado |
-| m5 | `SKIP LOCKED` como salida para varias instancias | 3 | — | Va en D77 y en los supuestos | Aceptado |
+| #  | Tema                                                                          | Fase  | Bloquea                        | Propuesta                                                                        | Estado       |
+|----|-------------------------------------------------------------------------------|-------|--------------------------------|----------------------------------------------------------------------------------|--------------|
+| 1  | Ordenar por `occurredAt` no es el orden en que el sistema conoció los eventos | 2 y 3 | Esquema de la tabla de eventos | Orden por la secuencia de inserción. `occurredAt` queda solo como dato del hecho | Aceptado     |
+| 2  | Sin la propuesta, no hay `Location` en el `POST /incidents`                   | 1     | Contrato de la API             | El controller compone `RegisterIncident` y la consulta de la propuesta           | Decisión 1.1 |
+| 3  | El cambio revisa D58, no D45                                                  | 1     | `DESIGN.md`                    | D73 revisa D58 y D64, y D45 recibe la nota                                       | Aceptado     |
+| 4  | Por D64, el puerto no devuelve `Incident`                                     | 1     | Firma del puerto               | `IncidentView` en `business.models.responses`                                    | Aceptado     |
+| 5  | `demo.http` y `DemoScriptApiTest` cambian más de lo que dice el documento     | 1     | —                              | Con la opción a) de la decisión 1.1, no cambian                                  | Decisión 1.1 |
+| 6  | "Por poco tiempo" no se sostiene sin acotar el backoff                        | 3     | D78                            | Fijar los valores concretos                                                      | Decisión 3.1 |
+| 7  | Awaitility y `@EnableScheduling` todavía no existen                           | 3     | —                              | Se suman en la Fase 3 y se anotan en el costo del cambio                         | Aceptado     |
+| 8  | Cómo se cumple "sin switch" en el JSON                                        | 2     | Formato del registro           | Guardar el nombre de la clase junto al JSON                                      | Aceptado     |
+| m1 | `docs/entrega-3-plan.md` no existía                                           | —     | —                              | Resuelto con este documento                                                      | Resuelto     |
+| m2 | `fieldops-entrega-3.md` no termina en newline                                 | 5     | —                              | Se corrige en el cierre                                                          | Aceptado     |
+| m3 | Falta el argumento de las dependencias de `RegisterIncident`                  | 1     | —                              | Va en D73                                                                        | Aceptado     |
+| m4 | La fila "Qué lleva cada evento" junta cinco decisiones                        | 1     | —                              | Se separan entre D70 y D71                                                       | Aceptado     |
+| m5 | `SKIP LOCKED` como salida para varias instancias                              | 3     | —                              | Va en D77 y en los supuestos                                                     | Aceptado     |
 
 Además de la review, el relevamiento del código para este plan encontró puntos que no estaban en las decisiones. Están marcados como **Agregado** en cada fase, y los más importantes son:
 
@@ -218,7 +218,7 @@ Todas se cierran el martes 03/11, antes de arrancar, porque la fase bloquea al r
 - **Decisión:** _a completar_
 - **Quién y cuándo:** _a completar_
 - **Por qué:** _a completar_
-- **Se registra en:** D72 (revisa D58)
+- **Se registra en:** D73 (revisa D58)
 
 #### 1.2 — De dónde sale el `occurredAt` de la aprobación · 👥 · ⬜ pendiente
 
@@ -299,20 +299,20 @@ Todas se cierran el martes 03/11, antes de arrancar, porque la fase bloquea al r
   - `ApproveExpedition`, que guarda la aprobada y, si era una alternativa, también la reemplazada, publica los eventos de las dos sin hacer nada.
   - `TrackActivity.finish` y `RegisterIncident.register` tampoco publican: solo guardan.
   - `start` y `observe` no generan eventos, y ningún otro caso de uso tampoco.
-- [ ] Interfaz nueva para los suscriptores asíncronos en `business.interfaces.events`, junto a `EventSubscriber`, que sigue siendo el síncrono. Por ejemplo `AsyncEventSubscriber<E>`, con `eventType()`, `on(E)` y `consumerName()`. El nombre se guarda en la base, así que no puede ser `getClass().getName()`: un refactor dejaría entregas huérfanas.
+- [ ] Interfaz nueva para los suscriptores asíncronos en `business.interfaces.events`, junto a `EventSubscriber`, que sigue siendo el síncrono. `AsyncEventSubscriber<E>`, con `eventType()`, `on(E)` y `consumerName()`, que devuelve un `ConsumerName` (value object). El nombre se guarda en la base, así que no puede ser `getClass().getName()`: un refactor dejaría entregas huérfanas. No hereda de `EventSubscriber`: si lo hiciera, Spring lo sumaría a la lista del publicador en proceso y lo entregaría síncrono.
 - [ ] `InMemoryEventPublisher` entrega solo a los `EventSubscriber`. En esta fase, los asíncronos no tienen quién los entregue: eso lo construyen las fases 2 y 3.
 - [ ] `RegisterIncident` deja de depender de `ReplanProposalRepository` y devuelve un `IncidentView` (punto 4).
 - [ ] `POST /incidents` según la decisión 1.1. Si es la a), las dos llamadas del controller corren en transacciones distintas, pero como la propuesta se confirmó junto con el incidente, la segunda siempre la encuentra.
 
-> **Review, punto 3 — Revisa D58, no D45.** D58 (`DESIGN.md:1135`) es la que decidió "201 con la propuesta y `Location`", y la tabla de endpoints está en D58 y D49. D72 dice "revisa D58 y D64", y D45 solo recibe una nota, por el cambio en quién genera los eventos (D70). Si la decisión 1.1 es la a), D58 cambia una línea: de dónde saca la propuesta el adaptador.
+> **Review, punto 3 — Revisa D58, no D45.** D58 (`DESIGN.md:1135`) es la que decidió "201 con la propuesta y `Location`", y la tabla de endpoints está en D58 y D49. D73 dice "revisa D58 y D64", y D45 solo recibe una nota, por el cambio en quién genera los eventos (D70). Si la decisión 1.1 es la a), D58 cambia una línea: de dónde saca la propuesta el adaptador.
 >
-> **Estado:** aceptado, se aplica en D72.
+> **Estado:** aceptado, se aplica en D73.
 
 > **Review, punto 4 — El puerto devuelve `IncidentView`, no `Incident`.** `RegisterIncidentPort.register` devuelve un `IncidentView` nuevo en `business.models.responses`, con el `of(Incident)` de las otras vistas, por D64. Hoy devuelve `ReplanProposalView`.
 >
 > **Estado:** aceptado.
 
-> **Review, menor m3 — El argumento más fuerte del desacople.** `RegisterIncident` pasa de tres dependencias a dos (sin `ReplanProposalRepository`) y desaparece el `IllegalStateException` "no replan proposal was made for the incident". Va en el "Por qué" de D72.
+> **Review, menor m3 — El argumento más fuerte del desacople.** `RegisterIncident` pasa de tres dependencias a dos (sin `ReplanProposalRepository`) y desaparece el `IllegalStateException` "no replan proposal was made for the incident". Va en el "Por qué" de D73.
 
 > **Review, menor m4 — Una decisión por entrada.** La fila "Qué lleva cada evento" se divide:
 > - D70: quién genera el evento.
@@ -321,7 +321,7 @@ Todas se cierran el martes 03/11, antes de arrancar, porque la fase bloquea al r
 
 ### Archivos
 
-- Nuevos: `business/models/events/EventId.java`, `ExpeditionApproved.java`, `ActivityCompleted.java`, `business/services/PublishingExpeditionRepository.java`, `business/interfaces/events/AsyncEventSubscriber.java` y `business/models/responses/IncidentView.java`.
+- Nuevos: `business/models/events/EventId.java`, `ExpeditionApproved.java`, `ActivityCompleted.java`, `business/services/PublishingExpeditionRepository.java`, `business/interfaces/events/AsyncEventSubscriber.java`, `business/models/events/ConsumerName.java` y `business/models/responses/IncidentView.java`.
 - Modificados: `DomainEvent`, `IncidentRegistered`, `Expedition`, `RegisterIncident` (pierde `EventPublisher`), `RegisterIncidentPort`, `ProposeReplan` (por el nombre del campo), `InMemoryEventPublisher` (solo síncronos), `FieldOpsConfig` (el repositorio decorado) y `ReplanningConfig` (el constructor de `RegisterIncident`).
 - Según la decisión 1.1: `IncidentController` y `QueryReplanProposalsPort`/`QueryReplanProposals`.
 - Según la decisión 1.2: `ApproveExpeditionPort`, `ApproveExpedition`, `ApprovalRequest`, `ApprovalMapper` y los tests de API de aprobación.
@@ -346,8 +346,8 @@ Todas se cierran el martes 03/11, antes de arrancar, porque la fase bloquea al r
 
 - D70: la entidad acumula los eventos y el caso de uso publica. Revisa D45, que lo había descartado porque no había `save`.
 - D71: qué lleva cada evento.
-- D72: publicación desacoplada de `RegisterIncident`. Revisa D58 y D64, con nota en D45.
-- D73: dos interfaces de suscriptor y qué garantía tiene cada una.
+- D72: dos interfaces de suscriptor y qué garantía tiene cada una.
+- D73: publicación desacoplada de `RegisterIncident`. Revisa D58 y D64, con nota en D45.
 - Nota en D45: `IncidentRegistered` es el `IncidentReported` de la consigna.
 - Supuesto nuevo: los timestamps del hecho los manda el cliente.
 
@@ -759,8 +759,8 @@ Cada fase escribe sus entradas en el mismo PR que el código, con el formato de 
 | --- | --- | --- |
 | D70 | La entidad acumula los eventos y el caso de uso publica | 1 |
 | D71 | Qué lleva cada evento: `EventId`, `occurredAt` del hecho y datos mínimos | 1 |
-| D72 | `RegisterIncident` desacoplado de la propuesta | 1 |
-| D73 | Suscriptores síncronos y asíncronos | 1 |
+| D72 | Suscriptores síncronos y asíncronos | 1 |
+| D73 | `RegisterIncident` desacoplado de la propuesta | 1 |
 | D74 | Outbox en PostgreSQL: registro y entregas | 2 |
 | D75 | Serialización de eventos sin `switch` | 2 |
 | D76 | Consulta del registro de eventos | 2 |

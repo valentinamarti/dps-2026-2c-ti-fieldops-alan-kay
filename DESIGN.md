@@ -1428,6 +1428,24 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
   - El `occurredAt` de un evento es el que informó el cliente. No sirve para ordenar los eventos en el orden en que el sistema los conoció.
   - Como el id es aleatorio, los tests no comparan un evento entero con `equals`: verifican su tipo y sus datos.
 
+### D72 — Los suscriptores síncronos y los asíncronos son dos tipos distintos (Entrega 3, propuesta de valor, completa D45)
+
+- **Origen:** la consigna pide al menos un consumidor que procese los eventos fuera del flujo de la petición, y las decisiones de la entrega mantienen síncrona la propuesta de replanificación. Conviven dos clases de consumidores con garantías distintas, y el dominio tiene que poder decir cuál es cuál.
+- **Patrón / principio:** dos contratos de suscriptor (Interface Segregation): el tipo del suscriptor dice qué garantía tiene la entrega.
+- **Dónde:** `AsyncEventSubscriber<E>` (en `business.interfaces.events`), junto a `EventSubscriber<E>`, con `eventType()`, `consumerName()` y `on(E)`; `ConsumerName` (en `business.models.events`).
+- **Por qué:**
+  - **`EventSubscriber` es el síncrono:** el publicador en proceso lo entrega adentro de la operación, en su misma transacción, y si falla se deshace la operación (D68). Es lo que necesita `ProposeReplan` (D45).
+  - **`AsyncEventSubscriber` es otro tipo, y no hereda de `EventSubscriber`.** El publicador en proceso recibe la lista de `EventSubscriber` que arma Spring. Si el asíncrono heredara del síncrono, Spring lo sumaría a esa lista y lo entregaría adentro de la operación, justo lo contrario de lo que promete su tipo, y sin ningún error que lo avise. Separados, lo garantizan los tipos: `InMemoryEventPublisher` no cambió y nunca ve a un asíncrono.
+  - **`consumerName()` identifica al consumidor con un nombre estable.** Es lo que identifica a cada consumidor en el registro de sus entregas, así que no puede salir del nombre de la clase: renombrarla dejaría entregas huérfanas. Es un `ConsumerName` y no un `String`, como el resto de los conceptos del dominio (D26).
+- **Alternativas descartadas:**
+  - Una sola interfaz con un indicador (un método `isAsync()` o una anotación) — cada publicador tendría que preguntarlo, y un suscriptor mal marcado pasaría sin errores.
+  - Que la garantía la decida la configuración — el dominio no sabría qué garantía tiene cada consumidor.
+  - Que todos los consumidores sean asíncronos — contradice que la propuesta tenga que existir cuando vuelve el registro del incidente (D45, D58).
+  - Que `AsyncEventSubscriber` extienda `EventSubscriber` para no repetir `eventType()` y `on(E)` — ver arriba.
+- **Consecuencia:**
+  - Las dos interfaces repiten dos firmas.
+  - Que el publicador en proceso no entregue a los asíncronos lo prueba `AsyncSubscribersAreNotDeliveredInProcessTest`: registra un suscriptor asíncrono en el contexto real de Spring y verifica que registrar un incidente arma la propuesta síncrona sin entregarle nada a él.
+
 ## Funcionalidades nuevas de la Entrega 2
 
 ### F1 — Actividades nocturnas
