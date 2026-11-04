@@ -1476,6 +1476,55 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
   - El controller sabe que la propuesta se arma de forma síncrona. Si alguna vez pasara a ser asíncrona, `ofIncident` no la encontraría y el controller tendría que cambiar. Es un acoplamiento aceptado en el adaptador, no en el dominio.
   - Si nadie armara la propuesta, el `POST` respondería 404 en vez del 500 de antes. Hoy no puede pasar: `ProposeReplan` siempre está conectado.
 
+### D74 — Outbox en PostgreSQL: el hecho y sus entregas, en dos tablas (Entrega 3, propuesta de valor)
+
+- **Origen:** la consigna pide un registro de eventos consultable y consumidores que procesen los eventos fuera del flujo de la petición. Con la entrega en proceso (D45), un evento publicado no deja rastro: si nadie lo atiende, o si quien lo atiende falla, no queda registrado que el hecho ocurrió. Y D45 dejó escrito que, con persistencia real, registrar y reaccionar tienen que ir en la misma transacción o pasar a un outbox.
+- **Patrón / principio:** Transactional Outbox sobre la misma base que el resto del estado, con el hecho y el estado de su entrega en tablas separadas.
+- **Dónde:** `V2__event_log.sql` (en `app`) crea `domain_event` y `event_delivery`; `DomainEventEntity`, `EventDeliveryEntity`, `EventDeliveryKey` y sus repositorios de Spring Data (en `adapters.driven.persistence`), que coinciden columna por columna con la migración porque `ddl-auto` está en `validate` (D67).
+- **Por qué:**
+  - **En la misma base y no en un broker.** Un broker sería otra pieza de infraestructura que levantar, y no resuelve el problema que importa: que el evento se guarde con el cambio que lo produjo. Guardarlo en la misma base lo deja adentro de la transacción del caso de uso (D68), que es exactamente la garantía que hace falta.
+  - **Dos tablas y no una.** El hecho es uno y sus entregas son varias, una por consumidor interesado. Con una sola tabla, un evento con dos consumidores se guardaría dos veces, con su payload duplicado, y un evento sin consumidores asíncronos no tendría ninguna fila: el registro dejaría de ser el registro de lo que pasó para ser la lista de lo que hay que entregar.
+  - **El orden es el de `sequence` y no el de `occurredAt`.** `sequence` es un `BIGSERIAL`, lo asigna la base al insertar. Los `occurredAt` los informa el cliente (D71), así que un fin de actividad cargado tarde quedaría antes de un incidente ya registrado. El índice `domain_event_of_expedition (expedition_id, sequence)` es el de la consulta por expedición.
+  - **El registro no depende del ciclo de vida de la expedición.** `expedition_id` no tiene clave foránea a `expedition`: un hecho ocurrió y tiene que seguir siendo consultable pase lo que pase con la fila de la expedición. La clave foránea que sí está es la de `event_delivery` a `domain_event`, porque una entrega sin su evento no significa nada.
+  - **El tipo se guarda como el nombre de la clase** (`event_type`), y `event_id` es único: el id del hecho lo genera el dominio (D71) y la base lo hace cumplir.
+  - **El payload es `jsonb`,** con un `String` en la entidad y `@JdbcTypeCode(SqlTypes.JSON)`. Se probó contra PostgreSQL 17 antes de escribir la migración: es la única de las tres variantes que pasa la validación del esquema y escribe con una sola anotación. Con `@ColumnTransformer(write = "?::jsonb")` hace falta además `@Column(columnDefinition = "jsonb")`, porque el transformador no participa de la validación. Con `jsonb` la base valida que lo que se guarda sea JSON.
+  - **La clave de la entrega es `(event_sequence, consumer)`:** un consumidor tiene una sola entrega de un evento, y es la clave la que lo garantiza.
+  - **`next_attempt_at` es `NOT NULL`:** una entrega pendiente siempre tiene un momento a partir del cual se la puede intentar, y la primera vez es enseguida. Así, el índice `event_delivery_to_attempt (status, next_attempt_at)` responde "qué hay para entregar" sin tratar el caso nulo. `delivered_at` y `last_error` sí quedan nulos hasta que haya algo que contar.
+- **Alternativas descartadas:**
+  - Un broker de mensajería (RabbitMQ, Kafka) — ver arriba: suma infraestructura y no da la atomicidad entre el cambio y el evento, que es lo que hace falta.
+  - Una sola tabla, con el estado de la entrega adentro del evento — ver arriba.
+  - Ordenar por `occurredAt` — es el momento del hecho que informó el cliente, no el orden en que el sistema se enteró.
+  - Un `uuid` como clave primaria de `domain_event`, con el `event_id` del dominio — lo que el registro tiene que responder es en qué orden pasaron las cosas, y un uuid no ordena. El `event_id` igual está, y es único.
+  - `payload` como `text` — funciona y es la única variante que devuelve el string tal cual, pero la base deja de validar que sea JSON y se pierde poder consultar adentro del payload.
+  - Una clave foránea de `domain_event` a `expedition` — ver arriba.
+- **Consecuencia:**
+  - **`jsonb` normaliza lo que guarda:** reordena las claves del objeto y mete un espacio después de cada `:` y `,`. El string que vuelve no es el que entró, así que lo que compare payloads compara JSON parseado y no strings (`JpaEventLogTest.keepsThePayloadOfTheEventAsJson`).
+  - **La secuencia se asigna al insertar y no al confirmar,** así que dos transacciones concurrentes pueden confirmar en otro orden que el de su secuencia. Para una misma expedición no pasa: las tres operaciones que emiten eventos cambian la fila `expedition`, que tiene `@Version` (D67), así que de dos transacciones concurrentes sobre la misma expedición una falla y se deshace junto con su evento. Entre expediciones no se promete ningún orden.
+  - **El registro crece sin límite:** nada borra eventos ni entregas. Es deuda técnica aceptada: un registro de auditoría que se purga deja de servir para auditar, y el volumen de esta aplicación no lo justifica.
+  - `clean-database.sql` y el `DatabaseCleaner` de `app` suman las dos tablas: una tabla nueva que no entre ahí hace que los tests pasen solos y fallen juntos.
+
+### D76 — El registro se consulta por un puerto de salida que devuelve su propia vista (Entrega 3, propuesta de valor)
+
+- **Origen:** la consigna pide que el registro de eventos sea consultable. Las tablas del outbox son del adaptador (D74), y el dominio no puede leerlas directo.
+- **Patrón / principio:** puerto de salida de solo lectura (D35) que devuelve vistas propias y no las entidades del adaptador (D64).
+- **Dónde:** `EventLog.ofExpedition(ExpeditionId)` (en `business.providers`); `RecordedEventView` y `EventDeliveryView` (en `business.models.responses`); `DeliveryStatus` (en `business.models.events`); `JpaEventLog` (en `adapters.driven.persistence`).
+- **Por qué:**
+  - **Es un puerto de salida y no un repositorio del dominio.** El registro no es un agregado: ninguna entidad lo modifica y nadie lo reconstruye. Lo único que se le pide es qué pasó en una expedición, así que el puerto tiene esa única operación.
+  - **Devuelve vistas y no las entidades JPA** (D64). `RecordedEventView` dice qué pasó —el id del evento, su tipo, cuándo ocurrió y cuándo quedó registrado— y `EventDeliveryView`, cómo le fue a cada consumidor: su estado, cuántos intentos lleva y el último error. El payload no sale por el puerto: lo que se consulta es qué pasó, no cómo se guardó.
+  - **La vista no expone la secuencia.** Que los eventos vengan en el orden en que se registraron es parte del contrato del puerto, así que quien lo consume no necesita conocer el `BIGSERIAL` de la tabla.
+  - **`DeliveryStatus` vive en el dominio** porque la vista lo expone, y en la base se guarda su nombre, como los demás enums (D67).
+  - **Las entregas salen ordenadas por consumidor,** para que la misma consulta responda siempre lo mismo.
+  - **Dos consultas y no una asociación.** El adaptador busca los eventos de la expedición y después las entregas de esos eventos, y las agrupa. No hay un `@OneToMany` entre las dos entidades: así la respuesta se arma completa, sin depender de que haya una transacción abierta cuando se la recorre (`open-in-view` está en `false`, D68), y las entregas quedan consultables por su cuenta.
+- **Alternativas descartadas:**
+  - Que el puerto devuelva los `DomainEvent` deserializados — obligaría a deserializar para contestar qué pasó, y el estado de las entregas no es parte del evento.
+  - Un `@OneToMany` de `domain_event` a `event_delivery` — ver arriba.
+  - Que la vista lleve la secuencia — expone el mecanismo de la tabla sin que nadie lo necesite.
+  - Un puerto con operaciones de escritura, como los repositorios — el dominio no escribe el registro; lo escribe el adaptador que publica.
+- **Consecuencia:**
+  - `type` es el nombre de la clase tal como se guardó (D74). Quien lo muestre decide cómo acortarlo.
+  - Una expedición sin eventos devuelve una lista vacía, no un error: el registro responde por un id de expedición, exista esa expedición o no.
+  - `JpaEventLogTest` corre contra PostgreSQL con Testcontainers, como el resto de los adaptadores de persistencia (D67): qué dice cada evento, el orden por secuencia y no por `occurredAt`, que no se mezclen las expediciones, la línea por consumidor con su error, un evento sin entregas, el payload que vuelve como JSON y el id de evento repetido que la base rechaza.
+
 ## Funcionalidades nuevas de la Entrega 2
 
 ### F1 — Actividades nocturnas
