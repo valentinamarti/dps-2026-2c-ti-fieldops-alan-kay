@@ -142,9 +142,11 @@ class ExpeditionIncidentsTest {
     void rejectsAnIncidentOnAnActivityThatAlreadyFinished() {
         inExecution().startActivity(morning, at(9));
         expedition.finishActivity(morning, at(11), "Samples taken");
+        expedition.pullEvents();
 
         assertThrows(InvalidTrackingException.class,
                 () -> expedition.registerIncident(morning, IncidentReport.of("Too late", at(12))));
+        assertEquals(List.of(), expedition.pullEvents());
     }
 
     @Test
