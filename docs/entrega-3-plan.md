@@ -70,7 +70,7 @@ Todos los puntos se verificaron contra el código y son correctos.
 |----|-------------------------------------------------------------------------------|-------|--------------------------------|----------------------------------------------------------------------------------|--------------|
 | 1  | Ordenar por `occurredAt` no es el orden en que el sistema conoció los eventos | 2 y 3 | Esquema de la tabla de eventos | Orden por la secuencia de inserción. `occurredAt` queda solo como dato del hecho | Aceptado     |
 | 2  | Sin la propuesta, no hay `Location` en el `POST /incidents`                   | 1     | Contrato de la API             | El controller compone `RegisterIncident` y la consulta de la propuesta           | Decisión 1.1 |
-| 3  | El cambio revisa D58, no D45                                                  | 1     | `DESIGN.md`                    | D73 revisa D58 y D64, y D45 recibe la nota                                       | Aceptado     |
+| 3  | El cambio revisa D58, no D45                                                  | 1     | `DESIGN.md`                    | D73 revisa D45 y D58                                                              | Aceptado     |
 | 4  | Por D64, el puerto no devuelve `Incident`                                     | 1     | Firma del puerto               | Se devuelve `Incident`: D64 deja salir tal cual a los `record` sin entidades     | Revisado     |
 | 5  | `demo.http` y `DemoScriptApiTest` cambian más de lo que dice el documento     | 1     | —                              | Con la opción a) de la decisión 1.1, no cambian                                  | Decisión 1.1 |
 | 6  | "Por poco tiempo" no se sostiene sin acotar el backoff                        | 3     | D78                            | Fijar los valores concretos                                                      | Decisión 3.1 |
@@ -187,6 +187,8 @@ La Fase 1 tiene que ser corta, porque bloquea a todos. Hasta que mergee, las fas
 
 Los tres hechos pasan a ser eventos del dominio que la expedición registra cuando ocurren. Los casos de uso solo guardan la expedición: el repositorio decorado (`PublishingExpeditionRepository`, decisión 1.5) publica lo que la expedición registró, sin que el caso de uso sepa qué eventos hubo ni quién los escucha. El publicador sigue siendo `InMemoryEventPublisher`: el outbox llega en la Fase 2 sin tocar el dominio.
 
+**Estado (03/11/2026, rama `assignment-3-phase-1`): la fase está completa.** Siete commits: `EventId`, la publicación al guardar (`PublishingExpeditionRepository`), `IncidentRegistered`, `ActivityCompleted`, `AsyncEventSubscriber`, `ExpeditionApproved` y `RegisterIncident` desacoplado. Las decisiones 1.1 a 1.5 están cerradas, y la 1.6 quedó decidida para que la implemente la Fase 4. `DESIGN.md` suma D70 a D73. `mvn -B verify` pasa con 912 tests. La API, el frontend y `demo.http` no cambiaron.
+
 ```mermaid
 flowchart LR
   A[Caso de uso: aprueba, termina o registra] --> B[Expedition registra el evento]
@@ -293,22 +295,22 @@ Todas se cierran el martes 03/11, antes de arrancar, porque la fase bloquea al r
 
 ### Diseño
 
-- [ ] `EventId` (value object, `record`) en `business.models.events`.
-- [ ] `DomainEvent` expone `id()`, `expeditionId()` y `occurredAt()`. Para respetar la consigna ("objetos inmutables del dominio"), los eventos son `record` con value objects, sin colecciones mutables.
-- [ ] Los eventos:
+- [x] `EventId` (value object, `record`) en `business.models.events`.
+- [x] `DomainEvent` expone `id()`, `expeditionId()` y `occurredAt()`. Para respetar la consigna ("objetos inmutables del dominio"), los eventos son `record` con value objects, sin colecciones mutables.
+- [x] Los eventos:
   - `ExpeditionApproved(EventId id, ExpeditionId expeditionId, LocalDateTime occurredAt)`.
   - `ActivityCompleted(EventId id, ExpeditionId expeditionId, ActivityId activity, LocalDateTime occurredAt, String result)`.
   - `IncidentRegistered`, que ya existe, suma `id` y `occurredAt`. Su campo `expedition` pasa a llamarse `expeditionId` para cumplir con `DomainEvent`.
-- [ ] `Expedition` acumula sus eventos en `approve(...)`, `finishActivity(...)` y `registerIncident(...)`, siempre después de que la operación ya validó todo. Así, una operación que falla no deja eventos (por ejemplo, el paso 20 de la demo, el 422).
-- [ ] `Expedition` tiene un método que toma los eventos pendientes y los vacía, por ejemplo `pullEvents()`. Los pendientes no entran en `snapshot()` ni en `restore()`.
-- [ ] `PublishingExpeditionRepository` en `business.services` (decisión 1.5): guarda y después publica los pendientes de a uno. `FieldOpsConfig` lo expone como el `ExpeditionRepository` de la aplicación. Con eso:
+- [x] `Expedition` acumula sus eventos en `approve(...)`, `finishActivity(...)` y `registerIncident(...)`, siempre después de que la operación ya validó todo. Así, una operación que falla no deja eventos (por ejemplo, el paso 20 de la demo, el 422).
+- [x] `Expedition` tiene un método que toma los eventos pendientes y los vacía, por ejemplo `pullEvents()`. Los pendientes no entran en `snapshot()` ni en `restore()`.
+- [x] `PublishingExpeditionRepository` en `business.services` (decisión 1.5): guarda y después publica los pendientes de a uno. `FieldOpsConfig` lo expone como el `ExpeditionRepository` de la aplicación. Con eso:
   - `ApproveExpedition`, que guarda la aprobada y, si era una alternativa, también la reemplazada, publica los eventos de las dos sin hacer nada.
   - `TrackActivity.finish` y `RegisterIncident.register` tampoco publican: solo guardan.
   - `start` y `observe` no generan eventos, y ningún otro caso de uso tampoco.
-- [ ] Interfaz nueva para los suscriptores asíncronos en `business.interfaces.events`, junto a `EventSubscriber`, que sigue siendo el síncrono. `AsyncEventSubscriber<E>`, con `eventType()`, `on(E)` y `consumerName()`, que devuelve un `ConsumerName` (value object). El nombre se guarda en la base, así que no puede ser `getClass().getName()`: un refactor dejaría entregas huérfanas. No hereda de `EventSubscriber`: si lo hiciera, Spring lo sumaría a la lista del publicador en proceso y lo entregaría síncrono.
-- [ ] `InMemoryEventPublisher` entrega solo a los `EventSubscriber`. En esta fase, los asíncronos no tienen quién los entregue: eso lo construyen las fases 2 y 3.
-- [ ] `RegisterIncident` deja de depender de `ReplanProposalRepository` y devuelve el `Incident` (punto 4).
-- [ ] `POST /incidents` según la decisión 1.1. Si es la a), las dos llamadas del controller corren en transacciones distintas, pero como la propuesta se confirmó junto con el incidente, la segunda siempre la encuentra.
+- [x] Interfaz nueva para los suscriptores asíncronos en `business.interfaces.events`, junto a `EventSubscriber`, que sigue siendo el síncrono. `AsyncEventSubscriber<E>`, con `eventType()`, `on(E)` y `consumerName()`, que devuelve un `ConsumerName` (value object). El nombre se guarda en la base, así que no puede ser `getClass().getName()`: un refactor dejaría entregas huérfanas. No hereda de `EventSubscriber`: si lo hiciera, Spring lo sumaría a la lista del publicador en proceso y lo entregaría síncrono.
+- [x] `InMemoryEventPublisher` entrega solo a los `EventSubscriber`. En esta fase, los asíncronos no tienen quién los entregue: eso lo construyen las fases 2 y 3.
+- [x] `RegisterIncident` deja de depender de `ReplanProposalRepository` y devuelve el `Incident` (punto 4).
+- [x] `POST /incidents` según la decisión 1.1. Si es la a), las dos llamadas del controller corren en transacciones distintas, pero como la propuesta se confirmó junto con el incidente, la segunda siempre la encuentra.
 
 > **Review, punto 3 — Revisa D58, no D45.** D58 (`DESIGN.md:1135`) es la que decidió "201 con la propuesta y `Location`", y la tabla de endpoints está en D58 y D49. D73 dice "revisa D58 y D64", y D45 solo recibe una nota, por el cambio en quién genera los eventos (D70). Si la decisión 1.1 es la a), D58 cambia una línea: de dónde saca la propuesta el adaptador.
 >
@@ -336,26 +338,26 @@ Todas se cierran el martes 03/11, antes de arrancar, porque la fase bloquea al r
 
 ### API
 
-- [ ] `POST /api/expeditions/{id}/incidents`: según la decisión 1.1.
-- [ ] `POST .../approval` no cambia: el controller completa el momento con la hora del servidor (decisión 1.2). Un test de punta a punta verifica que el evento lleva esa hora.
+- [x] `POST /api/expeditions/{id}/incidents`: según la decisión 1.1.
+- [x] `POST .../approval` no cambia: el controller completa el momento con la hora del servidor (decisión 1.2). Un test de punta a punta verifica que el evento lleva esa hora.
 
 ### Tests
 
-- [ ] Unitarios de `Expedition`: aprobar registra `ExpeditionApproved`, terminar una actividad registra `ActivityCompleted` y registrar un incidente registra `IncidentRegistered`, cada uno con los datos del hecho.
-- [ ] Una operación que falla no deja eventos: aprobar con críticas, terminar sin haber iniciado o un incidente sobre una actividad terminada.
-- [ ] `pullEvents()` vacía, y una expedición restaurada no trae eventos.
-- [ ] La alternativa que arma `ExpeditionReplanner` hereda los incidentes (`builder.addInheritedIncident`) **sin** emitir `IncidentRegistered`.
-- [ ] `PublishingExpeditionRepositoryTest`: publica lo que la expedición registró después de guardarla (con `save` y con `add`), en orden. Si guardar falla, no toma ni publica nada, y las lecturas pasan directo.
-- [ ] Con el repositorio decorado, aprobar una alternativa publica los eventos de las dos expediciones que se guardan, y `RegisterIncident` ya no consulta propuestas.
-- [ ] `InMemoryEventPublisher` no entrega a los asíncronos.
-- [ ] `ReplanningApiTest`, `DemoScriptApiTest` y `HexagonalArchitectureTest` siguen en verde.
+- [x] Unitarios de `Expedition`: aprobar registra `ExpeditionApproved`, terminar una actividad registra `ActivityCompleted` y registrar un incidente registra `IncidentRegistered`, cada uno con los datos del hecho.
+- [x] Una operación que falla no deja eventos: aprobar con críticas, terminar sin haber iniciado o un incidente sobre una actividad terminada.
+- [x] `pullEvents()` vacía, y una expedición restaurada no trae eventos.
+- [x] La alternativa que arma `ExpeditionReplanner` hereda los incidentes (`builder.addInheritedIncident`) **sin** emitir `IncidentRegistered`.
+- [x] `PublishingExpeditionRepositoryTest`: publica lo que la expedición registró después de guardarla (con `save` y con `add`), en orden. Si guardar falla, no toma ni publica nada, y las lecturas pasan directo.
+- [x] Con el repositorio decorado, aprobar una alternativa publica los eventos de las dos expediciones que se guardan, y `RegisterIncident` ya no consulta propuestas.
+- [x] `InMemoryEventPublisher` no entrega a los asíncronos.
+- [x] `ReplanningApiTest`, `DemoScriptApiTest` y `HexagonalArchitectureTest` siguen en verde.
 
 ### `DESIGN.md`
 
-- D70: la entidad acumula los eventos y el caso de uso publica. Revisa D45, que lo había descartado porque no había `save`.
+- D70: la expedición registra sus eventos y un decorador del repositorio los publica al guardarla. Revisa D45, que lo había descartado porque no había `save`.
 - D71: qué lleva cada evento.
 - D72: dos interfaces de suscriptor y qué garantía tiene cada una.
-- D73: publicación desacoplada de `RegisterIncident`. Revisa D58 y D64, con nota en D45.
+- D73: publicación desacoplada de `RegisterIncident`. Revisa D45 y D58, y aplica la regla de D64 para devolver `Incident`.
 - Nota en D45: `IncidentRegistered` es el `IncidentReported` de la consigna.
 - Supuesto nuevo: los timestamps del hecho los manda el cliente.
 
@@ -804,7 +806,7 @@ Cada fase escribe sus entradas en el mismo PR que el código, con el formato de 
 
 | Entrada | Tema | Fase |
 | --- | --- | --- |
-| D70 | La entidad acumula los eventos y el caso de uso publica | 1 |
+| D70 | La expedición registra sus eventos y se publican al guardarla | 1 |
 | D71 | Qué lleva cada evento: `EventId`, `occurredAt` del hecho y datos mínimos | 1 |
 | D72 | Suscriptores síncronos y asíncronos | 1 |
 | D73 | `RegisterIncident` desacoplado de la propuesta | 1 |
