@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.APPROVED_AT;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.assignContainers;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.assignCooler;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
@@ -46,7 +47,7 @@ class FinishExpeditionTest {
             assignContainers(expedition, item);
         });
         expedition.submitForReview();
-        new ApproveExpedition(List.of(), reservations, repository, new FakeResourceCatalog()).approve(expedition, List.of());
+        new ApproveExpedition(List.of(), reservations, repository, new FakeResourceCatalog()).approve(expedition, List.of(), APPROVED_AT);
     }
 
     @Test

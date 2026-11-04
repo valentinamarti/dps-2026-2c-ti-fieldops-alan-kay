@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.APPROVED_AT;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.usecases.IncidentScenario.TEN;
@@ -112,7 +113,7 @@ class UseCasesSaveTheirChangesTest {
         alternative.submitForReview();
         clearInvocations(scenario.expeditions, scenario.catalog);
 
-        scenario.approveExpedition.approve(alternative.getId(), List.of());
+        scenario.approveExpedition.approve(alternative.getId(), List.of(), APPROVED_AT);
 
         verify(scenario.expeditions).save(alternative);
         verify(scenario.expeditions).save(scenario.expedition);

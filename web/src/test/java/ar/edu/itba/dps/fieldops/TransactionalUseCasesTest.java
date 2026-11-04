@@ -1,5 +1,8 @@
 package ar.edu.itba.dps.fieldops;
 
+import ar.edu.itba.dps.fieldops.adapters.driven.persistence.ExpeditionJpaRepository;
+import ar.edu.itba.dps.fieldops.adapters.driven.persistence.JpaExpeditionRepository;
+import ar.edu.itba.dps.fieldops.adapters.driven.persistence.LoadedAggregates;
 import ar.edu.itba.dps.fieldops.business.exceptions.ConcurrentUpdateException;
 import ar.edu.itba.dps.fieldops.business.models.commands.RegisterIncidentCommand;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.Expedition;
@@ -12,9 +15,10 @@ import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.ports.in.RegisterIncidentPort;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
-import ar.edu.itba.dps.fieldops.business.providers.ReplanProposalRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
+import ar.edu.itba.dps.fieldops.business.rules.ActivityTypeRegistry;
+import ar.edu.itba.dps.fieldops.business.services.PublishingExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.usecases.RegisterIncident;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,11 +45,15 @@ class TransactionalUseCasesTest {
     @Autowired
     private ExpeditionRepository expeditions;
     @Autowired
-    private ReplanProposalRepository proposals;
-    @Autowired
     private ZoneRepository zones;
     @Autowired
     private ResourceCatalog catalog;
+    @Autowired
+    private ExpeditionJpaRepository expeditionRows;
+    @Autowired
+    private ActivityTypeRegistry types;
+    @Autowired
+    private LoadedAggregates loaded;
 
     private final Zone coast = zone("z-1");
     private final Person leader = person("p-1");
@@ -91,14 +99,18 @@ class TransactionalUseCasesTest {
         running.submitForReview();
         final var approved = Expedition.restore(inExecution(running));
         expeditions.add(approved);
-        final RegisterIncidentPort failing = transactional.writing(RegisterIncidentPort.class, new RegisterIncident(expeditions, event -> {
+        final RegisterIncidentPort failing = transactional.writing(RegisterIncidentPort.class, new RegisterIncident(new PublishingExpeditionRepository(storedExpeditions(), event -> {
             throw new IllegalStateException("the subscriber failed");
-        }, proposals));
+        })));
 
         assertThrows(IllegalStateException.class, () -> failing.register(new RegisterIncidentCommand(approved.getId(), activity.getId(),
                 IncidentReport.of("Storm", LocalDateTime.of(2026, 10, 1, 9, 0)))));
 
         assertTrue(expeditions.findById(approved.getId()).orElseThrow().getIncidents().isEmpty());
+    }
+
+    private ExpeditionRepository storedExpeditions() {
+        return new JpaExpeditionRepository(expeditionRows, zones, catalog, types, loaded);
     }
 
     private ExpeditionSnapshot inExecution(Expedition expedition) {

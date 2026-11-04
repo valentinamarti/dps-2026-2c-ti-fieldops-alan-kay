@@ -20,11 +20,13 @@ import ar.edu.itba.dps.fieldops.business.replanning.CancellationOptions;
 import ar.edu.itba.dps.fieldops.business.replanning.ExpeditionReplanner;
 import ar.edu.itba.dps.fieldops.business.replanning.RescheduleOptions;
 import ar.edu.itba.dps.fieldops.business.replanning.ResourceReplacementOptions;
+import ar.edu.itba.dps.fieldops.business.services.PublishingExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.APPROVED_AT;
 import static org.mockito.Mockito.spy;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.completeAssignments;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.createExpeditionOn;
@@ -44,11 +46,16 @@ final class IncidentScenario {
     final ResourceReservations reservations = new ResourceReservations();
     final ExpeditionReplanner replanner = new ExpeditionReplanner(expeditions);
     final ReplanExpedition replanExpedition = new ReplanExpedition(expeditions, replanner);
-    final ApproveExpedition approveExpedition = new ApproveExpedition(List.of(), reservations, expeditions, catalog);
     final ProposeReplan proposeReplan = new ProposeReplan(expeditions, proposals, replanner,
             List.of(new RescheduleOptions(), new ResourceReplacementOptions(catalog), new CancellationOptions()));
-    final EventPublisher publisher = event -> proposeReplan.on(IncidentRegistered.class.cast(event));
-    final RegisterIncident registerIncident = new RegisterIncident(expeditions, publisher, proposals);
+    final EventPublisher publisher = event -> {
+        if (event instanceof IncidentRegistered incident) {
+            proposeReplan.on(incident);
+        }
+    };
+    final PublishingExpeditionRepository publishing = new PublishingExpeditionRepository(expeditions, publisher);
+    final ApproveExpedition approveExpedition = new ApproveExpedition(List.of(), reservations, publishing, catalog);
+    final RegisterIncident registerIncident = new RegisterIncident(publishing);
     final DecideReplanProposal decide = new DecideReplanProposal(proposals, expeditions, replanner, replanExpedition, catalog);
     final QueryReplanProposals queryProposals = new QueryReplanProposals(proposals, expeditions);
 
@@ -69,12 +76,12 @@ final class IncidentScenario {
         expedition.schedule(dependent, hours(16, 17));
         completeAssignments(expedition);
         expedition.submitForReview();
-        approveExpedition.approve(expedition, List.of());
+        approveExpedition.approve(expedition, List.of(), APPROVED_AT);
         expedition.start();
     }
 
     ReplanProposal registered(RegisterIncidentCommand command) {
-        return proposals.findById(registerIncident.register(command).id()).orElseThrow();
+        return proposals.findByIncident(registerIncident.register(command).id()).orElseThrow();
     }
 
     Expedition accepted(ReplanProposalId proposal, int optionNumber, ReplanDecisionCommand command) {

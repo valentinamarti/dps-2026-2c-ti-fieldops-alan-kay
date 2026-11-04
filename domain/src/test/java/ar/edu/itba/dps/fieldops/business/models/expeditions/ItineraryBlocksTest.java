@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.APPROVED_AT;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.completeAssignments;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
@@ -143,7 +144,7 @@ class ItineraryBlocksTest {
         final var block = expedition.schedule(sequential(activity(dive, hours(9, 11)), activity(transect, hours(11, 13))));
         completeAssignments(expedition);
         expedition.submitForReview();
-        expedition.approve(List.of(), List.of());
+        expedition.approve(List.of(), List.of(), APPROVED_AT);
         expedition.start();
 
         expedition.startActivity(itemOf(dive), at(9));

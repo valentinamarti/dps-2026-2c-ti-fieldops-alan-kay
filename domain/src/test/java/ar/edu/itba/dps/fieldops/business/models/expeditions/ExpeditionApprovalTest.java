@@ -6,6 +6,7 @@ import ar.edu.itba.dps.fieldops.business.exceptions.UnacceptedWarningException;
 import ar.edu.itba.dps.fieldops.business.fixtures.SequentialExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.interfaces.validation.ValidationRule;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
+import ar.edu.itba.dps.fieldops.business.models.events.ExpeditionApproved;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.validation.AcceptedWarning;
 import ar.edu.itba.dps.fieldops.business.models.validation.RuleId;
@@ -16,12 +17,14 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.APPROVED_AT;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.diving;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ExpeditionApprovalTest {
@@ -42,9 +45,40 @@ class ExpeditionApprovalTest {
     void approvesAnExpeditionInReviewWithoutProblems() {
         expedition.submitForReview();
 
-        expedition.approve(finding(), List.of());
+        expedition.approve(finding(), List.of(), APPROVED_AT);
 
         assertEquals(ExpeditionStatus.APPROVED, expedition.getStatus());
+    }
+
+    @Test
+    void approvingRecordsExpeditionApprovedAtTheMomentItReceives() {
+        expedition.submitForReview();
+
+        expedition.approve(finding(), List.of(), APPROVED_AT);
+
+        final var events = expedition.pullEvents();
+        assertEquals(1, events.size());
+        final var event = assertInstanceOf(ExpeditionApproved.class, events.getFirst());
+        assertEquals(expedition.getId(), event.expeditionId());
+        assertEquals(APPROVED_AT, event.occurredAt());
+    }
+
+    @Test
+    void anApprovalThatIsRejectedRecordsNothing() {
+        expedition.submitForReview();
+
+        assertThrows(ExpeditionNotApprovableException.class, () -> expedition.approve(finding(MISSING_PERMIT), List.of(), APPROVED_AT));
+        assertThrows(UnacceptedWarningException.class, () -> expedition.approve(finding(RISKY_DIVE), List.of(), APPROVED_AT));
+
+        assertEquals(List.of(), expedition.pullEvents());
+    }
+
+    @Test
+    void anApprovalNeedsTheMomentItHappened() {
+        expedition.submitForReview();
+
+        assertThrows(NullPointerException.class, () -> expedition.approve(finding(), List.of(), null));
+        assertEquals(ExpeditionStatus.IN_REVIEW, expedition.getStatus());
     }
 
     @Test
@@ -52,7 +86,7 @@ class ExpeditionApprovalTest {
         expedition.schedule(diving("a-1", coast, hours(0, 24), 30), hours(9, 11));
         expedition.submitForReview();
 
-        assertThrows(ExpeditionNotApprovableException.class, () -> expedition.approve(List.of(), List.of()));
+        assertThrows(ExpeditionNotApprovableException.class, () -> expedition.approve(List.of(), List.of(), APPROVED_AT));
         assertEquals(ExpeditionStatus.IN_REVIEW, expedition.getStatus());
     }
 
@@ -62,7 +96,7 @@ class ExpeditionApprovalTest {
         expedition.submitForReview();
 
         assertThrows(ExpeditionNotApprovableException.class,
-                () -> expedition.approve(finding(MISSING_PERMIT, RISKY_DIVE), List.of(acceptance)));
+                () -> expedition.approve(finding(MISSING_PERMIT, RISKY_DIVE), List.of(acceptance), APPROVED_AT));
         assertEquals(ExpeditionStatus.IN_REVIEW, expedition.getStatus());
     }
 
@@ -70,7 +104,7 @@ class ExpeditionApprovalTest {
     void cannotBeApprovedWithAWarningNobodyAccepted() {
         expedition.submitForReview();
 
-        assertThrows(UnacceptedWarningException.class, () -> expedition.approve(finding(RISKY_DIVE), List.of()));
+        assertThrows(UnacceptedWarningException.class, () -> expedition.approve(finding(RISKY_DIVE), List.of(), APPROVED_AT));
         assertEquals(ExpeditionStatus.IN_REVIEW, expedition.getStatus());
     }
 
@@ -79,7 +113,7 @@ class ExpeditionApprovalTest {
         final var acceptance = new AcceptedWarning(RISKY_DIVE, leader, "Both divers are instructors");
         expedition.submitForReview();
 
-        expedition.approve(finding(RISKY_DIVE), List.of(acceptance));
+        expedition.approve(finding(RISKY_DIVE), List.of(acceptance), APPROVED_AT);
 
         assertEquals(ExpeditionStatus.APPROVED, expedition.getStatus());
         assertEquals(List.of(acceptance), expedition.getAcceptedWarnings());
@@ -91,12 +125,12 @@ class ExpeditionApprovalTest {
         expedition.submitForReview();
 
         assertThrows(UnacceptedWarningException.class,
-                () -> expedition.approve(finding(RISKY_DIVE), List.of(outsiderAcceptance)));
+                () -> expedition.approve(finding(RISKY_DIVE), List.of(outsiderAcceptance), APPROVED_AT));
     }
 
     @Test
     void mustBeInReviewToBeApproved() {
-        assertThrows(InvalidStatusTransitionException.class, () -> expedition.approve(finding(), List.of()));
+        assertThrows(InvalidStatusTransitionException.class, () -> expedition.approve(finding(), List.of(), APPROVED_AT));
         assertEquals(ExpeditionStatus.DRAFT, expedition.getStatus());
     }
 
@@ -106,7 +140,7 @@ class ExpeditionApprovalTest {
         final var reworded = ValidationResult.warning(RISKY_DIVE.rule(), RISKY_DIVE.subject(), "Diving a-1 is riskier than allowed");
         expedition.submitForReview();
 
-        expedition.approve(finding(reworded), List.of(acceptance));
+        expedition.approve(finding(reworded), List.of(acceptance), APPROVED_AT);
 
         assertEquals(ExpeditionStatus.APPROVED, expedition.getStatus());
     }
@@ -117,7 +151,7 @@ class ExpeditionApprovalTest {
         final var acceptance = new AcceptedWarning(otherDive, leader, "Both divers are instructors");
         expedition.submitForReview();
 
-        assertThrows(UnacceptedWarningException.class, () -> expedition.approve(finding(RISKY_DIVE), List.of(acceptance)));
+        assertThrows(UnacceptedWarningException.class, () -> expedition.approve(finding(RISKY_DIVE), List.of(acceptance), APPROVED_AT));
     }
 
     @Test

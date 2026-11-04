@@ -47,6 +47,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.APPROVED_AT;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.DIVING;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.diving;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
@@ -160,7 +161,7 @@ class ExpeditionLifecycleIntegrationTest {
         final var riskyDive = preview.validate(expedition).warnings().getFirst();
         expedition.submitForReview();
         expeditions.add(expedition);
-        approveExpedition.approve(expedition.getId(), List.of(acceptanceOf(riskyDive)));
+        approveExpedition.approve(expedition.getId(), List.of(acceptanceOf(riskyDive)), APPROVED_AT);
         return expedition.getId();
     }
 
@@ -196,7 +197,7 @@ class ExpeditionLifecycleIntegrationTest {
         expeditions.add(expedition);
 
         final var riskyDive = result.warnings().getFirst();
-        approveExpedition.approve(id, List.of(acceptanceOf(riskyDive)));
+        approveExpedition.approve(id, List.of(acceptanceOf(riskyDive)), APPROVED_AT);
         assertEquals(ExpeditionStatus.APPROVED, reloaded(id).getStatus());
         assertFalse(leaderIsFreeDuringTheDive());
 
@@ -230,7 +231,7 @@ class ExpeditionLifecycleIntegrationTest {
         final var alternativeId = replanExpedition
                 .replan(original, original.getItinerary().itemFor(survey).orElseThrow(), new Delay(Duration.ofHours(1))).getId();
         transitions.submitForReview(alternativeId);
-        approveExpedition.approve(alternativeId, List.of());
+        approveExpedition.approve(alternativeId, List.of(), APPROVED_AT);
 
         assertEquals(ExpeditionStatus.REPLACED, reloaded(originalId).getStatus());
         assertEquals(Optional.of(alternativeId), reloaded(originalId).getReplacement());
@@ -271,7 +272,7 @@ class ExpeditionLifecycleIntegrationTest {
         assertTrue(messages.stream().anyMatch(message -> message.contains("staff")), messages::toString);
         assertFalse(result.canBeApproved());
 
-        assertThrows(ExpeditionNotApprovableException.class, () -> approveExpedition.approve(expedition.getId(), List.of()));
+        assertThrows(ExpeditionNotApprovableException.class, () -> approveExpedition.approve(expedition.getId(), List.of(), APPROVED_AT));
         assertEquals(ExpeditionStatus.IN_REVIEW, reloaded(expedition.getId()).getStatus());
         assertTrue(leaderIsFreeDuringTheDive());
     }

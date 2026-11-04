@@ -10,6 +10,7 @@ import ar.edu.itba.dps.fieldops.business.exceptions.InvalidTrackingException;
 import ar.edu.itba.dps.fieldops.business.exceptions.NotAResponsibleException;
 import ar.edu.itba.dps.fieldops.business.exceptions.StaleAlternativeException;
 import ar.edu.itba.dps.fieldops.business.exceptions.UnacceptedWarningException;
+import ar.edu.itba.dps.fieldops.business.interfaces.events.DomainEvent;
 import ar.edu.itba.dps.fieldops.business.interfaces.itinerary.ItineraryNode;
 import ar.edu.itba.dps.fieldops.business.interfaces.itinerary.ItineraryNodeVisitor;
 import ar.edu.itba.dps.fieldops.business.interfaces.replanning.ReplanReason;
@@ -20,6 +21,10 @@ import ar.edu.itba.dps.fieldops.business.interfaces.validation.ValidationRule;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.common.DomainArguments;
 import ar.edu.itba.dps.fieldops.business.models.common.TimePeriod;
+import ar.edu.itba.dps.fieldops.business.models.events.ActivityCompleted;
+import ar.edu.itba.dps.fieldops.business.models.events.EventId;
+import ar.edu.itba.dps.fieldops.business.models.events.ExpeditionApproved;
+import ar.edu.itba.dps.fieldops.business.models.events.IncidentRegistered;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceId;
 import ar.edu.itba.dps.fieldops.business.models.validation.AcceptedWarning;
@@ -80,6 +85,7 @@ public class Expedition {
     @Getter
     private List<AcceptedWarning> acceptedWarnings = List.of();
     private final List<Incident> incidents = new ArrayList<>();
+    private final List<DomainEvent> pendingEvents = new ArrayList<>();
     private final ReplacedPlan replacedPlan;
     private final ReplanReason replanReason;
     private ExpeditionId replacement;
@@ -171,7 +177,8 @@ public class Expedition {
         transitionTo(ExpeditionStatus.DRAFT);
     }
 
-    public void approve(List<ValidationRule> additionalRules, List<AcceptedWarning> acceptances) {
+    public void approve(List<ValidationRule> additionalRules, List<AcceptedWarning> acceptances, LocalDateTime approvedAt) {
+        Objects.requireNonNull(approvedAt, "approvedAt is required");
         requireCanTransitionTo(ExpeditionStatus.APPROVED);
         final var result = new ApprovalPolicy(additionalRules).validate(this);
         if (!result.canBeApproved()) {
@@ -179,6 +186,7 @@ public class Expedition {
         }
         acceptedWarnings = result.warnings().stream().map(warning -> acceptanceOf(warning, acceptances)).toList();
         status = ExpeditionStatus.APPROVED;
+        pendingEvents.add(new ExpeditionApproved(EventId.generate(), id, approvedAt));
     }
 
     public void start() {
@@ -268,6 +276,7 @@ public class Expedition {
         consumeAssignedSupplies(item);
         tracking.finish(at, result);
         executionRevision++;
+        pendingEvents.add(new ActivityCompleted(EventId.generate(), id, item.getActivity().getId(), at, result));
     }
 
     public void recordObservation(ItineraryItem item, Observation observation) {
@@ -285,11 +294,18 @@ public class Expedition {
         final var incident = Incident.registered(new IncidentId(id, incidents.size() + 1), affected.getActivity().getId(), report);
         incidents.add(incident);
         executionRevision++;
+        pendingEvents.add(new IncidentRegistered(EventId.generate(), id, incident));
         return incident;
     }
 
     public List<Incident> getIncidents() {
         return Collections.unmodifiableList(incidents);
+    }
+
+    public List<DomainEvent> pullEvents() {
+        final var events = List.copyOf(pendingEvents);
+        pendingEvents.clear();
+        return events;
     }
 
     private void requireAssigned(ItineraryItem item, ResourceId resource) {

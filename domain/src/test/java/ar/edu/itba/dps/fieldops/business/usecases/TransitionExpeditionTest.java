@@ -17,6 +17,7 @@ import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.stream.Stream;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.APPROVED_AT;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
@@ -59,7 +60,7 @@ class TransitionExpeditionTest {
             expedition.submitForReview();
         }
         if (status == ExpeditionStatus.APPROVED || status == ExpeditionStatus.IN_EXECUTION || status == ExpeditionStatus.SUSPENDED) {
-            expedition.approve(List.of(), List.of());
+            expedition.approve(List.of(), List.of(), APPROVED_AT);
         }
         if (status == ExpeditionStatus.IN_EXECUTION || status == ExpeditionStatus.SUSPENDED) {
             expedition.start();

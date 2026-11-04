@@ -2,8 +2,11 @@ package ar.edu.itba.dps.fieldops.adapters.driven;
 
 import ar.edu.itba.dps.fieldops.business.interfaces.events.DomainEvent;
 import ar.edu.itba.dps.fieldops.business.interfaces.events.EventSubscriber;
+import ar.edu.itba.dps.fieldops.business.models.events.EventId;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -12,10 +15,19 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class InMemoryEventPublisherTest {
 
-    private record Happened(String what) implements DomainEvent {
+    private static final ExpeditionId EXPEDITION = new ExpeditionId("e-1");
+    private static final LocalDateTime TEN = LocalDateTime.of(2026, 10, 1, 10, 0);
+
+    private record Happened(EventId id, ExpeditionId expeditionId, LocalDateTime occurredAt, String what) implements DomainEvent {
+        Happened(String what) {
+            this(EventId.generate(), EXPEDITION, TEN, what);
+        }
     }
 
-    private record SomethingElse() implements DomainEvent {
+    private record SomethingElse(EventId id, ExpeditionId expeditionId, LocalDateTime occurredAt) implements DomainEvent {
+        SomethingElse() {
+            this(EventId.generate(), EXPEDITION, TEN);
+        }
     }
 
     private static final class Recorder implements EventSubscriber<Happened> {

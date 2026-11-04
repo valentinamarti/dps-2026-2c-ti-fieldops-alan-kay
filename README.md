@@ -294,7 +294,7 @@ property brings them structured, with the same shape `GET /api/expeditions/{id}/
 
 ## Tests
 
-`mvn -B verify` runs 886 tests: 698 in `domain`, 40 in `app` and 148 in `web`. The ones in `app` and `web` run
+`mvn -B verify` runs 912 tests: 722 in `domain`, 40 in `app` and 150 in `web`. The ones in `app` and `web` run
 against a real PostgreSQL, the same image as Compose, in a container that Testcontainers starts by itself, so
 Docker has to be running and `docker compose up` does not.
 
@@ -329,6 +329,6 @@ Work happens on one branch per phase with small pull requests.
 
 ## Design decisions
 
-See [DESIGN.md](DESIGN.md), in Spanish: D1 to D34 come from the first delivery and D35 to D69 from this one,
-plus one section per new functionality (F1, F2 and F3) with the classes added and modified, the refactorings
-and the technical debt that was left unresolved on purpose.
+See [DESIGN.md](DESIGN.md), in Spanish: D1 to D34 come from the first delivery, D35 to D69 from the second
+and D70 to D73 from the third, plus one section per new functionality of the second delivery (F1, F2 and F3)
+with the classes added and modified, the refactorings and the technical debt that was left unresolved on purpose.

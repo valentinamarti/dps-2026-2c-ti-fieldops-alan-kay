@@ -14,6 +14,7 @@ import ar.edu.itba.dps.fieldops.business.models.activities.ReusableRequirement;
 import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
 import ar.edu.itba.dps.fieldops.business.models.activities.StaffRequirement;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
+import ar.edu.itba.dps.fieldops.business.models.events.ActivityCompleted;
 import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
@@ -24,6 +25,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.APPROVED_AT;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.assignCooler;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
@@ -35,6 +37,7 @@ import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.LI
 import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.UNITS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -55,8 +58,9 @@ class ExpeditionTrackingTest {
         assignCooler(expedition, item);
         expedition.assignSupply(item, jars);
         expedition.submitForReview();
-        expedition.approve(List.of(), List.of());
+        expedition.approve(List.of(), List.of(), APPROVED_AT);
         expedition.start();
+        expedition.pullEvents();
         return expedition;
     }
 
@@ -123,6 +127,30 @@ class ExpeditionTrackingTest {
     }
 
     @Test
+    void finishingAnActivityRecordsActivityCompleted() {
+        inExecution().startActivity(item, at(9, 5));
+
+        expedition.finishActivity(item, at(10, 50), "Twelve samples collected");
+
+        final var events = expedition.pullEvents();
+        assertEquals(1, events.size());
+        final var event = assertInstanceOf(ActivityCompleted.class, events.getFirst());
+        assertEquals(expedition.getId(), event.expeditionId());
+        assertEquals(new ActivityId("a-1"), event.activity());
+        assertEquals(at(10, 50), event.occurredAt());
+        assertEquals("Twelve samples collected", event.result());
+    }
+
+    @Test
+    void startingAnActivityOrRecordingAnObservationRecordsNothing() {
+        inExecution().startActivity(item, at(9, 0));
+
+        expedition.recordObservation(item, new Observation("Water clearer than expected", at(9, 30)));
+
+        assertEquals(List.of(), expedition.pullEvents());
+    }
+
+    @Test
     void recordsObservationsOfAnActivityInProgress() {
         inExecution().startActivity(item, at(9, 0));
 
@@ -147,7 +175,7 @@ class ExpeditionTrackingTest {
         assignCooler(expedition, item);
         expedition.assignSupply(item, jars);
         expedition.submitForReview();
-        expedition.approve(List.of(), List.of());
+        expedition.approve(List.of(), List.of(), APPROVED_AT);
 
         assertThrows(InvalidTrackingException.class, () -> expedition.startActivity(item, at(9, 0)));
     }
@@ -166,6 +194,7 @@ class ExpeditionTrackingTest {
         assertThrows(InvalidTrackingException.class, () -> expedition.finishActivity(item, at(10, 0), "Done"));
         assertThrows(InvalidTrackingException.class,
                 () -> expedition.recordObservation(item, new Observation("Nothing to say", at(10, 0))));
+        assertEquals(List.of(), expedition.pullEvents());
     }
 
     @Test
@@ -173,9 +202,12 @@ class ExpeditionTrackingTest {
         inExecution().startActivity(item, at(9, 0));
 
         assertThrows(InvalidTrackingException.class, () -> expedition.finishActivity(item, at(8, 0), "Done"));
+        assertEquals(List.of(), expedition.pullEvents());
 
         expedition.finishActivity(item, at(10, 0), "Done");
+        expedition.pullEvents();
         assertThrows(InvalidTrackingException.class, () -> expedition.finishActivity(item, at(11, 0), "Done again"));
+        assertEquals(List.of(), expedition.pullEvents());
     }
 
     @Test
@@ -197,9 +229,10 @@ class ExpeditionTrackingTest {
         assignCooler(scarceExpedition, scarceItem);
         scarceExpedition.assignSupply(scarceItem, scarceJars);
         scarceExpedition.submitForReview();
-        scarceExpedition.approve(List.of(), List.of());
+        scarceExpedition.approve(List.of(), List.of(), APPROVED_AT);
         scarceJars.consume(repository.nextId(), Quantity.of("1", UNITS));
         scarceExpedition.start();
+        scarceExpedition.pullEvents();
         scarceExpedition.startActivity(scarceItem, at(9, 0));
 
         assertThrows(InsufficientStockException.class,
@@ -207,6 +240,7 @@ class ExpeditionTrackingTest {
 
         assertTrue(scarceItem.isInProgress());
         assertEquals(Quantity.of("2", UNITS), scarceJars.getStock());
+        assertEquals(List.of(), scarceExpedition.pullEvents());
     }
 
     @Test
@@ -219,7 +253,7 @@ class ExpeditionTrackingTest {
         multiSupplyExpedition.assignSupply(multiSupplyItem, fuel);
         multiSupplyExpedition.assignSupply(multiSupplyItem, scarceJars);
         multiSupplyExpedition.submitForReview();
-        multiSupplyExpedition.approve(List.of(), List.of());
+        multiSupplyExpedition.approve(List.of(), List.of(), APPROVED_AT);
         scarceJars.consume(repository.nextId(), Quantity.of("1", UNITS));
         multiSupplyExpedition.start();
         multiSupplyExpedition.startActivity(multiSupplyItem, at(9, 0));

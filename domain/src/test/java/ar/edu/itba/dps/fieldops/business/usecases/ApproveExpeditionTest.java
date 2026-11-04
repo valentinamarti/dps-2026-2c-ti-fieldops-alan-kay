@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.APPROVED_AT;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.assignContainers;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.assignCooler;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.diving;
@@ -61,7 +62,7 @@ class ApproveExpeditionTest {
         assignContainers(expedition, item);
         expedition.submitForReview();
 
-        finding().approve(expedition, List.of());
+        finding().approve(expedition, List.of(), APPROVED_AT);
 
         assertEquals(ExpeditionStatus.APPROVED, expedition.getStatus());
         assertFalse(worker.isAvailableDuring(hours(10, 12)));
@@ -75,7 +76,7 @@ class ApproveExpeditionTest {
         expedition.assignStaff(item, worker);
         expedition.submitForReview();
 
-        assertThrows(ExpeditionNotApprovableException.class, () -> finding(MISSING_PERMIT).approve(expedition, List.of()));
+        assertThrows(ExpeditionNotApprovableException.class, () -> finding(MISSING_PERMIT).approve(expedition, List.of(), APPROVED_AT));
 
         assertEquals(ExpeditionStatus.IN_REVIEW, expedition.getStatus());
         assertTrue(worker.isAvailableDuring(hours(9, 11)));
@@ -91,7 +92,7 @@ class ApproveExpeditionTest {
         assignCooler(otherExpedition, otherItem);
         assignContainers(otherExpedition, otherItem);
         otherExpedition.submitForReview();
-        finding().approve(otherExpedition, List.of());
+        finding().approve(otherExpedition, List.of(), APPROVED_AT);
 
         final var earlyItem = expedition.schedule(sampling("a-1", coast, hours(0, 24)), hours(6, 8));
         final var clashingItem = expedition.schedule(sampling("a-2", coast, hours(0, 24)), hours(10, 12));
@@ -104,7 +105,7 @@ class ApproveExpeditionTest {
         expedition.submitForReview();
         final var acceptances = List.of(new AcceptedWarning(RISKY_DIVE, leader, "Both divers are instructors"));
 
-        assertThrows(ResourceUnavailableException.class, () -> finding(RISKY_DIVE).approve(expedition, acceptances));
+        assertThrows(ResourceUnavailableException.class, () -> finding(RISKY_DIVE).approve(expedition, acceptances, APPROVED_AT));
         assertEquals(ExpeditionStatus.IN_REVIEW, expedition.getStatus());
         assertTrue(expedition.getAcceptedWarnings().isEmpty());
         assertTrue(freeWorker.isAvailableDuring(hours(6, 8)));
@@ -116,7 +117,7 @@ class ApproveExpeditionTest {
         expedition.submitForReview();
         final var approveExpedition = new ApproveExpedition(List.of(), reservations, repository, new FakeResourceCatalog());
 
-        assertThrows(ExpeditionNotApprovableException.class, () -> approveExpedition.approve(expedition, List.of()));
+        assertThrows(ExpeditionNotApprovableException.class, () -> approveExpedition.approve(expedition, List.of(), APPROVED_AT));
         assertEquals(ExpeditionStatus.IN_REVIEW, expedition.getStatus());
     }
 
@@ -129,7 +130,7 @@ class ApproveExpeditionTest {
         expedition.assignStaff(second, diver);
         expedition.submitForReview();
 
-        assertThrows(ResourceUnavailableException.class, () -> finding().approve(expedition, List.of()));
+        assertThrows(ResourceUnavailableException.class, () -> finding().approve(expedition, List.of(), APPROVED_AT));
 
         assertEquals(ExpeditionStatus.IN_REVIEW, expedition.getStatus());
         assertTrue(diver.isAvailableDuring(hours(9, 11)));
@@ -151,11 +152,11 @@ class ApproveExpeditionTest {
         second.assignStaff(secondItem, person("p-3"));
         assignCooler(second, secondItem);
         first.submitForReview();
-        approveExpedition.approve(first, List.of());
+        approveExpedition.approve(first, List.of(), APPROVED_AT);
         second.submitForReview();
 
         assertFalse(policy.validate(second).canBeApproved());
-        assertThrows(InsufficientStockException.class, () -> approveExpedition.approve(second, List.of()));
+        assertThrows(InsufficientStockException.class, () -> approveExpedition.approve(second, List.of(), APPROVED_AT));
         assertEquals(ExpeditionStatus.IN_REVIEW, second.getStatus());
         assertEquals(Quantity.of("3", UNITS), jars.getStock());
     }

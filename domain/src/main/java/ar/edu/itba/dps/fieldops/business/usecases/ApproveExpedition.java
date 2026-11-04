@@ -13,6 +13,7 @@ import ar.edu.itba.dps.fieldops.business.validations.ApprovalPolicy;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.services.ResourceReservations;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 
@@ -31,10 +32,10 @@ public class ApproveExpedition implements ApproveExpeditionPort {
     }
 
     @Override
-    public void approve(ExpeditionId id, List<WarningAcceptance> acceptances) {
+    public void approve(ExpeditionId id, List<WarningAcceptance> acceptances, LocalDateTime approvedAt) {
         final var expedition = Lookups.expedition(repository, id);
         final var current = new ApprovalPolicy(additionalRules).validate(expedition).warnings();
-        approve(expedition, acceptances.stream().map(acceptance -> accepted(acceptance, current)).toList());
+        approve(expedition, acceptances.stream().map(acceptance -> accepted(acceptance, current)).toList(), approvedAt);
     }
 
     private AcceptedWarning accepted(WarningAcceptance acceptance, List<ValidationResult> current) {
@@ -45,12 +46,12 @@ public class ApproveExpedition implements ApproveExpeditionPort {
         return new AcceptedWarning(warning, Lookups.staff(catalog, acceptance.responsibleId()), acceptance.justification());
     }
 
-    void approve(Expedition expedition, List<AcceptedWarning> acceptances) {
+    void approve(Expedition expedition, List<AcceptedWarning> acceptances, LocalDateTime approvedAt) {
         final var replaced = expedition.getReplacedExpedition().map(this::findReplaced);
         replaced.ifPresent(Expedition::requireReplaceable);
         replaced.ifPresent(expedition::requireBuiltOnCurrentPlanOf);
         reservations.requireReservable(expedition);
-        expedition.approve(additionalRules, acceptances);
+        expedition.approve(additionalRules, acceptances, approvedAt);
         replaced.ifPresent(reservations::releaseFor);
         reservations.reserveFor(expedition);
         replaced.ifPresent(original -> original.markReplacedBy(expedition.getId()));

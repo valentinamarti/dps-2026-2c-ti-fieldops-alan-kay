@@ -25,6 +25,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.APPROVED_AT;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.completeAssignments;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.diving;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
@@ -71,7 +72,7 @@ class ExpeditionReporterTest {
         expedition.assignSupply(afternoon, jars);
         completeAssignments(expedition);
         expedition.submitForReview();
-        expedition.approve(finding(findings), acceptances);
+        expedition.approve(finding(findings), acceptances, APPROVED_AT);
         expedition.start();
     }
 

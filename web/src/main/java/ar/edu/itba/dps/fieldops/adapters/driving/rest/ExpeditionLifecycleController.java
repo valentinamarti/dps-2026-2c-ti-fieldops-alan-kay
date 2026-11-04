@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDateTime;
 import java.util.Objects;
 
 @RestController
@@ -70,7 +71,7 @@ public class ExpeditionLifecycleController {
     @ApiResponse(responseCode = "422",
             description = "A critical is still open, or a warning the expedition raises was not accepted")
     public void approve(@PathVariable String expeditionId, @RequestBody ApprovalRequest request) {
-        approveExpedition.approve(new ExpeditionId(expeditionId), ApprovalMapper.toAcceptances(request));
+        approveExpedition.approve(new ExpeditionId(expeditionId), ApprovalMapper.toAcceptances(request), LocalDateTime.now());
     }
 
     @PostMapping("/execution")

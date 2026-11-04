@@ -773,6 +773,8 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
   - Que la entidad acumule los eventos y el repositorio los despache al guardar — hoy no existe ese "guardar" (D38).
 - **Consecuencia:** no hay transacción ni reintentos. Si el suscriptor falla, la excepción llega a quien registró el incidente, pero el incidente ya quedó registrado en la expedición. Con persistencia real, registrar y proponer tienen que ir en la misma transacción o pasar a un outbox. Queda como deuda técnica de F3.
 - **Revisado en D68:** el incidente y la propuesta corren en la misma transacción, así que si el suscriptor falla el incidente se deshace y no queda registrado sin propuesta. Sigue sin haber reintentos.
+- **Revisado en D70 y D71:** la expedición registra `IncidentRegistered` y un decorador del repositorio lo publica al guardarla, así que `RegisterIncident` ya no conoce a `EventPublisher`. El evento suma su id y el momento en que ocurrió. `IncidentRegistered` es el `IncidentReported` del ejemplo de la consigna de la Entrega 3: se mantuvo el nombre que ya tenían el código y los tests.
+- **Revisado en D73:** `RegisterIncident` ya no busca la propuesta ni falla con `IllegalStateException` si no la encuentra: devuelve el incidente. La propuesta la busca el adaptador REST.
 
 ### D46 — La propuesta ofrece varias opciones, una por generador, y solo las que se pueden armar (Entrega 2, F3, revisa D25, D33 y D40)
 
@@ -1175,6 +1177,7 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
   - La auditoría de F3 se recorre entera por HTTP sin ningún endpoint pensado para auditar: desde la propuesta se llega al incidente (en su cuerpo), a la decisión (en su cuerpo) y al plan original (por `originalExpeditionId`), y de la original a la alternativa y al revés (`replacementId` y `replacedExpeditionId`). `ReplanningApiTest.afterTheDecisionTheOriginalPlanTheIncidentAndTheDecisionAreAllQueryable` hace ese recorrido.
   - Un cliente que lea los críticos del 422 lee el mismo `ValidationFindingDto` que le da `GET .../validation`, así que puede mostrar el error de la aprobación con el mismo código con el que muestra la validación.
   - Sumar un tipo de opción (D46) no toca nada de la API: la opción nueva aparece numerada y con su resumen, como las demás.
+- **Revisado en D73:** el `POST` del incidente responde igual, pero la propuesta ya no la devuelve `RegisterIncident`: el controller registra el incidente y después la busca con `QueryReplanProposalsPort.ofIncident`.
 
 ### D59 — Una expedición no compite con sus propias reservas (Entrega 2, F5, revisa D9, D33 y D41)
 
@@ -1374,6 +1377,104 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
   - La pantalla ofrece iniciar y finalizar en todas las actividades mientras la expedición está en ejecución, porque la respuesta del itinerario no trae el seguimiento. Si la acción no corresponde, el dominio la rechaza y se muestra el motivo.
   - Las fechas de seguimiento son las del momento de la acción.
   - Los tests verifican que los archivos se sirven, pero no recorren la pantalla con un navegador: ese recorrido se probó a mano.
+
+### D70 — La expedición guarda sus eventos y se publican al guardarla (Entrega 3, propuesta de valor, revisa D45)
+
+- **Origen:** la propuesta de valor de la Entrega 3 pide modelar los hechos del dominio como eventos y publicarlos sin que quien los produce conozca a sus consumidores. D45 publicaba desde el caso de uso y descartaba que la entidad acumulara sus eventos, porque no había un "guardar" (D38). Desde D66 los casos de uso guardan lo que cambian, así que ese motivo ya no existe.
+- **Patrón / principio:** eventos de dominio acumulados por el agregado + Decorator sobre el puerto `ExpeditionRepository`, que publica al guardar.
+- **Dónde:**
+  - `Expedition` guarda sus eventos pendientes, y `pullEvents` los devuelve y los vacía. `approve` registra `ExpeditionApproved`, `registerIncident` registra `IncidentRegistered` y `finishActivity` registra `ActivityCompleted`, cada uno al final de su operación. `TrackActivity` no cambió: ya guardaba la expedición después de terminar la actividad. `ApproveExpedition` tampoco publica: guarda la aprobada y, si era una alternativa, también la reemplazada, y el decorador publica los eventos de las dos.
+  - `PublishingExpeditionRepository` (en `business.services`) guarda con el repositorio que decora y después publica cada evento pendiente con `EventPublisher`.
+  - `FieldOpsConfig` (en `web`) lo expone como el `ExpeditionRepository` de la aplicación, sobre `JpaExpeditionRepository`.
+  - `RegisterIncident` ya no conoce a `EventPublisher`: registra el incidente y guarda la expedición.
+- **Por qué:**
+  - **La regla de cuándo ocurre el hecho vive en el modelo.** La expedición sabe cuándo un incidente quedó registrado: después de validar el estado, la actividad y el recurso. Si el evento lo armara el caso de uso, cada caso de uso tendría que repetir cuándo corresponde.
+  - **Una operación que falla no deja eventos.** El evento se agrega al final, cuando todas las validaciones ya pasaron.
+  - **Nadie se puede olvidar de publicar.** Toda expedición que se guarda publica lo que registró, sea cual sea el caso de uso que la modificó, incluidos los que guardan más de una expedición. Si cada caso de uso tuviera que publicar después de guardar, uno nuevo que no lo hiciera perdería los eventos sin ningún error.
+  - **El caso de uso no tiene que saber que hay eventos.** Modifica la expedición y la guarda.
+  - **El adaptador de persistencia no cambia.** `JpaExpeditionRepository` sigue haciendo solo persistencia. Publicar es una capa encima, que se prueba sola.
+  - **Primero se guarda y después se publica**, como en D45 y D66, ahora en un solo lugar. Si guardar falla, los eventos no se toman ni se publican. Como el repositorio se llama adentro del caso de uso, la publicación corre en la misma transacción (D68).
+  - **Los pendientes no se guardan.** No entran en el `snapshot()`, así que una expedición restaurada arranca sin eventos. La alternativa que hereda los incidentes de la original (D48) tampoco los vuelve a emitir, porque los recibe por el builder y no por `registerIncident`.
+  - **`EventPublisher` sigue publicando de a un evento.** El único que recorre los pendientes es el decorador.
+- **Alternativas descartadas:**
+  - Que el caso de uso arme y publique el evento (lo que hacía D45) — la regla de cuándo ocurre el hecho quedaría fuera del modelo, y cada caso de uso tendría que acordarse de publicar.
+  - Que la entidad acumule los eventos y cada caso de uso los publique después de guardar — nadie garantiza que un caso de uso nuevo lo haga.
+  - Que publique `JpaExpeditionRepository` — el adaptador de persistencia tendría dos responsabilidades, y cada adaptador de repositorio tendría que repetirlo.
+  - `@DomainEvents` de Spring Data — resuelve lo mismo, pero mete Spring en el dominio (D36, D37).
+  - Que la entidad publique directo — la entidad dependería de un puerto de salida.
+  - `publish(List<DomainEvent>)` — cambiaría el puerto y su adaptador sin ganar nada, porque el único que recorre la lista es el decorador.
+- **Consecuencia:**
+  - Leyendo un caso de uso no se ve que se publique algo: se publica al guardar. Esta entrada es la que lo explica.
+  - En `web` sigue habiendo un solo bean `expeditionRepository`. Arma el `JpaExpeditionRepository` con `new` adentro del decorador, así que la anotación `@Transactional` del adaptador ya no aplica, porque Spring solo la aplica a sus beans. Por eso el decorado se envuelve con `TransactionalUseCases.writing`, el mismo mecanismo de los casos de uso (D68): cada operación del repositorio corre en una transacción, o se suma a la del caso de uso que la llamó.
+  - En los tests de `app` la anotación sí aplica y no se puede borrar: `PersistenceTestApplication` devuelve el `JpaExpeditionRepository` directo como `@Bean`, sin decorador, y sin esa transacción Hibernate no puede leer las colecciones de la expedición.
+  - El bean recibe el `EventPublisher` con `@Lazy`, porque el publicador necesita a sus suscriptores y `ProposeReplan` necesita el repositorio.
+  - Los tests de los casos de uso con un repositorio simulado no ven la publicación: está probada en `PublishingExpeditionRepositoryTest`, y cada evento, en los tests de la expedición.
+  - Un suscriptor síncrono corre en el `save` de la expedición, así que ve lo que el caso de uso guardó hasta ese momento. En `TrackActivity.finish`, por ejemplo, los insumos consumidos se guardan en el catálogo después de la expedición: un suscriptor síncrono de `ActivityCompleted` que leyera el stock todavía no lo vería guardado. Hoy `ActivityCompleted` no tiene suscriptores síncronos.
+
+### D71 — Qué lleva cada evento (Entrega 3, propuesta de valor, revisa D45)
+
+- **Origen:** la consigna pide eventos "como objetos inmutables del dominio". El registro de eventos los va a guardar y mostrar, así que cada uno tiene que identificarse y decir cuándo ocurrió.
+- **Patrón / principio:** value objects inmutables (`record`) + un contrato común (`DomainEvent`) que permite tratar a todos los eventos igual sin preguntar de qué tipo son.
+- **Dónde:** `EventId` (en `business.models.events`); `DomainEvent` (en `business.interfaces.events`) con `id()`, `expeditionId()` y `occurredAt()`; `ExpeditionApproved(id, expeditionId, occurredAt)`; `IncidentRegistered(id, expeditionId, incident)`; `ActivityCompleted(id, expeditionId, activity, occurredAt, result)`. `Expedition.approve` y `ApproveExpeditionPort.approve` reciben el momento de la aprobación, y `ExpeditionLifecycleController` (en `web`) lo completa con la hora del servidor.
+- **Por qué:**
+  - **`EventId` es un value object del dominio:** identifica un hecho que ocurrió una sola vez. Lo genera la expedición al registrar el evento (`EventId.generate()`, un UUID). Un proveedor, como `ExpeditionIdProvider` (D60), sumaría un colaborador sin una variante real que lo justifique.
+  - **`occurredAt` sale del hecho y no de un `now()`.** En `IncidentRegistered` es el momento del incidente que informó quien lo registró, y se lee del incidente en vez de guardarse dos veces. El dominio sigue sin fuente de tiempo propia.
+  - **`IncidentRegistered` lleva el incidente completo.** `Incident` ya es un `record` inmutable, y el suscriptor lo usa sin volver a buscarlo (D45). Achicarlo a su id obligaría a `ProposeReplan` a releerlo de la expedición, sin un problema real que lo pida.
+  - **Cada momento entra al dominio desde afuera, como un dato.** La expedición no lee la hora: la recibe. Lo que cambia es quién la pone. Los hechos del campo (el inicio y el fin de una actividad, un incidente) traen la hora que informa el cliente, porque pasan en el campo y se cargan después: una actividad que terminó a las 10:50 se puede informar a las 12. La aprobación es un acto del sistema: ocurre cuando el responsable aprueba, así que su momento lo pone el adaptador REST con la hora del servidor al recibir el pedido. El contrato de la API no cambió.
+  - **`ExpeditionApproved` solo lleva la expedición y el momento.** Las advertencias aceptadas ya quedan en la expedición y en su informe (D48).
+  - **`ActivityCompleted` lleva el id de la actividad, el momento en que terminó y su resultado.** No lleva el `ItineraryItem` ni la `Activity`, porque son entidades mutables y el evento tiene que ser inmutable. A diferencia de `Incident`, que es un `record`, copiarlas lo dejaría expuesto a cambios posteriores. El resultado va porque es lo que muestran los interesados en que una actividad termine. El momento es el `at` con el que se la terminó, como el del incidente.
+  - **El contrato común** deja que quien trate eventos en general los ordene y los muestre sin un condicional por tipo.
+  - `IncidentRegistered` es el `IncidentReported` del ejemplo de la consigna: se mantuvo el nombre que ya tenían el código, los tests y D45.
+- **Alternativas descartadas:**
+  - Ids de tipo `String` o `UUID` sueltos — un concepto del dominio como primitivo (D26).
+  - Un proveedor de ids de eventos — ver arriba.
+  - Tomar `occurredAt` de un reloj al registrar el evento — sería el momento en que el sistema se enteró y no el del hecho, y metería un reloj en el dominio.
+  - Que el cliente mande el momento de la aprobación en el body — la aprobación ocurre en el sistema, y el cliente podría mandar cualquier fecha. Además cambiaba la API, el frontend y el guion de la demo.
+  - Un `Clock` inyectado en `ApproveExpedition` — el dominio dejaría de recibir el tiempo como dato, solo para este caso.
+- **Consecuencia:**
+  - El `occurredAt` de un evento es el que informó el cliente. No sirve para ordenar los eventos en el orden en que el sistema los conoció.
+  - Como el id es aleatorio, los tests no comparan un evento entero con `equals`: verifican su tipo y sus datos.
+  - El controller lee la hora con `LocalDateTime.now()`, así que el test de punta a punta (`ApprovalPublishesItsEventTest`) verifica que el momento quedó entre el antes y el después del pedido, en vez de compararlo con un valor exacto.
+
+### D72 — Los suscriptores síncronos y los asíncronos son dos tipos distintos (Entrega 3, propuesta de valor, completa D45)
+
+- **Origen:** la consigna pide al menos un consumidor que procese los eventos fuera del flujo de la petición, y las decisiones de la entrega mantienen síncrona la propuesta de replanificación. Conviven dos clases de consumidores con garantías distintas, y el dominio tiene que poder decir cuál es cuál.
+- **Patrón / principio:** dos contratos de suscriptor (Interface Segregation): el tipo del suscriptor dice qué garantía tiene la entrega.
+- **Dónde:** `AsyncEventSubscriber<E>` (en `business.interfaces.events`), junto a `EventSubscriber<E>`, con `eventType()`, `consumerName()` y `on(E)`; `ConsumerName` (en `business.models.events`).
+- **Por qué:**
+  - **`EventSubscriber` es el síncrono:** el publicador en proceso lo entrega adentro de la operación, en su misma transacción, y si falla se deshace la operación (D68). Es lo que necesita `ProposeReplan` (D45).
+  - **`AsyncEventSubscriber` es otro tipo, y no hereda de `EventSubscriber`.** El publicador en proceso recibe la lista de `EventSubscriber` que arma Spring. Si el asíncrono heredara del síncrono, Spring lo sumaría a esa lista y lo entregaría adentro de la operación, justo lo contrario de lo que promete su tipo, y sin ningún error que lo avise. Separados, lo garantizan los tipos: `InMemoryEventPublisher` no cambió y nunca ve a un asíncrono.
+  - **`consumerName()` identifica al consumidor con un nombre estable.** Es lo que identifica a cada consumidor en el registro de sus entregas, así que no puede salir del nombre de la clase: renombrarla dejaría entregas huérfanas. Es un `ConsumerName` y no un `String`, como el resto de los conceptos del dominio (D26).
+- **Alternativas descartadas:**
+  - Una sola interfaz con un indicador (un método `isAsync()` o una anotación) — cada publicador tendría que preguntarlo, y un suscriptor mal marcado pasaría sin errores.
+  - Que la garantía la decida la configuración — el dominio no sabría qué garantía tiene cada consumidor.
+  - Que todos los consumidores sean asíncronos — contradice que la propuesta tenga que existir cuando vuelve el registro del incidente (D45, D58).
+  - Que `AsyncEventSubscriber` extienda `EventSubscriber` para no repetir `eventType()` y `on(E)` — ver arriba.
+- **Consecuencia:**
+  - Las dos interfaces repiten dos firmas.
+  - Que el publicador en proceso no entregue a los asíncronos lo prueba `AsyncSubscribersAreNotDeliveredInProcessTest`: registra un suscriptor asíncrono en el contexto real de Spring y verifica que registrar un incidente arma la propuesta síncrona sin entregarle nada a él.
+
+### D73 — `RegisterIncident` no conoce a los consumidores del incidente (Entrega 3, propuesta de valor, revisa D45 y D58)
+
+- **Origen:** la consigna pide que el código que produce el hecho no conozca a sus consumidores. `RegisterIncident` registraba el incidente y después buscaba la propuesta que había armado `ProposeReplan`, uno de sus consumidores, y fallaba con `IllegalStateException` si no la encontraba. La review de las decisiones de la entrega lo señaló, junto con qué tenía que responder el `POST` del incidente sin esa propuesta.
+- **Patrón / principio:** desacople entre productor y consumidor de un evento + el adaptador driving compone puertos de entrada para armar la respuesta del contrato HTTP (D49).
+- **Dónde:**
+  - `RegisterIncidentPort.register` devuelve el `Incident` registrado, y `RegisterIncident` solo depende de `ExpeditionRepository`.
+  - `QueryReplanProposalsPort.ofIncident(IncidentId)`, con el `findByIncident` que ya tenía el repositorio de propuestas.
+  - `IncidentController` (en `web`) registra el incidente y después pide su propuesta.
+- **Por qué:**
+  - **El productor ya no conoce a su consumidor.** `RegisterIncident` pasó de tres dependencias (expediciones, publicador y propuestas) a una, y desapareció el `IllegalStateException` "no replan proposal was made for the incident": el caso de uso registra el hecho y no sabe quién reacciona.
+  - **La respuesta HTTP sigue siendo la de D58.** Que el `POST` del incidente devuelva la propuesta, con el `Location` a ella, es una decisión del contrato de la API: hace que el criterio de F3 se vea en una sola llamada. Por eso la compone el adaptador, que es el que conoce ese contrato, con dos puertos. El JSON, el `Location`, el frontend y el guion de la demo no cambiaron, y `ReplanningApiTest` y `DemoScriptApiTest` siguen igual.
+  - **Las dos llamadas corren en transacciones distintas, y la segunda siempre encuentra la propuesta**, porque se confirmó junto con el incidente (D68).
+  - **El puerto devuelve `Incident` y no una vista.** D64 pide no devolver entidades mutables, y deja salir tal cual a los `record` sin entidades adentro, como `ExpeditionEstimate` y `ApprovalResult`. `Incident` es un `record` inmutable hecho solo de value objects, y `ReplanProposalView` ya lo devolvía desde la Entrega 2. Un `IncidentView` copiaría los mismos campos sin agregar nada.
+- **Alternativas descartadas:**
+  - Mantener que `RegisterIncident` devuelva la propuesta, como un acoplamiento aceptado — contradice lo que pide la consigna, y la propuesta no podría pasar a ser asíncrona sin cambiar el caso de uso.
+  - Responder 201 con el incidente y sin `Location` — rompe la convención de D49 y D58, y no hay un endpoint del incidente al que apuntar.
+  - Responder 204 y que el cliente busque la propuesta aparte — pierde lo que D58 justificaba: que el criterio de F3 se vea en una sola llamada.
+  - Un `IncidentView` — ver arriba.
+- **Consecuencia:**
+  - El controller sabe que la propuesta se arma de forma síncrona. Si alguna vez pasara a ser asíncrona, `ofIncident` no la encontraría y el controller tendría que cambiar. Es un acoplamiento aceptado en el adaptador, no en el dominio.
+  - Si nadie armara la propuesta, el `POST` respondería 404 en vez del 500 de antes. Hoy no puede pasar: `ProposeReplan` siempre está conectado.
 
 ## Funcionalidades nuevas de la Entrega 2
 
@@ -1647,3 +1748,4 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
 - Los nombres, horarios, parámetros y cantidades del escenario de `demo/` son ilustrativos, igual que los valores de las reglas de cada tipo: la consigna describe la demostración pero no da datos. Lo que no es ilustrativo es lo que la demostración tiene que mostrar (diez o más actividades, los seis tipos, la nocturna, el bloque compuesto, los recursos compartidos, la crítica, la advertencia y la replanificación), y eso lo verifican `DemoDataLoaderTest` y `DemoScriptApiTest` (D50).
 - La crítica que la demostración muestra y corrige es un recurso que falta (la iluminación de la actividad nocturna) y no un permiso faltante: los permisos concedidos son parte de los datos con los que se crea una expedición (D3) y ninguna operación los cambia después, así que una crítica de permiso se puede mostrar pero no corregir sobre la misma expedición (D50).
 - El seed carga los datos en cada arranque con el perfil `demo` y el guion los consume: no hay reversión ni limpieza. Correr el guion dos veces seguidas exige reiniciar la aplicación (D50).
+- Los momentos de los hechos del campo (el inicio y el fin de una actividad, una observación y un incidente) los informa el cliente, y el sistema confía en ellos: pasan en el campo y se pueden cargar después. La aprobación es un acto del sistema, y su momento es la hora del servidor al recibir el pedido. El dominio no lee la hora en ningún caso: la recibe (D71).

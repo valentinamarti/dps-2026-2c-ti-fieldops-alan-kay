@@ -1,6 +1,8 @@
 package ar.edu.itba.dps.fieldops.business.usecases;
 
+import ar.edu.itba.dps.fieldops.business.exceptions.NotFoundException;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.IncidentId;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposalId;
 import ar.edu.itba.dps.fieldops.business.models.responses.ReplanProposalView;
 import ar.edu.itba.dps.fieldops.business.ports.in.QueryReplanProposalsPort;
@@ -29,5 +31,11 @@ public class QueryReplanProposals implements QueryReplanProposalsPort {
         return proposals.findByExpedition(Lookups.expedition(expeditions, expeditionId).getId()).stream()
                 .map(ReplanProposalView::of)
                 .toList();
+    }
+
+    @Override
+    public ReplanProposalView ofIncident(IncidentId incident) {
+        return proposals.findByIncident(incident).map(ReplanProposalView::of)
+                .orElseThrow(() -> new NotFoundException("replan proposal for the incident", incident));
     }
 }

@@ -22,6 +22,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.APPROVED_AT;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.completeAssignments;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.expeditionIn;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hours;
@@ -49,7 +50,7 @@ class ExpeditionReplannerTest {
     private void approve() {
         completeAssignments(expedition);
         expedition.submitForReview();
-        expedition.approve(List.of(), List.of());
+        expedition.approve(List.of(), List.of(), APPROVED_AT);
     }
 
     @Test
@@ -509,6 +510,7 @@ class ExpeditionReplannerTest {
         final var alternative = replanner.planAlternative(expedition, affectedItem, new Cancellation());
 
         assertEquals(List.of(incident), alternative.getIncidents());
+        assertEquals(List.of(), alternative.pullEvents());
     }
 
     @Test
