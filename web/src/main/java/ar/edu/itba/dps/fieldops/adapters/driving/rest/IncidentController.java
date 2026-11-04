@@ -3,6 +3,7 @@ package ar.edu.itba.dps.fieldops.adapters.driving.rest;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.RegisterIncidentRequest;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.dtos.ReplanProposalResponse;
 import ar.edu.itba.dps.fieldops.adapters.driving.rest.mappers.ReplanningMapper;
+import ar.edu.itba.dps.fieldops.business.ports.in.QueryReplanProposalsPort;
 import ar.edu.itba.dps.fieldops.business.ports.in.RegisterIncidentPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -21,9 +22,11 @@ import java.util.Objects;
 @Tag(name = "Incidents", description = "Registering what went wrong with a scheduled activity, which proposes a replanning")
 public class IncidentController {
     private final RegisterIncidentPort registerIncident;
+    private final QueryReplanProposalsPort queryReplanProposals;
 
-    public IncidentController(RegisterIncidentPort registerIncident) {
+    public IncidentController(RegisterIncidentPort registerIncident, QueryReplanProposalsPort queryReplanProposals) {
         this.registerIncident = Objects.requireNonNull(registerIncident, "registerIncident is required");
+        this.queryReplanProposals = Objects.requireNonNull(queryReplanProposals, "queryReplanProposals is required");
     }
 
     @PostMapping
@@ -36,7 +39,8 @@ public class IncidentController {
     @ApiResponse(responseCode = "409", description = "There is already a proposal for this incident")
     public ResponseEntity<ReplanProposalResponse> register(@PathVariable String expeditionId,
                                                            @RequestBody RegisterIncidentRequest request) {
-        final var proposal = registerIncident.register(ReplanningMapper.toCommand(expeditionId, request));
+        final var incident = registerIncident.register(ReplanningMapper.toCommand(expeditionId, request));
+        final var proposal = queryReplanProposals.ofIncident(incident.id());
         return ResponseEntity.created(Locations.replanProposal(proposal.id().value()))
                 .body(ReplanningMapper.toResponse(proposal));
     }

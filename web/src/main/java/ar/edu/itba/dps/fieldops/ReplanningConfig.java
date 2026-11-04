@@ -47,8 +47,8 @@ public class ReplanningConfig {
     }
 
     @Bean
-    RegisterIncidentPort registerIncident(ExpeditionRepository expeditions, ReplanProposalRepository proposals, TransactionalUseCases transactional) {
-        return transactional.writing(RegisterIncidentPort.class, new RegisterIncident(expeditions, proposals));
+    RegisterIncidentPort registerIncident(ExpeditionRepository expeditions, TransactionalUseCases transactional) {
+        return transactional.writing(RegisterIncidentPort.class, new RegisterIncident(expeditions));
     }
 
     @Bean

@@ -10,7 +10,6 @@ import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.IncidentReport;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposal;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposalId;
-import ar.edu.itba.dps.fieldops.business.models.responses.ReplanProposalView;
 import ar.edu.itba.dps.fieldops.business.providers.EventPublisher;
 import ar.edu.itba.dps.fieldops.business.providers.ReplanProposalRepository;
 import ar.edu.itba.dps.fieldops.business.services.PublishingExpeditionRepository;
@@ -18,7 +17,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.util.List;
-import java.util.Optional;
 
 import static ar.edu.itba.dps.fieldops.business.usecases.IncidentScenario.TEN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -35,44 +33,29 @@ class RegisterIncidentTest {
 
     private final IncidentScenario scenario = new IncidentScenario();
     private final EventPublisher publisher = mock(EventPublisher.class);
-    private final ReplanProposalRepository proposals = mock(ReplanProposalRepository.class);
     private final RegisterIncident registerIncident =
-            new RegisterIncident(new PublishingExpeditionRepository(scenario.expeditions, publisher), proposals);
+            new RegisterIncident(new PublishingExpeditionRepository(scenario.expeditions, publisher));
 
     @Test
-    void storesTheIncidentInTheExpeditionPublishesItsEventAndReturnsTheProposalMadeForIt() {
-        final var expected = mock(ReplanProposal.class);
-        when(proposals.findByIncident(any())).thenReturn(Optional.of(expected));
-
-        final var proposal = registerIncident.register(scenario.incidentOn(scenario.afternoon, IncidentReport.of("Storm forecast", TEN)));
+    void storesTheIncidentInTheExpeditionPublishesItsEventAndReturnsIt() {
+        final var registered = registerIncident.register(scenario.incidentOn(scenario.afternoon, IncidentReport.of("Storm forecast", TEN)));
 
         final var incident = scenario.expedition.getIncidents().getFirst();
+        assertEquals(incident, registered);
         final var captor = ArgumentCaptor.forClass(DomainEvent.class);
         verify(publisher).publish(captor.capture());
         final var event = assertInstanceOf(IncidentRegistered.class, captor.getValue());
         assertEquals(scenario.expedition.getId(), event.expeditionId());
         assertEquals(incident, event.incident());
-        verify(proposals).findByIncident(incident.id());
-        assertEquals(ReplanProposalView.of(expected), proposal);
     }
 
     @Test
     void savesTheExpeditionBeforePublishingTheEvent() {
-        when(proposals.findByIncident(any())).thenReturn(Optional.of(mock(ReplanProposal.class)));
-
         registerIncident.register(scenario.incidentOn(scenario.afternoon, IncidentReport.of("Storm forecast", TEN)));
 
         final var order = inOrder(scenario.expeditions, publisher);
         order.verify(scenario.expeditions).save(scenario.expedition);
         order.verify(publisher).publish(any());
-    }
-
-    @Test
-    void failsIfNobodyMadeAProposalForTheIncident() {
-        when(proposals.findByIncident(any())).thenReturn(Optional.empty());
-
-        assertThrows(IllegalStateException.class,
-                () -> registerIncident.register(scenario.incidentOn(scenario.afternoon, IncidentReport.of("Storm forecast", TEN))));
     }
 
     @Test

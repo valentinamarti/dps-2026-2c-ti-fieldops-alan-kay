@@ -2,6 +2,7 @@ package ar.edu.itba.dps.fieldops.business.usecases;
 
 import ar.edu.itba.dps.fieldops.business.exceptions.NotFoundException;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
+import ar.edu.itba.dps.fieldops.business.models.expeditions.IncidentId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.IncidentReport;
 import ar.edu.itba.dps.fieldops.business.models.replanning.ReplanProposalId;
 import ar.edu.itba.dps.fieldops.business.models.responses.ReplanProposalView;
@@ -24,6 +25,19 @@ class QueryReplanProposalsTest {
 
         assertEquals(ReplanProposalView.of(second), scenario.queryProposals.get(second.getId()));
         assertEquals(List.of(ReplanProposalView.of(first), ReplanProposalView.of(second)), scenario.queryProposals.ofExpedition(scenario.expedition.getId()));
+    }
+
+    @Test
+    void findsTheProposalMadeForAnIncident() {
+        final var proposal = scenario.registered(scenario.incidentOn(scenario.afternoon, IncidentReport.of("Storm", TEN)));
+
+        assertEquals(ReplanProposalView.of(proposal), scenario.queryProposals.ofIncident(proposal.getIncident().id()));
+    }
+
+    @Test
+    void anIncidentWithoutAProposalIsNotFound() {
+        assertThrows(NotFoundException.class,
+                () -> scenario.queryProposals.ofIncident(new IncidentId(scenario.expedition.getId(), 1)));
     }
 
     @Test

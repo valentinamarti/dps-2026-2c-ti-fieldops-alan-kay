@@ -100,7 +100,7 @@ class IncidentReplanningIntegrationTest {
     void anIncidentInTheFieldEndsInAnApprovedAlternativeWithTheWholeHistoryQueryable() {
         final var original = approvedAndRunning();
 
-        final var proposal = proposals.findById(registerIncident.register(new RegisterIncidentCommand(original.getId(), sampling.getId(),
+        final var proposal = proposals.findByIncident(registerIncident.register(new RegisterIncidentCommand(original.getId(), sampling.getId(),
                 IncidentReport.of("Fever", TEN).affecting(sick.getId()))).id()).orElseThrow();
 
         assertEquals(List.of(new ResourceReplaced(sick.getId(), ResourceAssignment.of(leader)),

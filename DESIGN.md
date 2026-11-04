@@ -774,6 +774,7 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
 - **Consecuencia:** no hay transacción ni reintentos. Si el suscriptor falla, la excepción llega a quien registró el incidente, pero el incidente ya quedó registrado en la expedición. Con persistencia real, registrar y proponer tienen que ir en la misma transacción o pasar a un outbox. Queda como deuda técnica de F3.
 - **Revisado en D68:** el incidente y la propuesta corren en la misma transacción, así que si el suscriptor falla el incidente se deshace y no queda registrado sin propuesta. Sigue sin haber reintentos.
 - **Revisado en D70 y D71:** la expedición registra `IncidentRegistered` y un decorador del repositorio lo publica al guardarla, así que `RegisterIncident` ya no conoce a `EventPublisher`. El evento suma su id y el momento en que ocurrió.
+- **Revisado en D73:** `RegisterIncident` ya no busca la propuesta ni falla con `IllegalStateException` si no la encuentra: devuelve el incidente. La propuesta la busca el adaptador REST.
 
 ### D46 — La propuesta ofrece varias opciones, una por generador, y solo las que se pueden armar (Entrega 2, F3, revisa D25, D33 y D40)
 
@@ -1176,6 +1177,7 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
   - La auditoría de F3 se recorre entera por HTTP sin ningún endpoint pensado para auditar: desde la propuesta se llega al incidente (en su cuerpo), a la decisión (en su cuerpo) y al plan original (por `originalExpeditionId`), y de la original a la alternativa y al revés (`replacementId` y `replacedExpeditionId`). `ReplanningApiTest.afterTheDecisionTheOriginalPlanTheIncidentAndTheDecisionAreAllQueryable` hace ese recorrido.
   - Un cliente que lea los críticos del 422 lee el mismo `ValidationFindingDto` que le da `GET .../validation`, así que puede mostrar el error de la aprobación con el mismo código con el que muestra la validación.
   - Sumar un tipo de opción (D46) no toca nada de la API: la opción nueva aparece numerada y con su resumen, como las demás.
+- **Revisado en D73:** el `POST` del incidente responde igual, pero la propuesta ya no la devuelve `RegisterIncident`: el controller registra el incidente y después la busca con `QueryReplanProposalsPort.ofIncident`.
 
 ### D59 — Una expedición no compite con sus propias reservas (Entrega 2, F5, revisa D9, D33 y D41)
 
@@ -1450,6 +1452,28 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
 - **Consecuencia:**
   - Las dos interfaces repiten dos firmas.
   - Que el publicador en proceso no entregue a los asíncronos lo prueba `AsyncSubscribersAreNotDeliveredInProcessTest`: registra un suscriptor asíncrono en el contexto real de Spring y verifica que registrar un incidente arma la propuesta síncrona sin entregarle nada a él.
+
+### D73 — `RegisterIncident` no conoce a los consumidores del incidente (Entrega 3, propuesta de valor, revisa D45 y D58)
+
+- **Origen:** la consigna pide que el código que produce el hecho no conozca a sus consumidores. `RegisterIncident` registraba el incidente y después buscaba la propuesta que había armado `ProposeReplan`, uno de sus consumidores, y fallaba con `IllegalStateException` si no la encontraba. La review de las decisiones de la entrega lo señaló, junto con qué tenía que responder el `POST` del incidente sin esa propuesta.
+- **Patrón / principio:** desacople entre productor y consumidor de un evento + el adaptador driving compone puertos de entrada para armar la respuesta del contrato HTTP (D49).
+- **Dónde:**
+  - `RegisterIncidentPort.register` devuelve el `Incident` registrado, y `RegisterIncident` solo depende de `ExpeditionRepository`.
+  - `QueryReplanProposalsPort.ofIncident(IncidentId)`, con el `findByIncident` que ya tenía el repositorio de propuestas.
+  - `IncidentController` (en `web`) registra el incidente y después pide su propuesta.
+- **Por qué:**
+  - **El productor ya no conoce a su consumidor.** `RegisterIncident` pasó de tres dependencias (expediciones, publicador y propuestas) a una, y desapareció el `IllegalStateException` "no replan proposal was made for the incident": el caso de uso registra el hecho y no sabe quién reacciona.
+  - **La respuesta HTTP sigue siendo la de D58.** Que el `POST` del incidente devuelva la propuesta, con el `Location` a ella, es una decisión del contrato de la API: hace que el criterio de F3 se vea en una sola llamada. Por eso la compone el adaptador, que es el que conoce ese contrato, con dos puertos. El JSON, el `Location`, el frontend y el guion de la demo no cambiaron, y `ReplanningApiTest` y `DemoScriptApiTest` siguen igual.
+  - **Las dos llamadas corren en transacciones distintas, y la segunda siempre encuentra la propuesta**, porque se confirmó junto con el incidente (D68).
+  - **El puerto devuelve `Incident` y no una vista.** D64 pide no devolver entidades mutables, y deja salir tal cual a los `record` sin entidades adentro, como `ExpeditionEstimate` y `ApprovalResult`. `Incident` es un `record` inmutable hecho solo de value objects, y `ReplanProposalView` ya lo devolvía desde la Entrega 2. Un `IncidentView` copiaría los mismos campos sin agregar nada.
+- **Alternativas descartadas:**
+  - Mantener que `RegisterIncident` devuelva la propuesta, como un acoplamiento aceptado — contradice lo que pide la consigna, y la propuesta no podría pasar a ser asíncrona sin cambiar el caso de uso.
+  - Responder 201 con el incidente y sin `Location` — rompe la convención de D49 y D58, y no hay un endpoint del incidente al que apuntar.
+  - Responder 204 y que el cliente busque la propuesta aparte — pierde lo que D58 justificaba: que el criterio de F3 se vea en una sola llamada.
+  - Un `IncidentView` — ver arriba.
+- **Consecuencia:**
+  - El controller sabe que la propuesta se arma de forma síncrona. Si alguna vez pasara a ser asíncrona, `ofIncident` no la encontraría y el controller tendría que cambiar. Es un acoplamiento aceptado en el adaptador, no en el dominio.
+  - Si nadie armara la propuesta, el `POST` respondería 404 en vez del 500 de antes. Hoy no puede pasar: `ProposeReplan` siempre está conectado.
 
 ## Funcionalidades nuevas de la Entrega 2
 

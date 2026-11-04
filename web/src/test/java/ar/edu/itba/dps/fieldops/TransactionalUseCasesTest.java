@@ -15,7 +15,6 @@ import ar.edu.itba.dps.fieldops.business.models.resources.Person;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.ports.in.RegisterIncidentPort;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
-import ar.edu.itba.dps.fieldops.business.providers.ReplanProposalRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
 import ar.edu.itba.dps.fieldops.business.rules.ActivityTypeRegistry;
@@ -45,8 +44,6 @@ class TransactionalUseCasesTest {
     private TransactionalUseCases transactional;
     @Autowired
     private ExpeditionRepository expeditions;
-    @Autowired
-    private ReplanProposalRepository proposals;
     @Autowired
     private ZoneRepository zones;
     @Autowired
@@ -104,7 +101,7 @@ class TransactionalUseCasesTest {
         expeditions.add(approved);
         final RegisterIncidentPort failing = transactional.writing(RegisterIncidentPort.class, new RegisterIncident(new PublishingExpeditionRepository(storedExpeditions(), event -> {
             throw new IllegalStateException("the subscriber failed");
-        }), proposals));
+        })));
 
         assertThrows(IllegalStateException.class, () -> failing.register(new RegisterIncidentCommand(approved.getId(), activity.getId(),
                 IncidentReport.of("Storm", LocalDateTime.of(2026, 10, 1, 9, 0)))));

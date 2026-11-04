@@ -55,7 +55,7 @@ final class IncidentScenario {
     };
     final PublishingExpeditionRepository publishing = new PublishingExpeditionRepository(expeditions, publisher);
     final ApproveExpedition approveExpedition = new ApproveExpedition(List.of(), reservations, publishing, catalog);
-    final RegisterIncident registerIncident = new RegisterIncident(publishing, proposals);
+    final RegisterIncident registerIncident = new RegisterIncident(publishing);
     final DecideReplanProposal decide = new DecideReplanProposal(proposals, expeditions, replanner, replanExpedition, catalog);
     final QueryReplanProposals queryProposals = new QueryReplanProposals(proposals, expeditions);
 
@@ -81,7 +81,7 @@ final class IncidentScenario {
     }
 
     ReplanProposal registered(RegisterIncidentCommand command) {
-        return proposals.findById(registerIncident.register(command).id()).orElseThrow();
+        return proposals.findByIncident(registerIncident.register(command).id()).orElseThrow();
     }
 
     Expedition accepted(ReplanProposalId proposal, int optionNumber, ReplanDecisionCommand command) {
