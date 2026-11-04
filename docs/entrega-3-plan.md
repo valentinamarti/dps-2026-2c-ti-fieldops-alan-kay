@@ -12,7 +12,7 @@ La Entrega 3 suma la propuesta de valor, una arquitectura orientada a eventos, y
 | 2. Outbox y registro | Tablas de eventos y entregas, publicador que guarda en la misma transacción, consulta del registro y su endpoint | D74 a D76 | Sin asignar |
 | 3. Despachador y garantías | `@Scheduled`, orden, reintentos, `FAILED` y deduplicación | D77 y D78 | Sin asignar |
 | 4. Consumidores asíncronos | Notificaciones, avance del informe y eventos en el informe, con sus endpoints | D79 y D80 | Sin asignar |
-| 5. Frontend, demo y presentación | Seguimiento en el itinerario, secciones nuevas del frontend, `demo.http`, README, cierre de `DESIGN.md`, la presentación y **la organización de la demo y su video, que se graba con los cinco** | D81 | Sin asignar |
+| 5. Frontend, demo y presentación | Seguimiento en el itinerario, secciones nuevas del frontend, **mejoras generales del frontend**, `demo.http`, README, cierre de `DESIGN.md`, la presentación y **la organización de la demo y su video, que se graba con los cinco** | D81 | Sin asignar |
 
 **Lección de la Entrega 2:** el plan anterior dejaba los endpoints a la fase de API, las fases 2 a 4 mergearon sin ellos y la Fase 5 quedó sobrecargada. Acá **cada fase escribe los endpoints de lo que construye**, con su test de API. La Fase 5 solo suma el frontend y lo que la demo necesita.
 
@@ -279,17 +279,17 @@ Todas se cierran el martes 03/11, antes de arrancar, porque la fase bloquea al r
   - Costo: el bean `expeditionRepository` arma el JPA adentro del decorador y lo envuelve con `TransactionalUseCases.writing`, porque el `@Transactional` del adaptador solo aplica a beans. Recibe el publicador con `@Lazy`, para cortar el ciclo publicador → `ProposeReplan` → repositorio. Además, leyendo un caso de uso no se ve que se publica.
 - **Se registra en:** D70
 
-#### 1.6 — Resumen en palabras de cada evento (con la Fase 4) · ⬜ pendiente
+#### 1.6 — Resumen en palabras de cada evento (con la Fase 4) · ✅ decidida, se implementa en la Fase 4
 
 - **Pregunta:** las notificaciones de la Fase 4 necesitan un texto por evento, y no puede salir de un `switch` sobre el tipo. Como la respuesta toca `DomainEvent`, se decide acá.
 - **Opciones:**
   - a) `DomainEvent` expone un `summary()` y cada evento escribe el suyo, como hace `OptionSummaries` con las opciones.
   - b) Cada consumidor resuelve el texto con un mapa de tipo a función, registrado en la configuración.
 - **Recomendación:** a). El hecho sabe describirse, y sumar un evento sigue siendo sumar una clase.
-- **Decisión:** _a completar_
-- **Quién y cuándo:** _a completar, con el responsable de la Fase 4_
-- **Por qué:** _a completar_
-- **Se registra en:** D71 y D79
+- **Decisión:** a), pero **la implementa la Fase 4**, junto con las notificaciones, que son su primer uso. En la Fase 1 nadie la usaría, y agregarla antes sería código sin uso. Así, quien escribe las notificaciones ajusta el texto a lo que necesita mostrar.
+- **Quién y cuándo:** Valentina, 03/11/2026.
+- **Por qué:** evita el `switch` en el consumidor sin escribir código "por las dudas". El contrato de `DomainEvent` de la Fase 1 (`id()`, `expeditionId()` y `occurredAt()`) no cambia, y la Fase 4 le suma `summary()`.
+- **Se registra en:** D71 (lo completa la Fase 4) y D79
 
 ### Diseño
 
@@ -560,7 +560,7 @@ Los dos interesados que justifican los eventos: avisar a los responsables y mant
 
 ### Decisiones de la fase
 
-La 4.1 se cierra el miércoles 04/11, antes de arrancar el avance. El texto del aviso sin `switch` se decide en la Fase 1 (decisión 1.6), con el responsable de esta fase.
+La 4.1 se cierra el miércoles 04/11, antes de arrancar el avance. El texto del aviso sin `switch` ya quedó decidido en la Fase 1 (decisión 1.6: cada evento escribe su `summary()`), y **lo implementa esta fase**.
 
 #### 4.1 — Qué es el "avance del informe" · 👥 · ⬜ pendiente
 
@@ -591,7 +591,13 @@ La 4.1 se cierra el miércoles 04/11, antes de arrancar el avance. El texto del 
 - [ ] `Notification` en `business.models.notifications`: id, expedición, responsable (`PersonId`), id del evento que la originó, texto y `occurredAt` del hecho.
 - [ ] Puerto `NotificationRepository` en `business.providers`.
 - [ ] Un suscriptor asíncrono en `business.usecases` (por ejemplo `NotifyResponsibles`) que, ante cada evento, carga la expedición y crea un aviso por cada responsable (`Expedition.getResponsibles()`). Si la expedición tiene dos responsables, son dos avisos.
-- [ ] El texto del aviso, según la decisión 1.6, sin `switch` sobre el tipo de evento.
+- [ ] El resumen en palabras de cada evento (decisión 1.6), que viene de la Fase 1:
+  - `DomainEvent` suma `String summary()`, y cada evento escribe el suyo, en inglés como el resto de los mensajes. Por ejemplo: `ExpeditionApproved` → "The expedition was approved"; `IncidentRegistered` → "Incident on activity a-08: A storm flooded the station"; `ActivityCompleted` → "Activity a-08 finished: Twelve samples collected".
+  - El evento nombra la actividad por su id, porque lleva ids y no entidades (D71). El nombre de la expedición lo puede sumar la notificación, que ya carga la expedición para saber a quiénes avisar.
+  - Un test por evento, que verifique su resumen.
+  - Para la Fase 2: `summary()` no es un componente del `record`, así que el JSON del registro no lo guarda. Se calcula cada vez.
+  - D71 suma el punto "cada evento se describe en palabras", con las alternativas descartadas (un `switch` en el consumidor, un mapa de tipo a texto en la configuración).
+- [ ] El texto del aviso sale de `summary()`, sin `switch` sobre el tipo de evento.
 - [ ] La forma de suscribirse, según la decisión 4.2.
 - [ ] Adaptador JPA, tabla `notification` en `V3__notifications_and_progress.sql` y la tabla en `clean-database.sql`.
 - [ ] Caso de uso de consulta y `GET /api/expeditions/{id}/notifications`, con su test de API.
@@ -613,6 +619,7 @@ La 4.1 se cierra el miércoles 04/11, antes de arrancar el avance. El texto del 
 ### `DESIGN.md`
 
 - D79: notificaciones como consumidor asíncrono del dominio, guardadas en la base, sin mail ni servicio externo. Por qué el texto sale del evento.
+- D71 (de la Fase 1) suma el resumen en palabras de cada evento (decisión 1.6).
 - D80: avance del informe y eventos en la auditoría. Revisa D48.
 - La fila nueva de CQRS en patrones no aplicados.
 
@@ -670,6 +677,18 @@ Integra lo de las otras fases en lo que se muestra en vivo y prepara a los cinco
 - **Por qué:** _a completar_
 - **Se registra en:** este plan
 
+#### 5.5 — Qué se mejora del frontend y hasta dónde · ⬜ pendiente
+
+- **Pregunta:** el frontend se puede pulir mucho, y hay pocos días. Hay que decidir qué mejoras entran y cuánto tiempo se les da, sin que se coman la demo y la presentación.
+- **Opciones:**
+  - a) Una pasada acotada, de medio día como mucho: solo lo que se ve en el guion de la demo, empezando por las pantallas de la expedición, el itinerario y las secciones de eventos y notificaciones.
+  - b) Una revisión completa de todas las pantallas, incluido el catálogo y las zonas.
+- **Recomendación:** a). Lo que se evalúa es lo que se muestra, y el resto del frontend ya cumple el recorrido. Si sobra tiempo después del ensayo, se sigue con b).
+- **Decisión:** _a completar, con la lista priorizada_
+- **Quién y cuándo:** _a completar, antes del viernes 06/11_
+- **Por qué:** _a completar_
+- **Se registra en:** D81
+
 ### Seguimiento en el itinerario
 
 - [ ] `ScheduledActivityResponse` suma el estado del seguimiento (pendiente, en curso o terminada), inicio, fin, resultado y observaciones. Hoy no tiene nada de eso, aunque la API lo registra. Se mapea en `ItineraryMapper`, y si el dominio no lo expone para leer, se suma una vista.
@@ -681,6 +700,27 @@ Integra lo de las otras fases en lo que se muestra en vivo y prepara a los cinco
 - [ ] `expedition.js`: secciones "Eventos" (línea de tiempo con el estado de cada consumidor, y el error si quedó `FAILED`) y "Notificaciones". Las dos se recargan después de cada acción, con el mismo `refresh` que ya usa la página.
 - [ ] `expedition.js` (`reportView`): el avance y la línea de tiempo del informe.
 - [ ] Consume solo la API, como D69.
+
+#### Mejoras generales del frontend
+
+**La Fase 5 también se encarga de mejorar el frontend en general, no solo de sumar las secciones nuevas.** Es lo que se muestra en el video y en la presentación, así que tiene que verse prolijo y entenderse sin explicación. El frontend de la Entrega 2 (D69) es mínimo: cumple el recorrido, pero se pensó para que funcione, no para mostrarlo.
+
+- [ ] Recorrer todas las pantallas siguiendo el guion de la demo y anotar qué se ve mal, qué confunde y qué cuesta encontrar.
+- [ ] Priorizar la lista con la decisión 5.5. Primero lo que aparece en el video y en la demo en vivo.
+- [ ] Candidatos a revisar, según lo que hay hoy:
+  - **Navegación:** que siempre se sepa en qué expedición se está y cómo volver a la lista.
+  - **Estados:** que el estado de la expedición y el de cada actividad se vean de un vistazo (badges y colores consistentes en todas las pantallas).
+  - **Acciones:** que solo aparezcan las que se pueden hacer en ese estado, y que después de cada una haya una confirmación visible y no solo el refresco.
+  - **Errores:** `messages.js` muestra el `detail` del `ProblemDetail`. Revisar que se lea bien y quede cerca de donde se hizo la acción. Los críticos del 422 (D58) se pueden mostrar como lista.
+  - **Estados vacíos:** qué se ve cuando todavía no hay eventos, notificaciones, propuestas o actividades.
+  - **Formularios:** etiquetas claras, fechas fáciles de cargar, y el bloque en JSON (D69) con un ejemplo a mano.
+  - **Estilo:** una sola tipografía, espaciados y colores parejos en `styles.css`, y que se lea bien en la pantalla del proyector.
+- [ ] Límites:
+  - Sigue sin framework ni build (D69).
+  - No suma funcionalidades que no estén en la API: la consigna pide no agregar cosas ajenas a la propuesta de valor.
+  - Las reglas siguen en el dominio: el frontend no valida ni decide nada que el dominio ya resuelve.
+- [ ] `FrontendPagesTest` sigue en verde, y el recorrido completo se prueba a mano antes de grabar el video.
+- [ ] D81 registra qué se mejoró y por qué, como completa de D69.
 
 ### Demo
 
@@ -752,7 +792,7 @@ Presenta un integrante elegido al azar al comienzo de la clase, así que el mate
 
 ### `DESIGN.md`
 
-- D81: seguimiento en el itinerario y frontend de eventos. Completa D69.
+- D81: seguimiento en el itinerario, frontend de eventos y mejoras generales del frontend. Completa D69.
 
 **Terminado cuando:** la demo corre entera desde un clon limpio, `DemoScriptApiTest` la recorre en la CI y los cinco ensayaron.
 
@@ -775,7 +815,7 @@ Cada fase escribe sus entradas en el mismo PR que el código, con el formato de 
 | D78 | Garantías de entrega | 3 |
 | D79 | Notificaciones | 4 |
 | D80 | Avance del informe y eventos en la auditoría | 4 |
-| D81 | Seguimiento en el itinerario y frontend de eventos | 5 |
+| D81 | Seguimiento en el itinerario, frontend de eventos y mejoras del frontend | 5 |
 
 Si una fase necesita una entrada más, toma desde D82 y avisa al resto.
 
@@ -817,7 +857,7 @@ Es un índice. El detalle de cada decisión y su registro están en la sección 
 | 1.3 | Quién genera el `EventId` | 1 | 03/11 | Fase 1 | ⬜ |
 | 1.4 | Qué lleva `IncidentRegistered` | 1 | 03/11 | JSON de la Fase 2 | ✅ |
 | 1.5 | Quién publica los eventos y con qué firma | 1 | 03/11 | Fases 1 y 2 | ✅ |
-| 1.6 | Resumen en palabras de cada evento | 1 (con la 4) | 03/11 | `DomainEvent` y la Fase 4 | ⬜ |
+| 1.6 | Resumen en palabras de cada evento | 1 (la implementa la 4) | 03/11 | Fase 4 | ✅ |
 | 2.1 | Serializador y Jackson en `app` | 2 | 05/11 | PR 2b | ⬜ |
 | 2.2 | Tipo de la columna `payload` | 2 | 05/11 | PR 2b | ⬜ |
 | 2.3 | Qué pasa con `InMemoryEventPublisher` | 2 | 05/11 | PR 2b | ⬜ |
@@ -829,6 +869,7 @@ Es un índice. El detalle de cada decisión y su registro están en la sección 
 | 5.2 | Formato de la presentación 👥 | 5 | 06/11 | Fase 5 | ⬜ |
 | 5.3 | Cómo espera la demo al despachador | 5 | 08/11 | Demo | ⬜ |
 | 5.4 | Cómo se reparte y se graba el video de la demo 👥 | 5 | 06/11 | Video | ⬜ |
+| 5.5 | Qué se mejora del frontend y hasta dónde | 5 | 06/11 | Frontend | ⬜ |
 
 ### Riesgos
 
@@ -854,5 +895,6 @@ Es un índice. El detalle de cada decisión y su registro están en la sección 
 - [ ] `DESIGN.md` con D70 a D81, la sección de la propuesta de valor, los patrones no aplicados y los supuestos.
 - [ ] README actualizado.
 - [ ] `demo.http` con los pasos de eventos, recorrido por `DemoScriptApiTest`.
+- [ ] Frontend mejorado según la decisión 5.5, con el recorrido de la demo probado a mano.
 - [ ] Video de la demo grabado con los cinco integrantes, organizado por el responsable de la Fase 5, con el link en el README.
 - [ ] Presentación ensayada por los cinco, con el video como plan B.
