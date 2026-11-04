@@ -33,6 +33,7 @@ import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.samp
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -82,14 +83,17 @@ class ApproveAlternativeTest {
     @Test
     void approvingAnAlternativeThroughThePublishingRepositoryPublishesItsApproval() {
         final var alternative = approvedAlternative();
+        original.pullEvents();
         final var published = new ArrayList<DomainEvent>();
         final var publishing = new ApproveExpedition(List.of(), new ResourceReservations(),
                 new PublishingExpeditionRepository(repository, published::add), new FakeResourceCatalog());
 
         publishing.approve(alternative, List.of(), APPROVED_AT);
 
-        final var approved = published.stream().filter(ExpeditionApproved.class::isInstance).map(DomainEvent::expeditionId).toList();
-        assertTrue(approved.contains(alternative.getId()));
+        assertEquals(1, published.size());
+        final var event = assertInstanceOf(ExpeditionApproved.class, published.getFirst());
+        assertEquals(alternative.getId(), event.expeditionId());
+        assertEquals(APPROVED_AT, event.occurredAt());
     }
 
     @Test
