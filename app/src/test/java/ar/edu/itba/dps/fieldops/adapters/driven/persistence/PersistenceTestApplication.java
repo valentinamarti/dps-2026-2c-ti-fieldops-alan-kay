@@ -1,5 +1,6 @@
 package ar.edu.itba.dps.fieldops.adapters.driven.persistence;
 
+import ar.edu.itba.dps.fieldops.business.providers.EventLog;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ReplanProposalRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
@@ -46,6 +47,11 @@ class PersistenceTestApplication {
     ReplanProposalRepository replanProposalRepository(ReplanProposalJpaRepository proposals, ResourceCatalog catalog,
                                                       LoadedAggregates loaded) {
         return new JpaReplanProposalRepository(proposals, catalog, loaded);
+    }
+
+    @Bean
+    EventLog eventLog(DomainEventJpaRepository events, EventDeliveryJpaRepository deliveries) {
+        return new JpaEventLog(events, deliveries);
     }
 
     @Bean
