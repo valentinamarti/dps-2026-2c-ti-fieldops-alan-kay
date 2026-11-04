@@ -16,6 +16,7 @@ import ar.edu.itba.dps.fieldops.business.ports.in.TransitionExpeditionPort;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -92,6 +93,11 @@ class AsyncSubscribersAreNotDeliveredInProcessTest {
     private final Person leader = person("p-1");
     private final Person sampler = person("p-2");
     private final Activity sampling = sampling("a-1", coast, hours(8, 18));
+
+    @BeforeEach
+    void forgetEventsFromPreviousTests() {
+        asyncSubscriber.received.clear();
+    }
 
     @Test
     void registeringAnIncidentRunsTheSynchronousSubscriberButNotTheAsynchronousOne() {

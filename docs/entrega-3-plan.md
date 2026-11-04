@@ -240,16 +240,18 @@ Todas se cierran el martes 03/11, antes de arrancar, porque la fase bloquea al r
   - Costo: la firma de `ApproveExpeditionPort` y de `Expedition.approve` cambia, y los tests suman un momento fijo (`ExpeditionFixtures.APPROVED_AT`). El test de punta a punta verifica un rango de tiempo, no un valor exacto.
 - **Se registra en:** D71
 
-#### 1.3 — Quién genera el `EventId` · ⬜ pendiente
+#### 1.3 — Quién genera el `EventId` · ✅ decidida
 
 - **Pregunta:** el id del evento lo crea la entidad o un proveedor.
 - **Opciones:**
   - a) La entidad, con `UUID.randomUUID()` (por ejemplo, `EventId.generate()`).
   - b) Un proveedor, como `ExpeditionIdProvider`.
 - **Recomendación:** a). b) suma un colaborador a los tres casos de uso que publican, sin una variante real. Los tests comparan los eventos por tipo y por datos, no por id.
-- **Decisión:** _a completar_
-- **Quién y cuándo:** _a completar_
-- **Por qué:** _a completar_
+- **Decisión:** a). La expedición crea el id con `EventId.generate()`, que usa `UUID.randomUUID()`.
+- **Quién y cuándo:** Valentina, 03/11/2026.
+- **Por qué:**
+  - Un proveedor, como `ExpeditionIdProvider` (D60), sumaría un colaborador a los tres casos de uso que publican, sin una variante real que lo justifique.
+  - Los tests comparan los eventos por tipo y por datos, no por id, así que no necesitan controlar el valor.
 - **Se registra en:** D71
 
 #### 1.4 — Qué lleva `IncidentRegistered` · ✅ decidida

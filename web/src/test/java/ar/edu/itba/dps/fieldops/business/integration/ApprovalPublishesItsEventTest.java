@@ -8,6 +8,7 @@ import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -70,6 +71,11 @@ class ApprovalPublishesItsEventTest {
 
     private final Zone coast = zone("z-1");
     private final Person leader = person("p-1");
+
+    @BeforeEach
+    void forgetEventsFromPreviousTests() {
+        subscriber.received.clear();
+    }
 
     @Test
     void approvingThroughTheApiPublishesExpeditionApprovedAtTheTimeTheServerReceivedTheRequest() throws Exception {
