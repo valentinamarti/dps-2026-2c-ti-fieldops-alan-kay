@@ -5,6 +5,7 @@ import ar.edu.itba.dps.fieldops.adapters.driven.persistence.DomainEventJpaReposi
 import ar.edu.itba.dps.fieldops.adapters.driven.persistence.EventDeliveryEntity;
 import ar.edu.itba.dps.fieldops.adapters.driven.persistence.EventDeliveryJpaRepository;
 import ar.edu.itba.dps.fieldops.business.interfaces.events.AsyncEventSubscriber;
+import ar.edu.itba.dps.fieldops.business.interfaces.events.DomainEvent;
 import ar.edu.itba.dps.fieldops.business.interfaces.events.EventSubscriber;
 import ar.edu.itba.dps.fieldops.business.models.activities.ActivityId;
 import ar.edu.itba.dps.fieldops.business.models.events.ActivityCompleted;
@@ -84,6 +85,31 @@ class OutboxEventPublisherTest {
 
         @Override
         public void on(ExpeditionApproved event) {
+            log.add(name + ":" + event.id());
+        }
+    }
+
+    private static final class AnyEventRecorder implements AsyncEventSubscriber<DomainEvent> {
+        private final ConsumerName name;
+        private final List<String> log;
+
+        AnyEventRecorder(String name, List<String> log) {
+            this.name = new ConsumerName(name);
+            this.log = log;
+        }
+
+        @Override
+        public Class<DomainEvent> eventType() {
+            return DomainEvent.class;
+        }
+
+        @Override
+        public ConsumerName consumerName() {
+            return name;
+        }
+
+        @Override
+        public void on(DomainEvent event) {
             log.add(name + ":" + event.id());
         }
     }
@@ -185,6 +211,19 @@ class OutboxEventPublisherTest {
 
         assertEquals(List.of("notify-responsibles", "track-progress"),
                 pendingDeliveries().stream().map(delivery -> delivery.getId().getConsumer()).toList());
+    }
+
+    @Test
+    void leavesAPendingDeliveryOfEveryEventForAConsumerThatAsksForDomainEvent() {
+        final var log = new ArrayList<String>();
+        final var publisher = publisherWith(List.of(), List.of(new AnyEventRecorder("notify-responsibles", log)));
+
+        publisher.publish(APPROVAL);
+        publisher.publish(COMPLETION);
+
+        assertTrue(log.isEmpty());
+        assertEquals(List.of(1L, 2L),
+                pendingDeliveries().stream().map(delivery -> delivery.getId().getEventSequence()).toList());
     }
 
     @Test

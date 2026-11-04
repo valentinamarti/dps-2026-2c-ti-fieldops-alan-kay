@@ -452,7 +452,7 @@ La 2.1 y la 2.3 quedaron decididas el 04/11, antes de abrir el 2a. **La 2.2 se a
 
 ### PR 2b: publicador, consulta y endpoint
 
-**Estado (04/11/2026, rama `assignment-3-phase-2b`): el PR está completo.** Se desarrolló sobre el 2a, sin esperar su merge, con cuatro commits en el orden de menos a más acoplado a lo que la review del 2a puede discutir: serializador, publicador, wiring y consulta. `mvn -B verify` pasa con 943 tests (724 en `domain`, 63 en `app` y 156 en `web`). `DESIGN.md` cierra D74, suma D75, cierra D76 y actualiza las filas compartidas.
+**Estado (04/11/2026, rama `assignment-3-phase-2b`): el PR está completo.** Se desarrolló sobre el 2a, sin esperar su merge, con cuatro commits en el orden de menos a más acoplado a lo que la review del 2a puede discutir: serializador, publicador, wiring y consulta. `mvn -B verify` pasa con 944 tests (724 en `domain`, 64 en `app` y 156 en `web`). `DESIGN.md` cierra D74, suma D75, cierra D76 y actualiza las filas compartidas.
 
 > **Cuando el 2a mergee:** como los últimos PRs se mergearon con squash, rebasear con `git rebase origin/main` reaplicaría los commits del 2a y conflictúa. El comando es `git rebase --onto origin/main assignment-3-phase-2a assignment-3-phase-2b`, que replaya solo lo que es del 2b.
 
@@ -463,7 +463,7 @@ La 2.1 y la 2.3 quedaron decididas el 04/11, antes de abrir el 2a. **La 2.2 se a
 
   Todo corre dentro de la transacción del caso de uso (D68). Si el síncrono falla, no se guarda nada.
   - **Agregado:** el publicador recibe un `java.time.Clock`, con su bean en `EventsConfig`, porque es el que escribe `recorded_at` y el `next_attempt_at` de la primera entrega. La Fase 3 ya lo tiene armado: es el mismo bean que su "Agregado" del reloj inyectable pedía.
-  - **Para la Fase 4 (decisión 4.2):** confirmado, el filtro es `isInstance`, igual para los síncronos y para los asíncronos, así que la opción a) —un suscriptor con `eventType()` = `DomainEvent.class`— funciona.
+  - **Para la Fase 4 (decisión 4.2):** confirmado, el filtro es `isInstance`, igual para los síncronos y para los asíncronos, así que la opción a) —un suscriptor con `eventType()` = `DomainEvent.class`— funciona. Tiene su test, y la confirmación quedó también escrita en la decisión 4.2, que es donde la Fase 4 la va a buscar.
 - [x] Serializador de eventos en el adaptador, según el punto 8.
 - [x] `EventsConfig` en `web`: el bean del publicador recibe `List<EventSubscriber<?>>` y `List<AsyncEventSubscriber<?>>`. Se saca `eventPublisher` de `ReplanningConfig`.
   - **Corrección:** los asíncronos entran por `ObjectProvider<AsyncEventSubscriber<?>>` y no por `List`. Con una `List` requerida y cero candidatos —que es el contexto de producción hasta que la Fase 4 sume el primero— Spring no arranca. La Fase 4 no tiene que cambiar nada: sus beans aparecen solos.
@@ -622,6 +622,7 @@ La 4.1 se cierra el miércoles 04/11, antes de arrancar el avance. El texto del 
   - a) Uno solo, con `eventType()` = `DomainEvent.class`.
   - b) Uno por evento.
 - **Recomendación:** a), porque la regla es la misma para los tres (un aviso por responsable). Requiere que el publicador de la Fase 2 filtre con `isInstance`, como hace hoy `InMemoryEventPublisher`: hay que confirmarlo con la Fase 2.
+  - **Confirmado por la Fase 2 (Matías, 04/11/2026, PR 2b): la opción a) funciona.** `OutboxEventPublisher` filtra con `isInstance` igual para los síncronos y para los asíncronos, así que un suscriptor con `eventType()` = `DomainEvent.class` recibe los tres eventos y se le crea una entrega `PENDING` por cada uno. Lo cubre `OutboxEventPublisherTest.leavesAPendingDeliveryOfEveryEventForAConsumerThatAsksForDomainEvent`, que publica dos eventos de tipos distintos y verifica que le queda una entrega de cada uno. La precondición técnica está cumplida; la decisión entre a) y b) sigue siendo de la Fase 4.
 - **Decisión:** _a completar_
 - **Quién y cuándo:** _a completar_
 - **Por qué:** _a completar_
