@@ -8,8 +8,8 @@ La Entrega 3 suma la propuesta de valor, una arquitectura orientada a eventos, y
 
 | Fase | Qué entrega | Entradas de `DESIGN.md` | Responsable |
 | --- | --- | --- | --- |
-| 1. Eventos en el dominio | Los tres eventos, la entidad que los acumula, las dos interfaces de suscriptor y `RegisterIncident` desacoplado | D70 a D73 | Sin asignar |
-| 2. Outbox y registro | Tablas de eventos y entregas, publicador que guarda en la misma transacción, consulta del registro y su endpoint | D74 a D76 | Sin asignar |
+| 1. Eventos en el dominio | Los tres eventos, la entidad que los acumula, las dos interfaces de suscriptor y `RegisterIncident` desacoplado | D70 a D73 | Valentina · ✅ mergeada (PR #13, 04/11) |
+| 2. Outbox y registro | Tablas de eventos y entregas, publicador que guarda en la misma transacción, consulta del registro y su endpoint | D74 a D76 | Matías |
 | 3. Despachador y garantías | `@Scheduled`, orden, reintentos, `FAILED` y deduplicación | D77 y D78 | Sin asignar |
 | 4. Consumidores asíncronos | Notificaciones, avance del informe y eventos en el informe, con sus endpoints | D79 y D80 | Sin asignar |
 | 5. Frontend, demo y presentación | Seguimiento en el itinerario, secciones nuevas del frontend, **mejoras generales del frontend**, `demo.http`, README, cierre de `DESIGN.md`, la presentación y **la organización de la demo y su video, que se graba con los cinco** | D81 | Sin asignar |
@@ -371,53 +371,74 @@ El evento se guarda en la misma transacción que el cambio, con una entrega pend
 
 ### Decisiones de la fase
 
-La 2.2 se prueba el primer día del PR 2b. La 2.1 y la 2.3, antes de abrirlo.
+La 2.1 y la 2.3 quedaron decididas el 04/11, antes de abrir el 2a. **La 2.2 se adelanta al 2a y se prueba antes de escribir `V2__event_log.sql`**: el tipo de `payload` es una columna de esa migración, y con `ddl-auto: validate` la entidad JPA tiene que coincidir columna por columna. Probarla en el 2b, como decía este plan, obligaría a una migración nueva para cambiar el tipo, con la Fase 3 ya construyendo sobre el esquema del 2a.
 
-#### 2.1 — Dónde vive el serializador y Jackson en `app` · ⬜ pendiente
+#### 2.1 — Dónde vive el serializador y Jackson en `app` · ✅ decidida
 
 - **Pregunta:** el proyecto usa Jackson 3 (`tools.jackson.databind`, por Spring Boot 4.1.1), y solo `web` lo tiene en el classpath. `app` tiene JPA y Flyway, pero no Jackson.
 - **Opciones:**
   - a) Sumar `tools.jackson.core:jackson-databind` a `app/pom.xml`, con la versión del BOM, y que el serializador viva en el adaptador del outbox.
   - b) Dejar el serializador en `web` y pasárselo al publicador por una interfaz del adaptador.
 - **Recomendación:** a). El serializador es parte del adaptador del outbox. Jackson 3 trae de fábrica los records, `java.time` y `Optional`, así que no hacen falta módulos, y lo confirma el test de ida y vuelta.
-- **Decisión:** _a completar_
-- **Quién y cuándo:** _a completar_
-- **Por qué:** _a completar_
+- **Decisión:** a). `tools.jackson.core:jackson-databind` en `app/pom.xml`, sin `<version>`, y el serializador en el adaptador del outbox.
+- **Quién y cuándo:** Matías, 04/11/2026.
+- **Por qué:**
+  - El `spring-boot-dependencies` que ya importa `app` maneja la versión: agregada sin `<version>`, `dependency:tree` resuelve `tools.jackson.core:jackson-databind:3.1.5` y solo arrastra `jackson-core`, sin autoconfiguración de Spring ni Jackson 2. Probado el 04/11 y revertido, porque la dependencia entra con el serializador.
+  - **Corregido el 04/11 al probar la 2.2, en dos puntos.** La pregunta decía que `app` no tenía Jackson, y sí lo tiene: entra transitivo por `flyway-database-postgresql` → `flyway-core`, y no se puede excluir sin romper el bean `flyway`. Y el mapeo `jsonb` de la 2.2 lo usa, así que la dependencia **se declara en el PR 2a**, con el esquema, y no en el 2b con el serializador. La decisión no cambia: se declara igual, sin `<version>`, y el serializador sigue siendo del adaptador del outbox en el 2b.
+  - El serializador es parte del adaptador del outbox: dejarlo en `web` (opción b) obligaría a un puerto más solo para que el adaptador de `app` pueda escribir su propia columna.
+  - `domain` no se toca, así que el enforcer que le prohíbe Spring sigue igual y los eventos siguen sin anotaciones (punto 8 de la review).
 - **Se registra en:** D75
 
-#### 2.2 — Tipo de la columna `payload` · ⬜ pendiente
+#### 2.2 — Tipo de la columna `payload` · ✅ decidida
 
 - **Pregunta:** cómo se guarda el JSON. Con Hibernate 7.4 y Jackson 3, el mapeo de `jsonb` no está probado en el proyecto.
 - **Opciones:**
   - a) `jsonb`, con un `String` y `@JdbcTypeCode(SqlTypes.JSON)`, o con `@ColumnTransformer(write = "?::jsonb")`.
   - b) `text`.
 - **Recomendación:** a) si funciona en la primera prueba con una inserción real. Si no, b): el payload no se consulta por SQL, así que no se pierde nada.
-- **Decisión:** _a completar_
-- **Quién y cuándo:** _a completar_
-- **Por qué:** _a completar_
+- **Qué probar, y en este orden, antes de escribir la migración:** una inserción real contra el PostgreSQL de Testcontainers con la entidad del registro y un `String` de payload. Las dos variantes de a) se prueban por separado, porque no cuestan lo mismo: `@JdbcTypeCode(SqlTypes.JSON)` puede pedir un `FormatMapper` de JSON en el classpath de `app` —y entonces la 2.1 entra ya en el 2a y no en el 2b—, mientras que `@ColumnTransformer(write = "?::jsonb")` escribe un `String` y no depende de Jackson. Si las dos fallan, b) y listo.
+- **Decisión:** a), con `@JdbcTypeCode(SqlTypes.JSON)`. La columna es `payload JSONB NOT NULL` y la entidad tiene un `String` con esa única anotación.
+- **Quién y cuándo:** Matías, 04/11/2026, probado contra el PostgreSQL 17.11 de Testcontainers (Hibernate 7.4.5, Spring Boot 4.1.1) antes de escribir `V2__event_log.sql`.
+- **Por qué:**
+  - **`@JdbcTypeCode(SqlTypes.JSON)` funcionó a la primera.** Pasa `ddl-auto: validate` —Hibernate mapea `SqlTypes.JSON` a `jsonb`, que reporta `Types#OTHER`, y coincide— e inserta y lee con una sola anotación y sin tocar el `pom`.
+  - **`@ColumnTransformer(write = "?::jsonb")` queda dominada.** Sola no arranca el contexto: el `@ColumnTransformer` no participa de la validación de esquema, así que Hibernate compara un `String` contra la columna y falla con `wrong column type encountered in column [payload]: found [jsonb (Types#OTHER)], but expecting [varchar(255) (Types#VARCHAR)]`. Hay que sumarle `@Column(columnDefinition = "jsonb")`, y recién ahí funciona (sin `read`: el driver devuelve el `jsonb` por `getString()`). Son dos anotaciones y un cast escrito a mano para llegar a lo mismo que la otra hace con una.
+  - **`text` también funciona**, sin ninguna anotación, y es la única que devuelve el string tal cual. Se descarta igual: con `jsonb` la base valida que el payload sea JSON, y si alguna vez hace falta consultar adentro del payload están los operadores y los índices GIN.
+  - **La pregunta de Jackson de la 2.1 se contesta sola, y con una corrección.** `jsonb` sí pasa por un `FormatMapper` de JSON, incluso con un campo `String`: con un `FormatMapper` que falla a propósito (`hibernate.type.json_format_mapper`), la inserción revienta. El que usa es `Jackson3JsonFormatMapper`, que Hibernate 7.4 elige solo porque Jackson 3 ya está en el classpath.
+  - **Corrección a la 2.1: `app` ya tenía Jackson.** `tools.jackson.core:jackson-databind:3.1.5` está en el classpath de compilación de `app`, transitivo por `flyway-database-postgresql` → `flyway-core`, y no se puede sacar: excluyéndolo, el bean `flyway` falla con `NoClassDefFoundError: tools/jackson/databind/ObjectMapper`. Por eso la dependencia de la 2.1 **se declara en el 2a y no en el 2b**: es el mapeo de esta columna el que la necesita, y depender de un transitivo de Flyway para eso es frágil. Declararla no cambia nada de lo resuelto: sigue siendo la misma 3.1.5 que maneja el BOM.
+- **Costo:** `jsonb` normaliza lo que guarda —reordena las claves del objeto y mete un espacio después de cada `:` y `,`—, así que el string que vuelve no es el que entró. El test de ida y vuelta del 2b compara JSON parseado o el evento deserializado, nunca strings. `JpaEventLogTest.keepsThePayloadOfTheEventAsJson` ya lo hace así.
 - **Se registra en:** D74
 
-#### 2.3 — Qué pasa con `InMemoryEventPublisher` · ⬜ pendiente
+#### 2.3 — Qué pasa con `InMemoryEventPublisher` · ✅ decidida
 
 - **Pregunta:** el publicador del outbox lo reemplaza en el wiring. Hay que ver si el viejo sigue sirviendo para algo.
 - **Opciones:**
   - a) Borrarlo, si ningún test lo usa.
   - b) Dejarlo para los tests de `domain` que necesiten un publicador real sin base.
 - **Recomendación:** a). Un adaptador sin uso es código muerto, y los tests de `domain` usan Mockito.
-- **Decisión:** _a completar_
-- **Quién y cuándo:** _a completar_
-- **Por qué:** _a completar_
+- **Decisión:** a). Se borra en el PR 2b, junto con `InMemoryEventPublisherTest`, cuando `OutboxEventPublisher` lo reemplace en el wiring.
+- **Quién y cuándo:** Matías, 04/11/2026.
+- **Por qué:**
+  - Después del 2b nadie lo usa: hoy sus únicos usos son `ReplanningConfig:46`, que el 2b reemplaza por `EventsConfig`, y `InMemoryEventPublisherTest`, que es su propio test. Ningún test de `domain` lo usa, porque `domain` no lo ve: vive en `app`.
+  - **Condición para borrarlo:** `OutboxEventPublisherTest` tiene que cubrir primero lo que hoy cubre `InMemoryEventPublisherTest`, porque son garantías del paso 1 del publicador nuevo y no del viejo: entrega solo a los suscriptores cuyo `eventType()` coincide, los recorre en orden, deja subir la excepción del suscriptor que falla (de eso depende D68) y no entrega a los asíncronos.
+  - `AsyncSubscribersAreNotDeliveredInProcessTest` (en `web`) no se borra, pero en el 2b cambia de sujeto: la garantía pasa a ser que el publicador del outbox le deja una entrega `PENDING` al asíncrono en vez de llamarlo. Conviene ajustarle el nombre y sumar esa aserción en el mismo PR.
 - **Se registra en:** D74
 
 ### PR 2a: esquema y puertos (bloqueante para la Fase 3)
 
-- [ ] `V2__event_log.sql`:
+**Estado (04/11/2026, rama `assignment-3-phase-2a`): el PR está completo.** La decisión 2.2 se cerró con una prueba real antes de la migración, y de paso corrigió la 2.1. `mvn -B verify` pasa con 923 tests (722 en `domain`, 51 en `app` y 150 en `web`): los 11 nuevos son `JpaEventLogTest`. `DESIGN.md` suma D74 y D76 con lo que este PR implementa. La API, el frontend y `demo.http` no cambian, y el wiring de `web` tampoco: el puerto todavía no tiene consumidor, así que el bean lo arma solo `PersistenceTestApplication`.
+
+- [x] Probar el tipo de `payload` contra PostgreSQL y cerrar la decisión 2.2, **antes** de escribir la migración.
+- [x] `V2__event_log.sql`:
   - `domain_event` (inmutable): `sequence BIGSERIAL PRIMARY KEY`, `event_id` (único), `expedition_id`, `event_type` (nombre de la clase), `occurred_at`, `recorded_at` y `payload`. Índice por `(expedition_id, sequence)`.
   - `event_delivery`: `event_sequence` (FK a `domain_event`), `consumer`, `status` (`PENDING`, `DELIVERED`, `FAILED`), `attempts`, `last_error`, `next_attempt_at` y `delivered_at`. Clave `(event_sequence, consumer)` e índice por `(status, next_attempt_at)`.
   - Sin FK de `domain_event` a `expedition`: el registro no depende del ciclo de vida de la expedición.
-- [ ] Puerto de lectura en `business.providers`, por ejemplo `EventLog.ofExpedition(ExpeditionId)`. Devuelve `RecordedEventView` (tipo, `occurredAt`, momento de registro y una línea por consumidor con estado, intentos y último error), que vive en `business.models.responses`.
-- [ ] Entidades JPA y repositorios Spring Data en `app.adapters.driven.persistence`. Con `ddl-auto: validate`, tienen que coincidir columna por columna con la migración.
-- [ ] `clean-database.sql`: sumar `domain_event` y `event_delivery` al `TRUNCATE`.
+  - **Agregado:** `next_attempt_at` quedó `NOT NULL`. Una entrega pendiente siempre tiene un momento desde el cual se la puede intentar, y la primera vez es enseguida, así que la Fase 3 la crea con un valor y su consulta no trata el caso nulo. `last_error` y `delivered_at` sí son nulos hasta que haya algo que contar.
+- [x] Puerto de lectura en `business.providers`, por ejemplo `EventLog.ofExpedition(ExpeditionId)`. Devuelve `RecordedEventView` (tipo, `occurredAt`, momento de registro y una línea por consumidor con estado, intentos y último error), que vive en `business.models.responses`.
+  - Quedó `RecordedEventView(EventId id, String type, LocalDateTime occurredAt, LocalDateTime recordedAt, List<EventDeliveryView> deliveries)` y `EventDeliveryView(ConsumerName consumer, DeliveryStatus status, int attempts, Optional<String> lastError)`, con `DeliveryStatus` en `business.models.events`. Se sumó el `EventId`, que el puerto necesita para correlacionar (la `Notification` de la Fase 4 guarda el id del evento que la originó). La vista **no** lleva la secuencia: el orden es parte del contrato del puerto, así que las fases 4 y 5 no ven el `BIGSERIAL`. El payload tampoco sale por el puerto.
+- [x] Entidades JPA y repositorios Spring Data en `app.adapters.driven.persistence`. Con `ddl-auto: validate`, tienen que coincidir columna por columna con la migración.
+  - `DomainEventEntity`, `EventDeliveryEntity` con `@EmbeddedId EventDeliveryKey`, `DomainEventJpaRepository`, `EventDeliveryJpaRepository` y el adaptador `JpaEventLog`. Son dos entidades y no un `@ElementCollection`, porque la Fase 3 necesita consultar las entregas por su cuenta, por `(status, next_attempt_at)`.
+- [x] `clean-database.sql`: sumar `domain_event` y `event_delivery` al `TRUNCATE`. También el `DatabaseCleaner` de los tests de `app`, que tiene su propio `TRUNCATE`.
+- [x] `tools.jackson.core:jackson-databind` en `app/pom.xml`, por la corrección de la decisión 2.1: el mapeo `jsonb` lo usa, así que la dependencia entra con el esquema y no con el serializador.
 
 > **Review, punto 1 — El orden sale de la secuencia, no de `occurredAt`.** Los tres timestamps los manda el cliente (`StartActivityRequest(at)`, `FinishActivityRequest(at, result)` y `RegisterIncidentRequest(..., occurredAt, ...)`). Un fin de actividad cargado tarde quedaría antes de un incidente ya registrado, y el bloqueo por falla trabaría al evento equivocado. Por eso el orden es el de la columna `sequence`, y `occurredAt` es solo un dato del hecho.
 >
@@ -454,8 +475,8 @@ La 2.2 se prueba el primer día del PR 2b. La 2.1 y la 2.3, antes de abrirlo.
 
 ### Tests
 
-- [ ] Contrato del registro contra PostgreSQL (Testcontainers), en el estilo de `ExpeditionRepositoryContract`.
-- [ ] Ida y vuelta del JSON para cada uno de los tres eventos, incluido un `IncidentRegistered` con y sin recurso y retraso.
+- [x] **(2a)** Contrato del registro contra PostgreSQL (Testcontainers), en el estilo de `ExpeditionRepositoryContract`: `JpaEventLogTest`, con los once casos que lista D76. Quedó como un `@SpringBootTest` propio de `app` y no como una clase abstracta en el test-jar de `domain`, porque el puerto es de solo lectura y hay una sola implementación: el contrato de `ExpeditionRepository` existe como abstracto porque lo corrían dos adaptadores (D51, D67), y acá un abstracto con un solo hijo pediría un gancho de siembra que el publicador del 2b hace innecesario.
+- [ ] Ida y vuelta del JSON para cada uno de los tres eventos, incluido un `IncidentRegistered` con y sin recurso y retraso. **Compara JSON parseado o el evento deserializado, no strings:** `jsonb` normaliza (decisión 2.2).
 - [ ] Un `event_type` desconocido falla con un error claro al leer.
 - [ ] Si la transacción del caso de uso se deshace, el evento no queda registrado.
 - [ ] Si el consumidor síncrono falla, se deshace la operación y no queda ni el incidente ni el evento (D68).
@@ -467,10 +488,14 @@ La 2.2 se prueba el primer día del PR 2b. La 2.1 y la 2.3, antes de abrirlo.
 ### `DESIGN.md`
 
 - D74: outbox en PostgreSQL, con dos tablas. Cierra la deuda de D45 y revisa la idea inicial de una sola tabla.
-- D75: serialización genérica por nombre de clase, en el adaptador, sin versión de esquema.
+  - **(2a)** Escrita con lo que el 2a implementa: las dos tablas, por qué dos y no una, el orden por `sequence`, sin FK a `expedition`, la clave de la entrega, el `jsonb` de la decisión 2.2 y las consecuencias (la normalización del `jsonb`, la secuencia que se asigna al insertar, el registro que crece sin límite).
+  - **Queda para el 2b:** que el publicador guarde el evento y sus entregas en la transacción del caso de uso —que es lo que cierra la deuda de D45, así que el "revisa D45" del título y la línea "Revisado en D74" en D45 van con ese PR— y la decisión 2.3.
+- D75: serialización genérica por nombre de clase, en el adaptador, sin versión de esquema. **Entera en el 2b**, con el serializador.
 - D76: consulta del registro detrás de un puerto de salida y un caso de uso.
-- La fila de Event Sourcing de la tabla de patrones no aplicados, actualizada: ahora sí hay un registro de eventos, pero el estado no se reconstruye desde él.
-- La fila nueva de broker de mensajería.
+  - **(2a)** Escrita con el puerto, las dos vistas y el adaptador: por qué es un puerto de salida y no un repositorio, por qué devuelve vistas, por qué la vista no lleva la secuencia y por qué son dos consultas y no un `@OneToMany`.
+  - **Queda para el 2b:** el caso de uso de consulta, su puerto de entrada y el endpoint.
+- La fila de Event Sourcing de la tabla de patrones no aplicados, actualizada: ahora sí hay un registro de eventos, pero el estado no se reconstruye desde él. **En el 2b:** en el 2a las tablas existen pero nada las escribe todavía.
+- La fila nueva de broker de mensajería. **En el 2b**, por lo mismo. El argumento ("en la misma base, para que el evento se guarde con el cambio") ya está en D74, que es su lugar natural; la fila de la tabla compartida se agrega cuando el publicador exista.
 
 **Terminado cuando:** cada operación deja su evento y sus entregas pendientes en la misma transacción, y la línea de tiempo se consulta por HTTP.
 
@@ -858,13 +883,13 @@ Es un índice. El detalle de cada decisión y su registro están en la sección 
 | — | Reparto de las cinco fases 👥 | — | 03/11 | Todo | ⬜ |
 | 1.1 | Qué responde `POST /incidents` (review 2 y 5) 👥 | 1 | 03/11 | Fase 1 | ✅ |
 | 1.2 | `occurredAt` de la aprobación 👥 | 1 | 03/11 | Fase 1 | ✅ |
-| 1.3 | Quién genera el `EventId` | 1 | 03/11 | Fase 1 | ⬜ |
+| 1.3 | Quién genera el `EventId` | 1 | 03/11 | Fase 1 | ✅ |
 | 1.4 | Qué lleva `IncidentRegistered` | 1 | 03/11 | JSON de la Fase 2 | ✅ |
 | 1.5 | Quién publica los eventos y con qué firma | 1 | 03/11 | Fases 1 y 2 | ✅ |
 | 1.6 | Resumen en palabras de cada evento | 1 (la implementa la 4) | 03/11 | Fase 4 | ✅ |
-| 2.1 | Serializador y Jackson en `app` | 2 | 05/11 | PR 2b | ⬜ |
-| 2.2 | Tipo de la columna `payload` | 2 | 05/11 | PR 2b | ⬜ |
-| 2.3 | Qué pasa con `InMemoryEventPublisher` | 2 | 05/11 | PR 2b | ⬜ |
+| 2.1 | Serializador y Jackson en `app` | 2 | 04/11 | PR 2a (corregida al probar la 2.2) | ✅ |
+| 2.2 | Tipo de la columna `payload` | 2 | 04/11 | PR 2a | ✅ |
+| 2.3 | Qué pasa con `InMemoryEventPublisher` | 2 | 04/11 | PR 2b | ✅ |
 | 3.1 | Valores del despachador (review 6) 👥 | 3 | 04/11 | D78 | ⬜ |
 | 3.2 | Método del despachador para los tests | 3 | 04/11 | Fases 4 y 5 | ⬜ |
 | 4.1 | Qué es el "avance del informe" 👥 | 4 | 04/11 | Fase 4 | ⬜ |
@@ -880,7 +905,7 @@ Es un índice. El detalle de cada decisión y su registro están en la sección 
 - **Calendario.** Hay seis días hasta el lunes 09/11, y la Fase 1 bloquea a todos. El domingo queda para el video y el ensayo: si la integración del sábado se atrasa, se come ese margen. Si no mergea el 04/11, las fases 2, 3 y 4 avanzan sobre la rama de la Fase 1 y rebasean después.
 - **Transacciones del despachador.** Marcar el fallo en otra transacción, después del rollback, es lo más fácil de hacer mal. Lo cubre el test de `FAILED`.
 - **Tests inestables con el `@Scheduled`.** Todo se prueba invocando el despachador a mano, con un `Clock` que se adelanta. Awaitility queda para un solo test de punta a punta, y el resto de los tests corre con el despachador apagado.
-- **JSON con Jackson 3 y `jsonb` con Hibernate 7.** Hay que probarlos el primer día del PR 2b, con el test de ida y vuelta y una inserción real. La salida es la columna `text`.
+- **JSON con Jackson 3 y `jsonb` con Hibernate 7.** La mitad del `jsonb` se cerró en el 2a con una inserción real (decisión 2.2): anda con `@JdbcTypeCode(SqlTypes.JSON)`, y la columna `text` queda como salida que no hizo falta. Lo que falta probar en el 2b es la serialización de los tres eventos con Jackson 3, con el test de ida y vuelta, que compara JSON parseado y no strings.
 - **El orden depende de que cada evento cambie la fila `expedition`.** Hoy se cumple. Un evento nuevo que no la cambie rompe la garantía en silencio. Va en D78 como supuesto.
 - **La proyección del avance contra el informe.** Si no se decide bien, es la pregunta más incómoda de la presentación (ver Fase 4).
 - **Demo con consistencia eventual.** En vivo, el aviso aparece unos segundos después. El guion tiene que mostrarlo como lo que se quiere explicar, no como un error.
