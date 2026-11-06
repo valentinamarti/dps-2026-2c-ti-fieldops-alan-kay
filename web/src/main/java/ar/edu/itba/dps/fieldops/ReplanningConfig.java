@@ -1,15 +1,12 @@
 package ar.edu.itba.dps.fieldops;
 
-import ar.edu.itba.dps.fieldops.adapters.driven.InMemoryEventPublisher;
 import ar.edu.itba.dps.fieldops.adapters.driven.persistence.JpaReplanProposalRepository;
 import ar.edu.itba.dps.fieldops.adapters.driven.persistence.LoadedAggregates;
 import ar.edu.itba.dps.fieldops.adapters.driven.persistence.ReplanProposalJpaRepository;
-import ar.edu.itba.dps.fieldops.business.interfaces.events.EventSubscriber;
 import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.ports.in.DecideReplanProposalPort;
 import ar.edu.itba.dps.fieldops.business.ports.in.QueryReplanProposalsPort;
 import ar.edu.itba.dps.fieldops.business.ports.in.RegisterIncidentPort;
-import ar.edu.itba.dps.fieldops.business.providers.EventPublisher;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ReplanProposalRepository;
 import ar.edu.itba.dps.fieldops.business.replanning.CancellationOptions;
@@ -39,11 +36,6 @@ public class ReplanningConfig {
                                 ExpeditionReplanner replanner, ResourceCatalog catalog) {
         return new ProposeReplan(expeditions, proposals, replanner,
                 List.of(new RescheduleOptions(), new ResourceReplacementOptions(catalog), new CancellationOptions()));
-    }
-
-    @Bean
-    EventPublisher eventPublisher(List<EventSubscriber<?>> subscribers) {
-        return new InMemoryEventPublisher(subscribers);
     }
 
     @Bean

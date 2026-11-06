@@ -452,17 +452,26 @@ La 2.1 y la 2.3 quedaron decididas el 04/11, antes de abrir el 2a. **La 2.2 se a
 
 ### PR 2b: publicador, consulta y endpoint
 
-- [ ] `OutboxEventPublisher` en `app`, que reemplaza a `InMemoryEventPublisher` en el wiring:
+**Estado (04/11/2026, rama `assignment-3-phase-2b`): el PR está completo.** Se desarrolló sobre el 2a, sin esperar su merge, con cuatro commits en el orden de menos a más acoplado a lo que la review del 2a puede discutir: serializador, publicador, wiring y consulta. `mvn -B verify` pasa con 944 tests (724 en `domain`, 64 en `app` y 156 en `web`). `DESIGN.md` cierra D74, suma D75, cierra D76 y actualiza las filas compartidas.
+
+> **Cuando el 2a mergee:** como los últimos PRs se mergearon con squash, rebasear con `git rebase origin/main` reaplicaría los commits del 2a y conflictúa. El comando es `git rebase --onto origin/main assignment-3-phase-2a assignment-3-phase-2b`, que replaya solo lo que es del 2b.
+
+- [x] `OutboxEventPublisher` en `app`, que reemplaza a `InMemoryEventPublisher` en el wiring:
   1. Entrega a los suscriptores síncronos.
   2. Guarda el evento.
   3. Crea una entrega `PENDING` por cada suscriptor asíncrono interesado en ese tipo.
 
   Todo corre dentro de la transacción del caso de uso (D68). Si el síncrono falla, no se guarda nada.
-- [ ] Serializador de eventos en el adaptador, según el punto 8.
-- [ ] `EventsConfig` en `web`: el bean del publicador recibe `List<EventSubscriber<?>>` y `List<AsyncEventSubscriber<?>>`. Se saca `eventPublisher` de `ReplanningConfig`.
-- [ ] Caso de uso de consulta en `business.usecases`, por ejemplo `QueryExpeditionEvents`, con su puerto en `business.ports.in`. Se envuelve en `transactional.reading` y devuelve 404 si la expedición no existe.
-- [ ] `GET /api/expeditions/{id}/events`: la línea de tiempo en orden de `sequence`, con el estado de cada consumidor. Controller, DTO y mapper propios en `adapters.driving.rest`.
-- [ ] `InMemoryEventPublisher`, según la decisión 2.3.
+  - **Agregado:** el publicador recibe un `java.time.Clock`, con su bean en `EventsConfig`, porque es el que escribe `recorded_at` y el `next_attempt_at` de la primera entrega. La Fase 3 ya lo tiene armado: es el mismo bean que su "Agregado" del reloj inyectable pedía.
+  - **Para la Fase 4 (decisión 4.2):** confirmado, el filtro es `isInstance`, igual para los síncronos y para los asíncronos, así que la opción a) —un suscriptor con `eventType()` = `DomainEvent.class`— funciona. Tiene su test, y la confirmación quedó también escrita en la decisión 4.2, que es donde la Fase 4 la va a buscar.
+- [x] Serializador de eventos en el adaptador, según el punto 8.
+- [x] `EventsConfig` en `web`: el bean del publicador recibe `List<EventSubscriber<?>>` y `List<AsyncEventSubscriber<?>>`. Se saca `eventPublisher` de `ReplanningConfig`.
+  - **Corrección:** los asíncronos entran por `ObjectProvider<AsyncEventSubscriber<?>>` y no por `List`. Con una `List` requerida y cero candidatos —que es el contexto de producción hasta que la Fase 4 sume el primero— Spring no arranca. La Fase 4 no tiene que cambiar nada: sus beans aparecen solos.
+- [x] Caso de uso de consulta en `business.usecases`, por ejemplo `QueryExpeditionEvents`, con su puerto en `business.ports.in`. Se envuelve en `transactional.reading` y devuelve 404 si la expedición no existe.
+- [x] `GET /api/expeditions/{id}/events`: la línea de tiempo en orden de `sequence`, con el estado de cada consumidor. Controller, DTO y mapper propios en `adapters.driving.rest`.
+  - El `type` sale sin el paquete (`IncidentRegistered`): el registro guarda el nombre completo de la clase, y acortarlo es del mapper. La Fase 5 lo muestra tal cual.
+- [x] `InMemoryEventPublisher`, según la decisión 2.3. Borrado con su test, y el `AsyncSubscribersAreNotDeliveredInProcessTest` pasó a ser `AsyncSubscribersGetAPendingDeliveryTest`, que suma la aserción de la entrega `PENDING`.
+- [x] **Agregado:** el README suma el endpoint, pasa de 48 a 49, y deja de nombrar a `InMemoryEventPublisher`, que ya no existe. La cantidad de tests sigue siendo de la Fase 5.
 
 > **Review, punto 8 — JSON sin `switch`.** `domain/pom.xml` no tiene dependencias, así que no se puede anotar el evento con Jackson. Además, el enforcer solo prohíbe Spring, así que el build no lo frenaría. La forma que cumple "agregar un evento = agregar una clase" es:
 > - Guardar `event.getClass().getName()` en `event_type`.
@@ -476,26 +485,29 @@ La 2.1 y la 2.3 quedaron decididas el 04/11, antes de abrir el 2a. **La 2.2 se a
 ### Tests
 
 - [x] **(2a)** Contrato del registro contra PostgreSQL (Testcontainers), en el estilo de `ExpeditionRepositoryContract`: `JpaEventLogTest`, con los once casos que lista D76. Quedó como un `@SpringBootTest` propio de `app` y no como una clase abstracta en el test-jar de `domain`, porque el puerto es de solo lectura y hay una sola implementación: el contrato de `ExpeditionRepository` existe como abstracto porque lo corrían dos adaptadores (D51, D67), y acá un abstracto con un solo hijo pediría un gancho de siembra que el publicador del 2b hace innecesario.
-- [ ] Ida y vuelta del JSON para cada uno de los tres eventos, incluido un `IncidentRegistered` con y sin recurso y retraso. **Compara JSON parseado o el evento deserializado, no strings:** `jsonb` normaliza (decisión 2.2).
-- [ ] Un `event_type` desconocido falla con un error claro al leer.
-- [ ] Si la transacción del caso de uso se deshace, el evento no queda registrado.
-- [ ] Si el consumidor síncrono falla, se deshace la operación y no queda ni el incidente ni el evento (D68).
-- [ ] Se registra un evento aunque no tenga consumidores asíncronos.
-- [ ] Cada consumidor asíncrono interesado tiene su entrega `PENDING`, y los que no están interesados en ese tipo no.
-- [ ] Test de API del endpoint de eventos, más el 404 de una expedición inexistente.
-- [ ] `DataSurvivesARestartTest` sigue en verde, y si es fácil, suma que el registro sobrevive.
+- [x] **(2b)** Ida y vuelta del JSON para cada uno de los tres eventos, incluido un `IncidentRegistered` con y sin recurso y retraso: `EventSerializerTest`. Compara el evento deserializado, no strings. Jackson 3 los leyó y escribió sin ninguna anotación ni módulo.
+- [x] **(2b)** Un `event_type` desconocido falla con un error claro al leer: `EventSerializerTest`, en dos casos, el tipo que no existe y el que existe pero no es un `DomainEvent`.
+- [x] **(2b)** Si la transacción del caso de uso se deshace, el evento no queda registrado: `AFailingSubscriberUndoesTheEventTest`. Es el mismo caso que el de abajo, porque el suscriptor que falla es lo que deshace la transacción.
+- [x] **(2b)** Si el consumidor síncrono falla, se deshace la operación y no queda ni el incidente ni el evento (D68): `AFailingSubscriberUndoesTheEventTest`, que además verifica que no queda la propuesta y que el evento anterior de la expedición sigue estando.
+- [x] **(2b)** Se registra un evento aunque no tenga consumidores asíncronos: `OutboxEventPublisherTest` y `EventLogApiTest`.
+- [x] **(2b)** Cada consumidor asíncrono interesado tiene su entrega `PENDING`, y los que no están interesados en ese tipo no: `OutboxEventPublisherTest`, y de punta a punta en `AsyncSubscribersGetAPendingDeliveryTest`, donde la aprobación no le deja entrega al consumidor del incidente.
+- [x] **(2b)** Test de API del endpoint de eventos, más el 404 de una expedición inexistente: `EventLogApiTest`, con los tres eventos en el orden en que se registraron.
+- [x] **(2b)** `DataSurvivesARestartTest` sigue en verde. **No se le sumó el registro:** ese test registra una zona, que no emite eventos, así que sumarlo pedía armar y aprobar una expedición entera con dos contextos. Que las filas sobreviven a la transacción que las escribió ya lo prueban `JpaEventLogTest` y `EventLogApiTest`, que leen en otra transacción.
+- [x] **(2b) Agregado:** `OutboxEventPublisherTest` cubre lo que cubría `InMemoryEventPublisherTest`, que era la condición de la decisión 2.3 para borrarlo: entrega solo a los suscriptores cuyo `eventType()` coincide, los recorre en orden, deja subir la excepción del que falla y no entrega a los asíncronos.
+- [x] **(2b) Agregado:** `QueryExpeditionEventsTest` en `domain`, con un `EventLog` falso: devuelve lo que el registro tiene y no le pregunta nada al registro si la expedición no existe.
 
 ### `DESIGN.md`
 
 - D74: outbox en PostgreSQL, con dos tablas. Cierra la deuda de D45 y revisa la idea inicial de una sola tabla.
   - **(2a)** Escrita con lo que el 2a implementa: las dos tablas, por qué dos y no una, el orden por `sequence`, sin FK a `expedition`, la clave de la entrega, el `jsonb` de la decisión 2.2 y las consecuencias (la normalización del `jsonb`, la secuencia que se asigna al insertar, el registro que crece sin límite).
-  - **Queda para el 2b:** que el publicador guarde el evento y sus entregas en la transacción del caso de uso —que es lo que cierra la deuda de D45, así que el "revisa D45" del título y la línea "Revisado en D74" en D45 van con ese PR— y la decisión 2.3.
-- D75: serialización genérica por nombre de clase, en el adaptador, sin versión de esquema. **Entera en el 2b**, con el serializador.
+  - **(2b)** Cerrada: los tres pasos del publicador, por qué el síncrono va primero, el reloj inyectado, el `Clock` de `EventsConfig` y los descartes de publicar después del commit y de dejar los dos publicadores. El título suma "revisa D45" y D45 suma su línea "Revisado en D74 y D75".
+- D75: serialización genérica por nombre de clase, en el adaptador, sin versión de esquema.
+  - **(2b)** Escrita entera: el nombre de la clase como discriminador, la verificación de que sea un `DomainEvent`, por qué el dominio no se anota, por qué el tipo va en su columna y no adentro del JSON, y el costo de renombrar una clase de evento.
 - D76: consulta del registro detrás de un puerto de salida y un caso de uso.
   - **(2a)** Escrita con el puerto, las dos vistas y el adaptador: por qué es un puerto de salida y no un repositorio, por qué devuelve vistas, por qué la vista no lleva la secuencia y por qué son dos consultas y no un `@OneToMany`.
-  - **Queda para el 2b:** el caso de uso de consulta, su puerto de entrada y el endpoint.
-- La fila de Event Sourcing de la tabla de patrones no aplicados, actualizada: ahora sí hay un registro de eventos, pero el estado no se reconstruye desde él. **En el 2b:** en el 2a las tablas existen pero nada las escribe todavía.
-- La fila nueva de broker de mensajería. **En el 2b**, por lo mismo. El argumento ("en la misma base, para que el evento se guarde con el cambio") ya está en D74, que es su lugar natural; la fila de la tabla compartida se agrega cuando el publicador exista.
+  - **(2b)** Cerrada: por qué hay un caso de uso entre el puerto y el endpoint (el 404) y por qué el `type` sale sin el paquete.
+- La fila de Event Sourcing de la tabla de patrones no aplicados, actualizada: ahora sí hay un registro de eventos, pero el estado no se reconstruye desde él. **(2b)** Hecha, con el argumento de por qué no es Event Sourcing: son tres hechos de negocio y no cada cambio, y si se borrara el registro la expedición responde lo mismo.
+- La fila nueva de broker de mensajería. **(2b)** Hecha. Además, la fila vieja de "Entrega asíncrona de eventos (bus o cola)" suma su "Revisado en D74": la entrega síncrona no se perdió, es el paso 1 del publicador del outbox.
 
 **Terminado cuando:** cada operación deja su evento y sus entregas pendientes en la misma transacción, y la línea de tiempo se consulta por HTTP.
 
@@ -610,6 +622,7 @@ La 4.1 se cierra el miércoles 04/11, antes de arrancar el avance. El texto del 
   - a) Uno solo, con `eventType()` = `DomainEvent.class`.
   - b) Uno por evento.
 - **Recomendación:** a), porque la regla es la misma para los tres (un aviso por responsable). Requiere que el publicador de la Fase 2 filtre con `isInstance`, como hace hoy `InMemoryEventPublisher`: hay que confirmarlo con la Fase 2.
+  - **Confirmado por la Fase 2 (Matías, 04/11/2026, PR 2b): la opción a) funciona.** `OutboxEventPublisher` filtra con `isInstance` igual para los síncronos y para los asíncronos, así que un suscriptor con `eventType()` = `DomainEvent.class` recibe los tres eventos y se le crea una entrega `PENDING` por cada uno. Lo cubre `OutboxEventPublisherTest.leavesAPendingDeliveryOfEveryEventForAConsumerThatAsksForDomainEvent`, que publica dos eventos de tipos distintos y verifica que le queda una entrega de cada uno. La precondición técnica está cumplida; la decisión entre a) y b) sigue siendo de la Fase 4.
 - **Decisión:** _a completar_
 - **Quién y cuándo:** _a completar_
 - **Por qué:** _a completar_

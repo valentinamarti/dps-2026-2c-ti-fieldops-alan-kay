@@ -156,8 +156,8 @@ The project is a multi-module Maven build following a hexagonal architecture (se
 | Module | Contains | Depends on |
 | --- | --- | --- |
 | `domain` | All of `business.*`: model, rules, validations, services, use cases, `business.ports.in` (input ports) and `business.providers` (output ports). Publishes a `test-jar` with shared fixtures | No frameworks. The enforcer bans `org.springframework*`, direct or transitive |
-| `app` | `adapters.driven`: the JPA adapters of `adapters.driven.persistence` (`JpaExpeditionRepository`, `JpaZoneRepository`, `JpaReplanProposalRepository`, `JpaResourceCatalog`), with their own entities and mappers, the Flyway migrations, and the synchronous `InMemoryEventPublisher` | `domain` |
-| `web` | Spring Boot application (`FieldOpsApplication`), the `@Configuration` classes that wire the use cases (composition root, D37) — `FieldOpsConfig` and `ReplanningConfig` (F3) — the transactional proxy of the use cases (`TransactionalUseCases`), `adapters.driving`: the REST adapter (`rest`) and the seed loader of the demonstration (`seed`, D50), and the frontend (`static`) | `domain`, `app` |
+| `app` | `adapters.driven`: the JPA adapters of `adapters.driven.persistence` (`JpaExpeditionRepository`, `JpaZoneRepository`, `JpaReplanProposalRepository`, `JpaResourceCatalog`), with their own entities and mappers, the Flyway migrations, and the outbox of the events (`OutboxEventPublisher`, `EventSerializer` and `JpaEventLog`) | `domain` |
+| `web` | Spring Boot application (`FieldOpsApplication`), the `@Configuration` classes that wire the use cases (composition root, D37) — `FieldOpsConfig`, `ReplanningConfig` (F3) and `EventsConfig` — the transactional proxy of the use cases (`TransactionalUseCases`), `adapters.driving`: the REST adapter (`rest`) and the seed loader of the demonstration (`seed`, D50), and the frontend (`static`) | `domain`, `app` |
 
 ```
 domain/src/main/java/ar/edu/itba/dps/fieldops/business
@@ -173,9 +173,9 @@ domain/src/main/java/ar/edu/itba/dps/fieldops/business
 ├── services        # ResourceReservations
 ├── usecases        # implementations of the input ports: operations by id (create, schedule, assign, transition, approve, track, finish, replan, register an incident, decide a replan proposal) and queries (get, list, validate, estimate, report, candidates, activity types, replan proposals)
 └── exceptions      # domain exceptions
-app/src/main/java/ar/edu/itba/dps/fieldops/adapters/driven     # persistence (JPA adapters, entities, mappers) and InMemoryEventPublisher
+app/src/main/java/ar/edu/itba/dps/fieldops/adapters/driven     # persistence (JPA adapters, entities, mappers) and the outbox of the events
 app/src/main/resources/db/migration                            # Flyway migrations of the schema
-web/src/main/java/ar/edu/itba/dps/fieldops                     # FieldOpsApplication, FieldOpsConfig, ReplanningConfig, TransactionalUseCases
+web/src/main/java/ar/edu/itba/dps/fieldops                     # FieldOpsApplication, FieldOpsConfig, ReplanningConfig, EventsConfig, TransactionalUseCases
 web/src/main/java/.../adapters/driving/rest                    # controllers, DomainExceptionHandler, OpenApiConfig, and the dtos and mappers subpackages
 web/src/main/java/.../adapters/driving/seed                    # DemoDataLoader and the @Profile("demo") that turns it on
 web/src/main/resources/static                                  # the frontend
@@ -188,7 +188,7 @@ DESIGN.md                                                      # design decision
 
 ## API contracts
 
-48 endpoints, all under `/api`, generated into OpenAPI by springdoc:
+49 endpoints, all under `/api`, generated into OpenAPI by springdoc:
 <http://localhost:8080/swagger-ui.html>. Operations that are not CRUD are sub-resources in `POST` and not
 verbs in the URL (`/approval`, `/suspension`, `/completion`), which is the convention D49 fixes.
 
@@ -276,6 +276,12 @@ A supply has stock and not a calendar, so `/api/supplies/{id}/unavailabilities` 
 | `GET /api/replan-proposals/{proposalId}` | One proposal: the incident, the options and the decision. It is the audit record |
 | `POST /api/replan-proposals/{proposalId}/acceptance` | Accepts one option and answers with the alternative expedition, as a draft |
 | `POST /api/replan-proposals/{proposalId}/rejection` | Rejects the proposal; the expedition keeps the plan it had |
+
+### Event log
+
+| Method and path | What it does |
+| --- | --- |
+| `GET /api/expeditions/{id}/events` | What happened in the expedition, in the order the system recorded it, with a line per consumer of each event: its status, its attempts and the error of the last failed one. `type` is the name of the event class, without its package |
 
 ### Errors
 

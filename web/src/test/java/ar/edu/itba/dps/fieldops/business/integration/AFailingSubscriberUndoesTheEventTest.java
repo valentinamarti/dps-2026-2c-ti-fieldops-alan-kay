@@ -1,22 +1,24 @@
 package ar.edu.itba.dps.fieldops.business.integration;
 
-import ar.edu.itba.dps.fieldops.business.interfaces.events.AsyncEventSubscriber;
+import ar.edu.itba.dps.fieldops.business.interfaces.events.EventSubscriber;
 import ar.edu.itba.dps.fieldops.business.models.activities.Activity;
 import ar.edu.itba.dps.fieldops.business.models.commands.RegisterIncidentCommand;
-import ar.edu.itba.dps.fieldops.business.models.events.ConsumerName;
+import ar.edu.itba.dps.fieldops.business.models.events.ExpeditionApproved;
 import ar.edu.itba.dps.fieldops.business.models.events.IncidentRegistered;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.ExpeditionId;
 import ar.edu.itba.dps.fieldops.business.models.expeditions.IncidentReport;
 import ar.edu.itba.dps.fieldops.business.models.resources.Person;
+import ar.edu.itba.dps.fieldops.business.models.responses.RecordedEventView;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.ports.in.ApproveExpeditionPort;
 import ar.edu.itba.dps.fieldops.business.ports.in.QueryReplanProposalsPort;
 import ar.edu.itba.dps.fieldops.business.ports.in.RegisterIncidentPort;
+import ar.edu.itba.dps.fieldops.business.ports.in.ReportExpeditionPort;
 import ar.edu.itba.dps.fieldops.business.ports.in.TransitionExpeditionPort;
+import ar.edu.itba.dps.fieldops.business.providers.EventLog;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -25,7 +27,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.test.context.jdbc.Sql;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.APPROVED_AT;
@@ -39,22 +40,23 @@ import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone
 import static ar.edu.itba.dps.fieldops.business.models.common.MeasurementUnit.UNITS;
 import static ar.edu.itba.dps.fieldops.business.models.common.Quantity.of;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
 @Sql("/clean-database.sql")
-class AsyncSubscribersAreNotDeliveredInProcessTest {
+class AFailingSubscriberUndoesTheEventTest {
     private static final LocalDateTime TEN = LocalDateTime.of(2026, 10, 1, 10, 0);
 
     @TestConfiguration
-    static class WithAnAsyncSubscriber {
+    static class WithAFailingSubscriber {
         @Bean
-        RecordingSubscriber recordingSubscriber() {
-            return new RecordingSubscriber();
+        FailingSubscriber failingSubscriber() {
+            return new FailingSubscriber();
         }
     }
 
-    static final class RecordingSubscriber implements AsyncEventSubscriber<IncidentRegistered> {
-        private final List<IncidentRegistered> received = new ArrayList<>();
+    static final class FailingSubscriber implements EventSubscriber<IncidentRegistered> {
 
         @Override
         public Class<IncidentRegistered> eventType() {
@@ -62,18 +64,11 @@ class AsyncSubscribersAreNotDeliveredInProcessTest {
         }
 
         @Override
-        public ConsumerName consumerName() {
-            return new ConsumerName("recording");
-        }
-
-        @Override
         public void on(IncidentRegistered event) {
-            received.add(event);
+            throw new IllegalStateException("the subscriber of the incident failed");
         }
     }
 
-    @Autowired
-    private RecordingSubscriber asyncSubscriber;
     @Autowired
     private ExpeditionRepository expeditions;
     @Autowired
@@ -85,6 +80,10 @@ class AsyncSubscribersAreNotDeliveredInProcessTest {
     @Autowired
     private QueryReplanProposalsPort queryReplanProposals;
     @Autowired
+    private ReportExpeditionPort reportExpedition;
+    @Autowired
+    private EventLog eventLog;
+    @Autowired
     private ResourceCatalog catalog;
     @Autowired
     private ZoneRepository zones;
@@ -94,19 +93,19 @@ class AsyncSubscribersAreNotDeliveredInProcessTest {
     private final Person sampler = person("p-2");
     private final Activity sampling = sampling("a-1", coast, hours(8, 18));
 
-    @BeforeEach
-    void forgetEventsFromPreviousTests() {
-        asyncSubscriber.received.clear();
-    }
-
     @Test
-    void registeringAnIncidentRunsTheSynchronousSubscriberButNotTheAsynchronousOne() {
+    void leavesNeitherTheIncidentNorItsEventNorTheProposal() {
         final var expedition = approvedAndRunning();
+        final var approval = eventLog.ofExpedition(expedition);
 
-        registerIncident.register(new RegisterIncidentCommand(expedition, sampling.getId(), IncidentReport.of("Storm", TEN)));
+        assertThrows(IllegalStateException.class, () -> registerIncident.register(
+                new RegisterIncidentCommand(expedition, sampling.getId(), IncidentReport.of("Storm", TEN))));
 
-        assertEquals(1, queryReplanProposals.ofExpedition(expedition).size());
-        assertEquals(List.of(), asyncSubscriber.received);
+        assertEquals(List.of(ExpeditionApproved.class.getName()),
+                approval.stream().map(RecordedEventView::type).toList());
+        assertEquals(approval, eventLog.ofExpedition(expedition));
+        assertTrue(reportExpedition.report(expedition).incidents().isEmpty());
+        assertTrue(queryReplanProposals.ofExpedition(expedition).isEmpty());
     }
 
     private ExpeditionId approvedAndRunning() {
