@@ -776,6 +776,7 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
 - **Revisado en D70 y D71:** la expedición registra `IncidentRegistered` y un decorador del repositorio lo publica al guardarla, así que `RegisterIncident` ya no conoce a `EventPublisher`. El evento suma su id y el momento en que ocurrió. `IncidentRegistered` es el `IncidentReported` del ejemplo de la consigna de la Entrega 3: se mantuvo el nombre que ya tenían el código y los tests.
 - **Revisado en D73:** `RegisterIncident` ya no busca la propuesta ni falla con `IllegalStateException` si no la encuentra: devuelve el incidente. La propuesta la busca el adaptador REST.
 - **Revisado en D74 y D75:** la deuda de esta entrada queda cerrada. El publicador es el outbox: entrega a los suscriptores síncronos, guarda el hecho y le deja una entrega pendiente a cada consumidor asíncrono, todo en la transacción del caso de uso. `InMemoryEventPublisher` se borró, y la entrega síncrona que esta decisión eligió sigue siendo la del paso 1 del publicador nuevo.
+- **Revisado en D78:** los consumidores asíncronos sí tienen reintentos, con un límite, y después la entrega queda `FAILED`. El síncrono, `ProposeReplan`, sigue sin tenerlos: si falla, se deshace el incidente (D68).
 
 ### D46 — La propuesta ofrece varias opciones, una por generador, y solo las que se pueden armar (Entrega 2, F3, revisa D25, D33 y D40)
 
@@ -1360,6 +1361,7 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
   - `@Transactional` en los controllers — la transacción quedaría atada a HTTP, y el cargador de la demo no la tendría.
   - Mantener los adaptadores en memoria para los tests de dominio — los tests usan dobles propios, y el código de producción no debe tener una segunda implementación sin uso.
 - **Consecuencia:** correr la aplicación y los tests de `web` y `app` requiere Docker. La deuda de D51 queda resuelta.
+- **Revisado en D77:** un solo test de `web`, `ScheduledDispatchTest`, sí usa `@DirtiesContext`. Es el único que prende el despachador `@Scheduled`, y su contexto no puede quedar en la caché de Spring, porque despacharía las entregas de los tests que corren después. El resto sigue compartiendo un contexto y limpiando la base con `@Sql`.
 
 ### D69 — Frontend mínimo con páginas estáticas que consumen la API (corrección de la Entrega 2, cierra el pendiente de D51)
 
@@ -1555,6 +1557,94 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
   - `type` llega al puerto como el nombre completo de la clase y sale a la API sin el paquete. Son dos formas del mismo dato, y la de la API es la que el frontend muestra.
   - El puerto devuelve una lista vacía para una expedición sin eventos, y no sabe si esa expedición existe: eso lo responde el caso de uso.
   - `JpaEventLogTest` corre contra PostgreSQL con Testcontainers, como el resto de los adaptadores de persistencia (D67): qué dice cada evento, el orden por secuencia y no por `occurredAt`, que no se mezclen las expediciones, la línea por consumidor con su error, un evento sin entregas, el payload que vuelve como JSON y el id de evento repetido que la base rechaza. `EventLogApiTest` recorre el endpoint con los tres eventos de una expedición en el orden en que se registraron, el caso sin entregas, la línea de tiempo vacía y el 404.
+
+### D77 — Un `@Scheduled` en `web` dispara el despachador, que vive junto al outbox en `app` (Entrega 3, propuesta de valor, completa D74)
+
+- **Origen:** la consigna pide al menos un consumidor que procese los eventos fuera del flujo de la petición. Desde D74, cada evento deja una entrega `PENDING` por consumidor asíncrono interesado, pero nadie se las entregaba.
+- **Patrón / principio:** Polling Publisher, el lector del Transactional Outbox, + Humble Object: el `@Scheduled` solo dispara, y la lógica es un método que los tests invocan a mano.
+- **Dónde:**
+  - `EventDispatcher` y `RetryPolicy` (en `app`, `adapters.driven`), junto a `OutboxEventPublisher`.
+  - La consulta `EventDeliveryJpaRepository.findReadyToDeliver`.
+  - `EventDispatchScheduler` y `EventsProperties` (en `web`), y el bean `eventDispatcher` al final de `EventsConfig`, que suma `@EnableConfigurationProperties(EventsProperties.class)`.
+  - `fieldops.events.*` en los dos `application.yml` de `web`.
+  - `org.awaitility:awaitility` en `web/pom.xml`, con scope `test`.
+  - Los tests: `EventDispatcherTest`, `ScheduledDispatchTest` y `RetryPolicyTest`.
+- **Por qué:**
+  - **La lógica vive en `app` y el disparo en `web`.** Qué entregar, en qué orden y qué hacer si falla depende de las tablas del outbox, que son del adaptador (D74). `web` es el composition root (D37) y decide cuándo correr. `EventDispatchScheduler` no tiene lógica: llama a `dispatchPending()`.
+  - **`dispatchPending()` procesa todo lo que está listo y vuelve** (decisión 3.2). Es el contrato de los tests de las fases 4 y 5: con el scheduler apagado, inyectan el bean y lo llaman a mano, sin dormir ni esperar.
+  - **Una sola consulta dice qué está listo.** Por cada par de expedición y consumidor, toma la primera entrega `PENDING` en orden de `sequence`, y la devuelve solo si su `next_attempt_at` ya pasó. Si no pasó, ese par espera y los eventos siguientes también, pero las otras expediciones no. `event_delivery` no tiene la expedición, así que la consulta la une con `domain_event`. Las entregas `DELIVERED` y las `FAILED` no cuentan, así que una `FAILED` deja de trabar a las que siguen.
+  - **Repite hasta que no quede nada listo**, para entregar en la misma llamada lo que se va destrabando: si el primer evento de una expedición se entrega o queda `FAILED`, el segundo pasa a ser el primero pendiente. La hora se toma una sola vez por llamada. Cada vuelta deja cada entrega que tomó entregada, fallida, o con su próximo intento después de esa hora, así que la llamada siempre termina: en el peor caso, cada entrega se toma tantas veces como intentos tiene.
+  - **Cada entrega es una transacción propia,** con una `TransactionTemplate`:
+    1. Relee la entrega y sigue solo si sigue `PENDING`.
+    2. Deserializa el evento (D75).
+    3. Busca al suscriptor por `consumerName()` y le pasa el evento.
+    4. Marca la entrega `DELIVERED`, con `delivered_at`.
+
+    El efecto del consumidor y la marca se confirman juntos, y eso es lo que evita los duplicados (D78). Una transacción para toda la corrida haría que una falla deshiciera las entregas que ya habían salido bien.
+  - **La falla se anota después, en otra transacción.** Si el consumidor falla, su transacción se deshace entera, y recién después otra suma el intento, guarda el error y calcula el próximo intento (D78). Si el intento se anotara adentro de la que falló, el rollback lo borraría, y el evento se reintentaría para siempre sin dejar rastro. No hace falta `REQUIRES_NEW`: son dos transacciones seguidas, no una adentro de la otra.
+  - **No pasa por `TransactionalUseCases`.** Esa clase envuelve puertos de entrada en un proxy con una transacción por llamada (D68). El despachador no es un puerto de entrada, y los consumidores tampoco.
+  - **La hora sale del `Clock` de `EventsConfig`, nunca del `now()` de la base.** Es el mismo reloj que escribe `recorded_at` y el primer `next_attempt_at` (D74). Los tests del backoff lo adelantan en vez de dormir.
+  - **Depende solo de `AsyncEventSubscriber`.** Recibe los suscriptores que encuentra Spring, igual que el publicador (D74), y no conoce ninguna clase de `business.usecases`.
+  - **`fixedDelay` y no `fixedRate`.** La corrida siguiente arranca un intervalo después de que terminó la anterior, así que dos corridas no se pisan aunque una tarde más que el intervalo.
+  - **Se prende y se apaga por configuración.**
+    - Los valores son un `record` con `@ConfigurationProperties`, `EventsProperties`, con prefijo `fieldops.events`, que se valida al arrancar: `dispatch-interval`, `max-attempts`, `initial-backoff`, `max-backoff` y `dispatcher-enabled`.
+    - `EventDispatchScheduler` se crea solo si `dispatcher-enabled` es `true` (`@ConditionalOnProperty`), y lleva el `@EnableScheduling`: con el despachador apagado, la aplicación no programa nada.
+    - Está prendido en `web/src/main/resources/application.yml`, y el perfil `demo` lo hereda. Está apagado en el de test.
+  - **Un solo test usa el `@Scheduled` real.** `ScheduledDispatchTest` prende el despachador con un intervalo de 200 ms, aprueba una expedición y espera con Awaitility a que el consumidor de prueba la reciba. Usa `@DirtiesContext`: si su contexto quedara en la caché de Spring con el scheduler andando, despacharía las entregas de los tests que corren después y los volvería inestables.
+- **Alternativas descartadas:**
+  - Entregar al confirmar la transacción, con un `TransactionSynchronization.afterCommit`, y un `@Scheduled` de respaldo para lo que quede — son dos caminos de entrega que hay que mantener coherentes, y el del commit corre en el hilo de la petición, que es justo lo que un consumidor asíncrono tiene que evitar. Lo único que gana es latencia, a lo sumo un intervalo de 2 s, y nada la pide.
+  - `fixedRate` — una corrida que tarda más que el intervalo se solaparía con la siguiente, y las dos podrían tomar la misma entrega.
+  - Que el despachador viva en `domain` — tendría que conocer las tablas del outbox, las transacciones de Spring y el reloj, y el enforcer lo prohíbe (D36). Lo que es de negocio son las reglas de cada consumidor, y esas ya viven en `business` (D72).
+  - Que pase por `TransactionalUseCases` — ver arriba.
+  - `dispatchPending(int max)`, con un límite por corrida — ningún test lo necesita (decisión 3.2).
+  - Esperas fijas o `Thread.sleep` en los tests — son lentas y fallan según la máquina. Con el reloj inyectado y la invocación a mano, los tests son deterministas.
+- **Consecuencia:**
+  - **Supone una sola instancia.** El despachador no bloquea las entregas que toma: con dos instancias, dos despachadores podrían tomar la misma y entregarla dos veces. Si hicieran falta varias, la salida es tomar las entregas con `SELECT … FOR UPDATE SKIP LOCKED`, para que cada una la tome un solo despachador. Está en los supuestos.
+  - **Infraestructura nueva:** `@EnableScheduling` (en `EventDispatchScheduler`) y `org.awaitility:awaitility`, con la versión que maneja el BOM de Spring Boot.
+  - El efecto asíncrono aparece hasta un intervalo después de la operación (2 s), más lo que tarden los reintentos si falla (D78). Es la consistencia eventual que la presentación tiene que mostrar.
+  - El `application.yml` de test tapa al de `main` en el classpath, así que repite los valores de `fieldops.events` con el despachador apagado.
+  - Un test de las fases 4 y 5 que espera un efecto asíncrono inyecta `EventDispatcher` y llama a `dispatchPending()` antes de consultar.
+
+### D78 — Garantías de la entrega asíncrona, con sus números (Entrega 3, propuesta de valor, completa D74 y D77)
+
+- **Origen:** la consigna pide discutir las consecuencias de comunicarse por eventos: consistencia eventual, orden, reintentos y duplicados. Las decisiones de la entrega fijaron cada garantía, y la review de esas decisiones (punto 6) pidió reemplazar "por poco tiempo" por valores concretos (decisión 3.1).
+- **Patrón / principio:** entrega al menos una vez, con el efecto del consumidor y la marca de la entrega en la misma transacción, orden por expedición y reintentos con backoff exponencial acotado.
+- **Dónde:** `EventDispatcher`, `RetryPolicy` y `EventDeliveryJpaRepository.findReadyToDeliver` (D77); los valores, en `fieldops.events` de `web/src/main/resources/application.yml`; los tests, en `EventDispatcherTest`, `ScheduledDispatchTest` y `RetryPolicyTest`.
+- **Garantías:**
+
+  | Tema | Qué se garantiza | Con qué números | Lo prueba |
+  |---|---|---|---|
+  | Entrega | **Al menos una vez.** Una entrega sigue `PENDING` hasta que se confirma su marca. Si la aplicación se cae en el medio, se vuelve a intentar | Una corrida cada 2 s | `deliversWhatIsPendingAndMarksItDelivered`, `ScheduledDispatchTest` |
+  | Duplicados | **No se duplica un efecto que se escribe en la base.** El efecto y la marca `DELIVERED` se confirman en la misma transacción, y una entrega `DELIVERED` no se vuelve a tomar. Ningún consumidor tiene que deduplicar | — | `dispatchingAgainDoesNotRepeatTheEffect`, `aFailureAfterTheConsumerWroteLeavesNoEffectAndCountsTheAttempt` |
+  | Límite de los duplicados | **Un efecto fuera de la base sí se puede duplicar.** Si un consumidor mandara un mail y después fallara la marca, el reintento lo mandaría otra vez. Hoy ningún consumidor tiene efectos fuera de la base | — | — |
+  | Orden | **Por expedición y por consumidor, en orden de `sequence`.** Entre expediciones no se promete orden | — | `theNextEventsOfThatExpeditionWaitForThatConsumerAndArriveInOrder`, `theEventsOfAnotherExpeditionDoNotWait` |
+  | Los posteriores esperan | **Mientras un evento se reintenta para un consumidor, los siguientes de esa expedición esperan para ese consumidor**, hasta que se entregue o quede `FAILED`. Los otros consumidores y las otras expediciones no esperan | En el peor caso, unos 25 s: 15 s de backoff más hasta 2 s de intervalo antes de cada uno de los 5 intentos | `theNextEventsOfThatExpeditionWaitForThatConsumerAndArriveInOrder`, `theNextEventsOfThatExpeditionGoOnOnceTheOneHoldingThemBackFails` |
+  | Reintentos | **Backoff exponencial con tope.** El próximo intento es la hora de la falla más `min(1 s × 2^(intentos − 1), 30 s)` | 5 intentos en total; esperas de 1, 2, 4 y 8 s; tope de 30 s | `waitsTheExactBackoffBeforeEachRetry`, `RetryPolicyTest` |
+  | `FAILED` | **Al quinto intento fallido, la entrega queda `FAILED`**, con el último error y la cantidad de intentos, visible en `GET /api/expeditions/{id}/events`. La operación original no se deshace y el otro consumidor del mismo evento no se frena | `last_error` guarda hasta 1000 caracteres; si la excepción no tiene mensaje, el nombre de su clase | `exhaustingTheAttemptsLeavesItFailedWithItsErrorAndHowManyAttemptsItTook`, `aFailingConsumerDoesNotUndoTheOperationNorHoldBackTheOtherConsumerOfTheSameEvent`, `keepsTheClassOfAFailureWithoutMessageAndCutsAMessageThatDoesNotFit` |
+  | Consumidor desconocido | **Una entrega para un consumidor que ya no existe en el código queda `FAILED` en el acto**, con un error que lo nombra, para no trabar a la expedición | 1 intento | `aConsumerThatNoLongerExistsLeavesItsDeliveryFailedWithoutHoldingBackTheOthers` |
+  | Evento ilegible | **Un evento cuya clase ya no existe (`UnknownEventTypeException`, D75) también queda `FAILED` en el acto**, y los siguientes siguen | 1 intento | `anEventThatCannotBeReadLeavesItsDeliveryFailedAndTheNextOnesGoOn` |
+  | Consumidor nuevo | **Sin backfill.** Un consumidor que se agrega recibe los eventos que se registran desde ese momento, no los anteriores | — | — |
+  | Reentrega de una `FAILED` | **Sin reentrega manual.** Una entrega `FAILED` queda así, visible en el registro | — | — |
+
+- **Por qué:**
+  - **El orden por `sequence` se sostiene aunque la secuencia se asigne al insertar** (review, punto 1). Dos transacciones concurrentes pueden confirmar en otro orden que el de su secuencia (D74). Para una misma expedición no pasa, porque las tres operaciones que emiten eventos cambian la fila `expedition`: `status` al aprobar y `execution_revision` al terminar una actividad o registrar un incidente. Esa fila tiene `@Version` (D67), así que de dos transacciones concurrentes sobre la misma expedición, una falla con `ConcurrentUpdateException` y se deshace junto con su evento (D68). **Supuesto:** todo evento cambia la fila `expedition`. Un evento nuevo que no la cambie rompe esta garantía sin ningún error que lo avise.
+  - **Los posteriores esperan porque saltear al que falla rompe el orden.** Un consumidor que lleva el avance de una expedición no puede recibir el fin de una actividad antes que la aprobación. La espera es solo de ese par de expedición y consumidor, y tiene un límite: el último intento.
+  - **Los números son los de la decisión 3.1.** Con 5 intentos, la espera total de backoff es 15 s. El tope de 30 s no se alcanza con esos valores: está para que subir `max-attempts` no haga crecer la espera sin límite. Si el equipo pide otros valores, cambian el `application.yml` y esta entrada.
+  - **Cada intento cuenta, también el que sale bien.** Una entrega a la primera tiene 1 intento, y una que salió en el tercero tiene 3. Así el registro dice cuántas veces se le dio el evento al consumidor.
+  - **Lo que no se arregla reintentando queda `FAILED` enseguida.** Un consumidor desconocido o un evento ilegible van a fallar igual en el quinto intento, y mientras tanto trabarían a los siguientes eventos de la expedición unos 25 s.
+- **Alternativas descartadas:**
+  - Deduplicar en cada consumidor, guardando los ids de los eventos que ya procesó — cada consumidor tendría que acordarse, y el despachador ya lo garantiza con la misma transacción. Sí haría falta para un efecto fuera de la base.
+  - Exactamente una vez — no se puede prometer sin que el destino participe de la transacción. Con la base, el efecto y la marca ya se confirman juntos, que es lo que importa.
+  - Saltear al que falla — rompe el orden.
+  - Orden global estricto — un evento que falla frenaría a todas las expediciones.
+  - Reintentos sin límite — una falla permanente trabaría para siempre a esa expedición para ese consumidor.
+  - Sin reintentos — una falla pasajera, como un conflicto de versión, dejaría `FAILED` un evento que en el segundo intento salía.
+  - Reintentar el consumidor desconocido o el evento ilegible como cualquier otra falla — ver arriba.
+- **Consecuencia:**
+  - **Sin backfill.** Si hiciera falta que un consumidor nuevo reciba los eventos viejos, hay que insertarle sus entregas `PENDING` a mano.
+  - **Sin reentrega manual de una `FAILED`.** No hay un endpoint para volver a intentarla: hay que pasar la fila a `PENDING` en la base, con sus intentos en cero. El error queda en el registro, que es donde se ve.
+  - Cambiar el `consumerName()` de un consumidor deja sus entregas pendientes como las de un consumidor desconocido, que terminan `FAILED`. Por eso es un nombre estable elegido a mano y no el de la clase (D72).
+  - La garantía de orden depende del supuesto de arriba: un evento nuevo tiene que cambiar la fila `expedition`.
 
 ## Funcionalidades nuevas de la Entrega 2
 
@@ -1788,6 +1878,7 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
 | Bean Validation en los DTOs de entrada (`@Valid` y anotaciones de `jakarta.validation`) | Las reglas ya están en el dominio: `DomainArguments` y los constructores rechazan un nombre vacío, una lista de objetivos vacía o un período al revés (D8, D49). Repetirlas en los DTOs daría dos fuentes de verdad que se desincronizan, y la validación de la API quedaría más laxa o más estricta que la del negocio según quién toque cuál. El adaptador no valida: deja pasar lo que llegó y traduce la excepción del dominio a 400. | Los mensajes de error son los del dominio, de a uno por pedido, y no una lista de todos los campos mal a la vez. Si hiciera falta responder todos juntos, la salida es que la validación del dominio devuelva varios resultados (como hace `ApprovalPolicy` con las críticas), no anotar los DTOs. |
 | Entrega asíncrona de eventos (bus o cola) | El criterio de F3 exige que la propuesta exista cuando vuelve el registro del incidente. Con un solo proceso y una transacción por caso de uso, la entrega síncrona del `InMemoryEventPublisher` lo garantiza sin reintentos ni orden de entrega que resolver (D45, D68). **Revisado en D74:** la Entrega 3 sí suma la entrega asíncrona, y la síncrona no se perdió: es el paso 1 del publicador del outbox, así que la propuesta sigue existiendo cuando vuelve el registro del incidente. Lo que cambió es que ahora conviven las dos, y el tipo del suscriptor dice cuál le toca (D72). | Si un suscriptor se vuelve lento o externo (avisar por correo, otro servicio), habría que sumar un adaptador asíncrono detrás del mismo `EventPublisher`, con un outbox para no perder eventos. **Cumplido en D74:** el outbox es la tabla `domain_event` con una entrega por consumidor. |
 | Broker de mensajería (RabbitMQ, Kafka) | Lo que la propuesta de valor necesita es que el hecho quede guardado junto con el cambio que lo produjo, y eso lo da la misma base con la transacción del caso de uso (D74, D68). Un broker sumaría un servicio que levantar, configurar y tener corriendo en la demostración, y encima no resolvería la atomicidad: entre confirmar la transacción y publicar en el broker hay una ventana donde el evento se pierde, y taparla es, otra vez, un outbox. | No sirve para repartir el trabajo entre varios procesos ni para que lo consuma otra aplicación: la aplicación corre en una sola instancia, y eso es parte del precio. Si apareciera un consumidor de afuera, el camino es publicar al broker desde quien lee el outbox, sin tocar ni el dominio ni el registro. |
+| Saga (orquestada o coreografiada) | Una saga coordina una operación que cruza varias transacciones o servicios, con una acción que compensa cada paso si uno posterior falla. Acá no hay operaciones distribuidas que compensar: cada caso de uso es una sola transacción sobre una sola base (D68), y lo único que se deshace ante una falla es lo síncrono, que el rollback deshace solo (si `ProposeReplan` falla, no queda el incidente). Los consumidores asíncronos no son pasos de la operación: cuando corren, la operación ya está confirmada, y si fallan se reintentan, no se compensan (D77, D78). | Una falla definitiva de un consumidor asíncrono no deshace nada: la entrega queda `FAILED` y visible en el registro, y la operación original se mantiene. Si algún día un consumidor tuviera que poder revertir la operación, por ejemplo rechazar una aprobación, eso sí sería una saga, con su evento de compensación, y no un reintento. |
 | Anotar el dominio con JPA | D36 prohíbe que `domain` dependa de un framework, y el enforcer lo hace cumplir. El adaptador tiene sus propias entidades y mappers, y el dominio solo sabe volcar y reconstruir su estado (D65, D67). | Hay más código de mapeo, y un atributo nuevo se escribe en el modelo, la entidad, el mapper y una migración. `PersistedStateRoundTripTest` avisa si algo se pierde en el camino. |
 | Clases de Java con el escenario de la demostración | Los datos de la demostración son datos: viven en `demo/catalog.json` y `demo/expedition.json`, y el único Java es un cargador genérico que los mete por los casos de uso, igual que el adaptador REST (D50). Una clase que armara el escenario en código lo dejaría en el lenguaje más caro de leer y de cambiar, y haría recompilar para mover un horario. | El esquema de los documentos es el de los cuerpos de la API, así que lo que se puede sembrar es exactamente lo que se puede pedir por HTTP. Un escenario que necesitara un estado que la API no sabe producir no se puede expresar, y eso es a propósito. |
 
@@ -1830,3 +1921,4 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
 - La crítica que la demostración muestra y corrige es un recurso que falta (la iluminación de la actividad nocturna) y no un permiso faltante: los permisos concedidos son parte de los datos con los que se crea una expedición (D3) y ninguna operación los cambia después, así que una crítica de permiso se puede mostrar pero no corregir sobre la misma expedición (D50).
 - El seed carga los datos en cada arranque con el perfil `demo` y el guion los consume: no hay reversión ni limpieza. Correr el guion dos veces seguidas exige reiniciar la aplicación (D50).
 - Los momentos de los hechos del campo (el inicio y el fin de una actividad, una observación y un incidente) los informa el cliente, y el sistema confía en ellos: pasan en el campo y se pueden cargar después. La aprobación es un acto del sistema, y su momento es la hora del servidor al recibir el pedido. El dominio no lee la hora en ningún caso: la recibe (D71).
+- La aplicación corre en una sola instancia. El despachador de eventos no bloquea las entregas que toma, así que con dos instancias dos despachadores podrían entregar dos veces la misma. Si hicieran falta varias, la salida es tomar las entregas con `SELECT … FOR UPDATE SKIP LOCKED`, para que cada una la tome un solo despachador (D77).

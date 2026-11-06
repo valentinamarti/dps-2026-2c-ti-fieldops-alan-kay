@@ -7,3 +7,10 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
+fieldops:
+  events:
+    dispatcher-enabled: true
+    dispatch-interval: 2s
+    max-attempts: 5
+    initial-backoff: 1s
+    max-backoff: 30s
