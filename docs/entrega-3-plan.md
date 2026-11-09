@@ -12,7 +12,7 @@ La Entrega 3 suma la propuesta de valor, una arquitectura orientada a eventos, y
 | 2. Outbox y registro              | Tablas de eventos y entregas, publicador que guarda en la misma transacción, consulta del registro y su endpoint                                                                                                                                      | D74 a D76                 | Matías · ✅ mergeada (PR #14 y #15, 04/11)   |
 | 3. Despachador y garantías       | `@Scheduled`, orden, reintentos, `FAILED` y deduplicación                                                                                                                                                                                         | D77 y D78                 | Matías Romanato · ✅ mergeada (PR #16, 04/11) |
 | 4. Consumidores asíncronos       | Notificaciones, avance del informe y eventos en el informe, con sus endpoints                                                                                                                                                                          | D79 y D80                 | Julieta · ✅ mergeada (PR #17, 04/11)          |
-| 5. Frontend, demo y presentación | Seguimiento en el itinerario, secciones nuevas del frontend, **mejoras generales del frontend**, `demo.http`, README, cierre de `DESIGN.md`, la presentación y **la organización de la demo y su video, que se graba con los cinco** | D81                       | Tobías                                         |
+| 5. Frontend, demo y presentación | Seguimiento en el itinerario, secciones nuevas del frontend, **mejoras generales del frontend**, `demo.http`, README, cierre de `DESIGN.md`, la presentación y **la organización de la demo y su video, que se graba con los cinco** | D81 y D82                 | Tobías · ✅ cerrada (PR #18, 09/11), falta el video |
 
 **Lección de la Entrega 2:** el plan anterior dejaba los endpoints a la fase de API, las fases 2 a 4 mergearon sin ellos y la Fase 5 quedó sobrecargada. Acá **cada fase escribe los endpoints de lo que construye**, con su test de API. La Fase 5 solo suma el frontend y lo que la demo necesita.
 
@@ -744,6 +744,8 @@ La 4.1 se cierra el miércoles 04/11, antes de arrancar el avance. El texto del 
 
 Integra lo de las otras fases en lo que se muestra y prepara a los cinco para el video. El seguimiento del itinerario y el frontend pueden empezar el viernes 06/11, sobre la Fase 1. La demo y el README necesitan todo mergeado.
 
+**Estado (09/11/2026, rama `assignment-3-phase-5`): el código, la demo y la documentación de la fase se cerraron en el PR #18.** Las decisiones 5.1, 5.3, 5.5 y 5.6 están cerradas. El itinerario muestra el seguimiento, el frontend suma eventos, notificaciones y las mejoras de la 5.5, sin framework, y el perfil `demo` corre sobre H2, sin Docker. La API no suma endpoints. `DESIGN.md` suma D81 y D82. Desde un clon limpio de `940f577`, `mvn -B clean verify` pasa con 1004 tests (743 en `domain`, 78 en `app` y 183 en `web`), y los 53 pasos de `demo.http` corren sin fallos contra el jar con el perfil `demo`. Quedan fuera del PR, porque son del equipo, las decisiones 5.2 y 5.4, el recorrido a mano del frontend y la grabación y publicación del video. La presentación se armó con las candidatas 3, 4, 5, 8 y 9 de `docs/entrega-3-presentacion.md`.
+
 ### Decisiones de la fase
 
 #### 5.1 — Duración y formato de la presentación · 👥 · ✅ decidida
@@ -868,7 +870,7 @@ La demo es un tramo corto del video de la presentación, no un video aparte. El 
 - [x] La espera del despachador en la demo, según la decisión 5.3.
 - [x] `DemoScriptApiTest`: replica los pasos nuevos e invoca `dispatchPending()` antes de cada consulta asíncrona.
 - [x] La falla se muestra con los tests y se explica con el registro: no hay código que exista solo para la demo (D50).
-- [ ] Probar la demo entera desde un clon limpio, con el perfil `demo`, sin Docker, siguiendo el README.
+- [x] Probar la demo entera desde un clon limpio, con el perfil `demo`, sin Docker, siguiendo el README.
 
 ### README y cierre
 
