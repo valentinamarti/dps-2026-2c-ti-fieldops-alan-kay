@@ -115,7 +115,7 @@ export async function renderExpedition(id) {
     return h("div", {},
         headerView(expedition, names, refresh),
         await itineraryView(expedition, itinerary, names, refresh),
-        expedition.status === "DRAFT" ? await planningView(expedition, refresh) : null,
+        expedition.status === "DRAFT" ? await planningView(expedition, activitiesOf(itinerary.nodes), refresh) : null,
         approvalView(expedition, validation, names, refresh),
         proposalsView(expedition, proposals, names, refresh),
         eventsView(events, refresh),

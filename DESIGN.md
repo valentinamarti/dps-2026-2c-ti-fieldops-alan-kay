@@ -1385,7 +1385,7 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
   - La pantalla ofrece iniciar y finalizar en todas las actividades mientras la expedición está en ejecución, porque la respuesta del itinerario no trae el seguimiento. Si la acción no corresponde, el dominio la rechaza y se muestra el motivo.
   - Las fechas de seguimiento son las del momento de la acción.
   - Los tests verifican que los archivos se sirven, pero no recorren la pantalla con un navegador: ese recorrido se probó a mano.
-- **Revisado en D81:** la página de la expedición suma las secciones de eventos y notificaciones, el avance y la línea de tiempo en el informe, y acciones de seguimiento según el estado de cada actividad. También suma textos legibles, nombres en vez de ids, bloques plegables y un estilo general nuevo, siempre sin framework ni build.
+- **Revisado en D81:** la página de la expedición suma las secciones de eventos y notificaciones, el avance y la línea de tiempo en el informe, y acciones de seguimiento según el estado de cada actividad. También suma textos legibles, nombres en vez de ids, bloques plegables y un estilo general nuevo, siempre sin framework ni build. El formulario de bloques en JSON se quitó: los bloques se ven en el itinerario, pero se crean por la API o desde el seed.
 
 ### D70 — La expedición guarda sus eventos y se publican al guardarla (Entrega 3, propuesta de valor, revisa D45)
 
@@ -1723,6 +1723,8 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
   - `ScheduledActivityResponse` suma `tracking` también en la respuesta de agendar una actividad, donde siempre está pendiente.
   - Los textos que arma el dominio, como los avisos y las propuestas de replanificación, siguen trayendo ids. Cambiarlos es trabajo del dominio, no del frontend.
   - Lo que queda plegado se olvida al recargar el navegador.
+  - El frontend ya no crea bloques. Pedir un árbol en JSON no era apto para quien usa la aplicación, y un editor visual es mucho código para lo que se muestra. `POST /blocks` sigue en la API, y `demo.http` y el seed lo usan.
+  - Agendar una actividad ya no pide un id: el frontend arma el siguiente `a-NN` a partir del itinerario, y las dependencias se eligen por nombre.
   - El motivo de una replanificación, las indisponibilidades de un recurso y el tipo de una actividad no se ven en el frontend, porque la API no los devuelve. Se dejaron afuera para no cambiar la API a días de la entrega.
 
 ### D82 — Perfiles `prod` y `demo`: PostgreSQL persistente y H2 efímero (Entrega 3, revisa D50 y D67)

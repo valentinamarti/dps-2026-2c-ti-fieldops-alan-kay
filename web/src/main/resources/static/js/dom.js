@@ -83,6 +83,15 @@ export function button(label, onClick, kind = "") {
     return h("button", {type: "button", class: kind, onClick}, label);
 }
 
+export function checkboxes(name, options) {
+    return h("div", {class: "checks"}, options.map(option => h("label", {class: "inline"},
+        h("input", {type: "checkbox", name, value: option.id}), option.name)));
+}
+
+export function submitButton(label) {
+    return h("button", {type: "submit"}, label);
+}
+
 export function formOf(fields, submitLabel, onSubmit) {
     return h("form", {
         class: "grid-form",
@@ -90,7 +99,7 @@ export function formOf(fields, submitLabel, onSubmit) {
             event.preventDefault();
             onSubmit(new FormData(event.target), event.target);
         },
-    }, ...fields, h("button", {type: "submit"}, submitLabel));
+    }, ...fields, submitLabel ? submitButton(submitLabel) : null);
 }
 
 export function listOfText(value) {

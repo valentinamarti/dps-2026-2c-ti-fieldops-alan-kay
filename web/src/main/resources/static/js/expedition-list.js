@@ -1,5 +1,5 @@
 import {api} from "./api.js";
-import {badge, field, formOf, h, listOfText, panel, selectOf, statusBadge, table, textInput} from "./dom.js";
+import {badge, checkboxes, field, formOf, h, listOfText, panel, selectOf, statusBadge, submitButton, table, textInput} from "./dom.js";
 import {formatPeriod, humanize} from "./format.js";
 import {reporting} from "./messages.js";
 
@@ -7,11 +7,6 @@ const RISK_LEVELS = ["LOW", "MEDIUM", "HIGH", "EXTREME"].map(value => ({value, l
 
 function linkTo(expedition) {
     return h("a", {href: `#/expeditions/${encodeURIComponent(expedition.id)}`}, expedition.name);
-}
-
-function checkboxes(name, options) {
-    return h("div", {}, options.map(option => h("label", {class: "inline"},
-        h("input", {type: "checkbox", name, value: option.id}), option.name)));
 }
 
 function creationForm(zones, staff) {
@@ -24,8 +19,10 @@ function creationForm(zones, staff) {
         field("Responsibles", checkboxes("responsibleIds", staff)),
         field("Granted permits (comma separated)", textInput("grantedPermits")),
         field("Max participants", textInput("maxParticipants", {type: "number", min: "1", value: "10", required: true})),
-        field("Risk tolerance", selectOf("riskTolerance", RISK_LEVELS)),
-    ], "Create expedition", reporting(async data => {
+        h("div", {class: "form-actions"},
+            field("Risk tolerance", selectOf("riskTolerance", RISK_LEVELS)),
+            submitButton("Create expedition")),
+    ], null, reporting(async data => {
         const created = await api.post("/expeditions", {
             name: data.get("name"),
             period: {start: data.get("start"), end: data.get("end")},
@@ -50,5 +47,5 @@ export async function renderExpeditionList() {
                 formatPeriod(expedition.period),
             ]))
             : h("p", {class: "muted"}, "There are no expeditions yet.")),
-        panel("New expedition", creationForm(zones, staff)));
+        panel("New expedition", h("div", {class: "top-aligned"}, creationForm(zones, staff))));
 }

@@ -27,10 +27,20 @@ export function eventsView(events, refresh) {
         events.length > 0 ? timelineTable(events) : h("p", {class: "muted"}, "No events yet: they appear when the expedition is approved or tracked."));
 }
 
+function groupedByEvent(notifications) {
+    const groups = new Map();
+    notifications.forEach(notification => {
+        const group = groups.get(notification.eventId) ?? {...notification, responsibleIds: []};
+        group.responsibleIds.push(notification.responsibleId);
+        groups.set(notification.eventId, group);
+    });
+    return [...groups.values()];
+}
+
 export function notificationsView(notifications, names, refresh) {
     return panel("Notifications", refreshButton(refresh),
         notifications.length > 0
-            ? table(["When", "Responsible", "Notice"], notifications.map(notification =>
-                [formatMoment(notification.occurredAt), names.resource(notification.responsibleId), notification.text]))
+            ? table(["When", "Notice", "Sent to"], groupedByEvent(notifications).map(group =>
+                [formatMoment(group.occurredAt), group.text, group.responsibleIds.map(names.resource).join(", ")]))
             : h("p", {class: "muted"}, "No notifications yet."));
 }

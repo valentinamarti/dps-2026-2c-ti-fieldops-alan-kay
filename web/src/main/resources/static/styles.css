@@ -145,6 +145,29 @@ p {
     margin: 8px 0;
 }
 
+.top-aligned .grid-form {
+    align-items: start;
+}
+
+.form-wide {
+    grid-column: 1 / -1;
+}
+
+.form-wide .checks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+}
+
+.form-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: flex-end;
+    gap: 10px;
+}
+
 label {
     display: flex;
     flex-direction: column;
@@ -298,7 +321,7 @@ details > summary::-webkit-details-marker {
 }
 
 details > summary::before {
-    content: "▾";
+    content: "\25BE";
     display: inline-block;
     transform: rotate(-90deg);
     transition: transform 0.12s ease;
