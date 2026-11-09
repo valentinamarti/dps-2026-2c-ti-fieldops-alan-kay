@@ -12,7 +12,7 @@ class DatabaseCleaner {
 
     void clean() {
         try (var connection = dataSource.getConnection(); var statement = connection.createStatement()) {
-            statement.execute("TRUNCATE zone, resource, expedition, replan_proposal, domain_event, event_delivery, notification RESTART IDENTITY CASCADE");
+            statement.execute("TRUNCATE zone, resource, expedition, replan_proposal, domain_event, event_delivery, notification, expedition_progress RESTART IDENTITY CASCADE");
         } catch (SQLException failure) {
             throw new IllegalStateException("the database could not be cleaned", failure);
         }

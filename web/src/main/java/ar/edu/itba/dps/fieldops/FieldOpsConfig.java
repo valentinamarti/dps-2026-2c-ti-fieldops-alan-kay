@@ -28,9 +28,11 @@ import ar.edu.itba.dps.fieldops.business.ports.in.ScheduleBlockPort;
 import ar.edu.itba.dps.fieldops.business.ports.in.TrackActivityPort;
 import ar.edu.itba.dps.fieldops.business.ports.in.TransitionExpeditionPort;
 import ar.edu.itba.dps.fieldops.business.ports.in.ValidateExpeditionPort;
+import ar.edu.itba.dps.fieldops.business.providers.EventLog;
 import ar.edu.itba.dps.fieldops.business.providers.EventPublisher;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionIdProvider;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
+import ar.edu.itba.dps.fieldops.business.providers.ProgressHistory;
 import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
 import ar.edu.itba.dps.fieldops.business.replanning.ExpeditionReplanner;
 import ar.edu.itba.dps.fieldops.business.reports.ExpeditionReporter;
@@ -194,8 +196,9 @@ public class FieldOpsConfig {
     }
 
     @Bean
-    ReportExpeditionPort reportExpedition(ExpeditionRepository repository, ExpeditionReporter reporter, TransactionalUseCases transactional) {
-        return transactional.reading(ReportExpeditionPort.class, new ReportExpedition(repository, reporter));
+    ReportExpeditionPort reportExpedition(ExpeditionRepository repository, ExpeditionReporter reporter, EventLog events,
+                                          ProgressHistory progress, TransactionalUseCases transactional) {
+        return transactional.reading(ReportExpeditionPort.class, new ReportExpedition(repository, reporter, events, progress));
     }
 
     @Bean

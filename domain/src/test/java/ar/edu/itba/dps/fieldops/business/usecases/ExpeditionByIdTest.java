@@ -21,6 +21,7 @@ import ar.edu.itba.dps.fieldops.business.models.validation.ValidationResult;
 import ar.edu.itba.dps.fieldops.business.models.validation.ValidationSubject;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
+import ar.edu.itba.dps.fieldops.business.providers.ProgressHistory;
 import ar.edu.itba.dps.fieldops.business.replanning.Cancellation;
 import ar.edu.itba.dps.fieldops.business.replanning.ExpeditionReplanner;
 import ar.edu.itba.dps.fieldops.business.reports.ExpeditionReporter;
@@ -38,6 +39,7 @@ import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.hour
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.person;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.sampling;
 import static ar.edu.itba.dps.fieldops.business.fixtures.ExpeditionFixtures.zone;
+import static org.mockito.Mockito.mock;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -97,10 +99,11 @@ class ExpeditionByIdTest {
         readyToApprove();
         final var estimator = new ExpeditionEstimator();
         final var estimates = new EstimateExpedition(repository, estimator);
-        final var reports = new ReportExpedition(repository, new ExpeditionReporter(estimator));
+        final var reports = new ReportExpedition(repository, new ExpeditionReporter(estimator), _ -> List.of(),
+                mock(ProgressHistory.class));
 
         assertEquals(estimator.estimate(expedition), estimates.estimate(expedition.getId()));
-        assertEquals(ExpeditionReportView.of(new ExpeditionReporter(estimator).reportOf(expedition)), reports.report(expedition.getId()));
+        assertEquals(ExpeditionReportView.of(new ExpeditionReporter(estimator).reportOf(expedition), List.of(), List.of()), reports.report(expedition.getId()));
         assertThrows(NotFoundException.class, () -> estimates.estimate(unknown));
         assertThrows(NotFoundException.class, () -> reports.report(unknown));
     }

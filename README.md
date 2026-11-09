@@ -257,7 +257,7 @@ A supply has stock and not a calendar, so `/api/supplies/{id}/unavailabilities` 
 | `POST /api/expeditions/{id}/suspension` | In execution -> suspended |
 | `POST /api/expeditions/{id}/resumption` | Suspended -> in execution |
 | `POST /api/expeditions/{id}/completion` | Closes the expedition; one with an activity in progress is a `409` |
-| `GET /api/expeditions/{id}/report` | Operative summary, actual consumption, risks, incidents and accepted warnings |
+| `GET /api/expeditions/{id}/report` | Operative summary, actual consumption, risks, incidents and accepted warnings. It also brings the `timeline` of the events of the expedition and the `progress`: how far along it was each time an activity finished, which appears some seconds later, once the dispatcher delivers the event |
 
 ### Tracking
 

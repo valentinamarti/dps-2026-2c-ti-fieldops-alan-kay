@@ -7,5 +7,6 @@ import java.util.List;
 public record ExpeditionReportResponse(String expeditionName, ExpeditionStatus status, int scheduledActivities,
                                        int finishedActivities, EstimateResponse estimate,
                                        List<SupplyRequirementDto> actualConsumption, List<IncidentDto> incidents,
-                                       List<AcceptedWarningDto> acceptedWarnings) {
+                                       List<AcceptedWarningDto> acceptedWarnings,
+                                       List<RecordedEventResponse> timeline, List<ProgressEntryResponse> progress) {
 }
