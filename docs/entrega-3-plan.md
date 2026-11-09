@@ -11,7 +11,7 @@ La Entrega 3 suma la propuesta de valor, una arquitectura orientada a eventos, y
 | 1. Eventos en el dominio | Los tres eventos, la entidad que los acumula, las dos interfaces de suscriptor y `RegisterIncident` desacoplado | D70 a D73 | Valentina · ✅ mergeada (PR #13, 04/11) |
 | 2. Outbox y registro | Tablas de eventos y entregas, publicador que guarda en la misma transacción, consulta del registro y su endpoint | D74 a D76 | Matías |
 | 3. Despachador y garantías | `@Scheduled`, orden, reintentos, `FAILED` y deduplicación | D77 y D78 | Matías Romanato |
-| 4. Consumidores asíncronos | Notificaciones, avance del informe y eventos en el informe, con sus endpoints | D79 y D80 | Sin asignar |
+| 4. Consumidores asíncronos | Notificaciones, avance del informe y eventos en el informe, con sus endpoints | D79 y D80 | Julieta |
 | 5. Frontend, demo y presentación | Seguimiento en el itinerario, secciones nuevas del frontend, **mejoras generales del frontend**, `demo.http`, README, cierre de `DESIGN.md`, la presentación y **la organización de la demo y su video, que se graba con los cinco** | D81 | Sin asignar |
 
 **Lección de la Entrega 2:** el plan anterior dejaba los endpoints a la fase de API, las fases 2 a 4 mergearon sin ellos y la Fase 5 quedó sobrecargada. Acá **cada fase escribe los endpoints de lo que construye**, con su test de API. La Fase 5 solo suma el frontend y lo que la demo necesita.
@@ -630,19 +630,28 @@ Los dos interesados que justifican los eventos: avisar a los responsables y mant
 
 La 4.1 se cierra el miércoles 04/11, antes de arrancar el avance. El texto del aviso sin `switch` ya quedó decidido en la Fase 1 (decisión 1.6: cada evento escribe su `summary()`), y **lo implementa esta fase**.
 
-#### 4.1 — Qué es el "avance del informe" · 👥 · ⬜ pendiente
+**Estado (08/11/2026, rama `assignment-3-phase-4`): la fase está completa.** Se desarrolló sobre `main` con la Fase 3 ya mergeada (#16). Las decisiones 4.1 y 4.2 están cerradas, y se sumaron la 4.3 y la 4.4, que salieron al cotejar este plan con el código. `DESIGN.md` suma D79 y D80, completa D71 y D48, y agrega la fila de CQRS. `V3__notifications_and_progress.sql` crea las dos tablas. La API suma un endpoint (de 49 a 50), y el informe suma `timeline` y `progress` al final. El frontend y `demo.http` no cambian: son de la Fase 5.
+
+#### 4.1 — Qué es el "avance del informe" · 👥 · ✅ decidida
 
 - **Pregunta:** `ExpeditionReporter.reportOf` ya calcula, a partir de la expedición, `scheduledActivities`, `finishedActivities` y `actualConsumption`. Una proyección que "cuenta lo terminado" repite lo que el informe ya sabe calcular. La consigna pide que la lógica de negocio no se duplique, y el docente lo puede preguntar.
 - **Opciones:**
   - a) **La proyección guarda lo que el agregado no guarda:** en qué orden supo el sistema de cada actividad terminada (la secuencia del evento), con su resultado y el momento. El informe la lee como "avance", en vez de calcularlo. Es lo que proponen las decisiones. Hay que explicar por qué no es CQRS.
   - b) **Actualización de informes, literal de la consigna:** ante cualquiera de los tres eventos, el consumidor regenera el informe con el mismo `ExpeditionReporter` y lo guarda. `GET .../report` devuelve el guardado, con "actualizado a las HH:MM". No duplica lógica y muestra la consistencia eventual en la demo, pero el informe puede estar unos segundos atrasado y cambia qué devuelve un endpoint que ya existe.
+  - c) **Agregada al implementar — historial de avance:** ante `ActivityCompleted`, el consumidor le pide los números a `ExpeditionReporter` y guarda una fila con el evento, el momento y las terminadas/programadas de ese punto.
+  - d) **Agregada al implementar — sin proyección:** solo notificaciones como consumidor real.
 - **Recomendación:** a), si el equipo puede explicar en una frase qué agrega la proyección que el informe no tiene. Si no, b), que se defiende sola.
-- **Decisión:** _a completar_
-- **Quién y cuándo:** _a completar, antes del miércoles 04/11_
-- **Por qué:** _a completar_
+- **Decisión:** c).
+- **Quién y cuándo:** Julieta, 08/11/2026. Es una decisión de equipo: queda para confirmar con el grupo.
+- **Por qué:**
+  - Pasa la condición que ponía este plan, con una frase: el informe dice dónde está la expedición, y el historial, cómo llegó ahí.
+  - a) guarda datos que ya existen: el resultado y el fin están en `ActivityTracking`, y el orden en `domain_event`. Además, una alternativa hereda actividades terminadas sin evento, y su lista quedaría más corta que su `finishedActivities`.
+  - b) tiene un problema concreto: `start`, `suspend`, `resume` y `review` no emiten eventos, así que el `status` del informe guardado quedaría desactualizado, y antes del primer evento no habría informe.
+  - d) contradice la decisión del 02/11, y `ActivityCompleted` quedaría con un solo interesado.
+  - Costo: la foto se toma al despachar, así que con actividades muy seguidas o con reintentos puede mostrar un número adelantado.
 - **Se registra en:** D80, y la fila de CQRS en patrones no aplicados
 
-#### 4.2 — Un suscriptor de notificaciones o uno por evento · ⬜ pendiente
+#### 4.2 — Un suscriptor de notificaciones o uno por evento · ✅ decidida
 
 - **Pregunta:** cómo se suscriben las notificaciones a los tres eventos.
 - **Opciones:**
@@ -650,40 +659,69 @@ La 4.1 se cierra el miércoles 04/11, antes de arrancar el avance. El texto del 
   - b) Uno por evento.
 - **Recomendación:** a), porque la regla es la misma para los tres (un aviso por responsable). Requiere que el publicador de la Fase 2 filtre con `isInstance`, como hace hoy `InMemoryEventPublisher`: hay que confirmarlo con la Fase 2.
   - **Confirmado por la Fase 2 (Matías, 04/11/2026, PR 2b): la opción a) funciona.** `OutboxEventPublisher` filtra con `isInstance` igual para los síncronos y para los asíncronos, así que un suscriptor con `eventType()` = `DomainEvent.class` recibe los tres eventos y se le crea una entrega `PENDING` por cada uno. Lo cubre `OutboxEventPublisherTest.leavesAPendingDeliveryOfEveryEventForAConsumerThatAsksForDomainEvent`, que publica dos eventos de tipos distintos y verifica que le queda una entrega de cada uno. La precondición técnica está cumplida; la decisión entre a) y b) sigue siendo de la Fase 4.
-- **Decisión:** _a completar_
-- **Quién y cuándo:** _a completar_
-- **Por qué:** _a completar_
+- **Decisión:** a). `NotifyResponsibles` se suscribe a `DomainEvent`, con el nombre estable `notify-responsibles`.
+- **Quién y cuándo:** Julieta, 08/11/2026.
+- **Por qué:**
+  - Lo único que varía entre los eventos es el texto, y lo resuelve `summary()`. La clase tiene una sola razón de cambio (SRP), y sumar un evento no la toca (OCP).
+  - Conserva el orden entre tipos de evento: D78 lo garantiza por consumidor, y con tres consumidores valdría solo dentro de cada tipo.
+  - Costo: leyendo la clase no se ve qué eventos notifica, y una falla frena a los siguientes de esa expedición, de cualquier tipo, hasta unos 25 s.
 - **Se registra en:** D79
+
+#### 4.3 — **Agregada:** identidad de la notificación y duplicados · ✅ decidida
+
+- **Pregunta:** D78 dice que el despachador evita repetir una entrega y que ningún consumidor deduplica, pero este plan pide probar que un evento "despachado dos veces" no duplica el aviso. Falta decidir qué identidad tiene `Notification` y qué protege contra el duplicado.
+- **Opciones:**
+  - a) Identidad natural (evento y responsable) con `UNIQUE` en la tabla, sin lógica de deduplicación.
+  - b) Un id propio, confiando solo en el despachador.
+  - c) `UNIQUE` y un guardado que ignore el duplicado.
+- **Decisión:** a).
+- **Quién y cuándo:** Julieta, 08/11/2026.
+- **Por qué:** la invariante queda en el esquema y un duplicado es un error visible (fail fast). D78 no cambia. c) contradice D78, que descartó deduplicar en dos lugares, y b) deja un id sin uso.
+- **Se registra en:** D79
+
+#### 4.4 — **Agregada:** dónde se integra la línea de tiempo al informe · ✅ decidida
+
+- **Pregunta:** este plan decía que `ExpeditionReport` sumaba la línea de tiempo leyendo `EventLog`, pero `ExpeditionReporter` es un cálculo puro sobre la expedición y `RecordedEventView` es una vista de `models.responses`.
+- **Opciones:**
+  - a) La compone `ReportExpedition`, y los campos van en `ExpeditionReportView`.
+  - b) Como decía el plan: el reporter recibe los puertos.
+  - c) `reportOf` recibe los datos ya cargados.
+- **Decisión:** a).
+- **Quién y cuándo:** Julieta, 08/11/2026.
+- **Por qué:** el reporter calcula y el caso de uso orquesta (SRP), y un modelo no depende de una vista. Con b), `TrackProgress` usaría un reporter que lee lo que él escribe. **Se aparta del plan:** `ExpeditionReport` y `ExpeditionReporter` no cambian.
+- **Se registra en:** D80
 
 ### Notificaciones
 
-- [ ] `Notification` en `business.models.notifications`: id, expedición, responsable (`PersonId`), id del evento que la originó, texto y `occurredAt` del hecho.
-- [ ] Puerto `NotificationRepository` en `business.providers`.
-- [ ] Un suscriptor asíncrono en `business.usecases` (por ejemplo `NotifyResponsibles`) que, ante cada evento, carga la expedición y crea un aviso por cada responsable (`Expedition.getResponsibles()`). Si la expedición tiene dos responsables, son dos avisos.
-- [ ] El resumen en palabras de cada evento (decisión 1.6), que viene de la Fase 1:
+- [x] `Notification` en `business.models.notifications`: expedición, responsable, id del evento que la originó, texto y `occurredAt` del hecho.
+  - **Agregado:** no tiene id propio (decisión 4.3), y el responsable es un `ResourceId`, porque `PersonId` no existe en el proyecto.
+- [x] Puerto `NotificationRepository` en `business.providers`.
+- [x] Un suscriptor asíncrono en `business.usecases` (por ejemplo `NotifyResponsibles`) que, ante cada evento, carga la expedición y crea un aviso por cada responsable (`Expedition.getResponsibles()`). Si la expedición tiene dos responsables, son dos avisos.
+- [x] El resumen en palabras de cada evento (decisión 1.6), que viene de la Fase 1:
   - `DomainEvent` suma `String summary()`, y cada evento escribe el suyo, en inglés como el resto de los mensajes. Por ejemplo: `ExpeditionApproved` → "The expedition was approved"; `IncidentRegistered` → "Incident on activity a-08: A storm flooded the station"; `ActivityCompleted` → "Activity a-08 finished: Twelve samples collected".
   - El evento nombra la actividad por su id, porque lleva ids y no entidades (D71). El nombre de la expedición lo puede sumar la notificación, que ya carga la expedición para saber a quiénes avisar.
   - Un test por evento, que verifique su resumen.
   - Para la Fase 2: `summary()` no es un componente del `record`, así que el JSON del registro no lo guarda. Se calcula cada vez.
   - D71 suma el punto "cada evento se describe en palabras", con las alternativas descartadas (un `switch` en el consumidor, un mapa de tipo a texto en la configuración).
-- [ ] El texto del aviso sale de `summary()`, sin `switch` sobre el tipo de evento.
-- [ ] La forma de suscribirse, según la decisión 4.2.
-- [ ] Adaptador JPA, tabla `notification` en `V3__notifications_and_progress.sql` y la tabla en `clean-database.sql`.
-- [ ] Caso de uso de consulta y `GET /api/expeditions/{id}/notifications`, con su test de API.
+- [x] El texto del aviso sale de `summary()`, sin `switch` sobre el tipo de evento.
+- [x] La forma de suscribirse, según la decisión 4.2.
+- [x] Adaptador JPA, tabla `notification` en `V3__notifications_and_progress.sql` y la tabla en `clean-database.sql`.
+  - **Agregado:** también en el `DatabaseCleaner` de los tests de `app`, que tiene su propio `TRUNCATE`. El orden sale de un `BIGSERIAL` que no sale del adaptador, porque `occurredAt` lo manda el cliente (punto 1 de la review).
+- [x] Caso de uso de consulta y `GET /api/expeditions/{id}/notifications`, con su test de API.
 
 ### Avance del informe
 
-- [ ] El suscriptor asíncrono, según la decisión 4.1. Con la a), es un suscriptor de `ActivityCompleted` que actualiza la proyección. Con la b), es uno de los tres eventos que regenera el informe. En los dos casos va con su puerto en `business.providers`, su adaptador JPA y su tabla en `V3` y en `clean-database.sql`.
-- [ ] `ExpeditionReport` suma el avance y la línea de tiempo de eventos, que lee por el puerto `EventLog` de la Fase 2. Así, los eventos quedan integrados a la auditoría existente. `ExpeditionReportResponse` y `ReportMapper` suman los campos al final, y `GET .../report` los devuelve.
+- [x] El suscriptor asíncrono, según la decisión 4.1: `TrackProgress`, de `ActivityCompleted`, con el puerto `ProgressHistory` en `business.providers`, su adaptador JPA y su tabla en `V3`, en `clean-database.sql` y en `DatabaseCleaner`.
+- [x] El informe suma el avance y la línea de tiempo de eventos, que lee por el puerto `EventLog` de la Fase 2, según la decisión 4.4: los compone `ReportExpedition` en `ExpeditionReportView`. Así, los eventos quedan integrados a la auditoría existente. `ExpeditionReportResponse` y `ReportMapper` suman los campos al final, y `GET .../report` los devuelve.
 
 ### Tests
 
-- [ ] Unitarios de cada consumidor, llamando a `on(event)` directo: a quién se avisa, qué texto lleva, qué se proyecta.
-- [ ] Contrato de `NotificationRepository` y del puerto de la proyección contra PostgreSQL.
-- [ ] Integración con el despachador de la Fase 3: aprobar, terminar o registrar, invocar el despachador y ver el aviso y el avance.
-- [ ] Un evento despachado dos veces (simulando la reentrega) no duplica el aviso.
-- [ ] Si un consumidor real falla (por ejemplo, con un repositorio que falla en el contexto de test), queda `FAILED` y el otro consumidor del mismo evento igual recibe el suyo.
-- [ ] Test de API del informe con el avance y la línea de tiempo.
+- [x] Unitarios de cada consumidor, llamando a `on(event)` directo: a quién se avisa, qué texto lleva, qué se proyecta.
+- [x] Contrato de `NotificationRepository` y del puerto de la proyección contra PostgreSQL.
+- [x] Integración con el despachador de la Fase 3: aprobar, terminar o registrar, invocar el despachador y ver el aviso y el avance.
+- [x] Un evento despachado dos veces (simulando la reentrega) no duplica el aviso: `dispatchingAgainDoesNotNotifyTwice` y `anEventDeliveredAgainDoesNotNotifyTwiceAndTheFailureIsVisible`, que vuelve a poner la entrega en `PENDING`.
+- [x] Si un consumidor real falla (por ejemplo, con un repositorio que falla en el contexto de test), queda `FAILED` y el otro consumidor del mismo evento igual recibe el suyo: `AFailingProgressConsumerTest`.
+- [x] Test de API del informe con el avance y la línea de tiempo.
 
 ### `DESIGN.md`
 
@@ -691,6 +729,7 @@ La 4.1 se cierra el miércoles 04/11, antes de arrancar el avance. El texto del 
 - D71 (de la Fase 1) suma el resumen en palabras de cada evento (decisión 1.6).
 - D80: avance del informe y eventos en la auditoría. Revisa D48.
 - La fila nueva de CQRS en patrones no aplicados.
+- **Agregado:** el README suma el endpoint de notificaciones (de 49 a 50) y describe los campos nuevos del informe.
 
 **Terminado cuando:** aprobar, terminar una actividad o registrar un incidente deja, después del despacho, los avisos y el avance consultables por HTTP y en el informe.
 
@@ -932,8 +971,10 @@ Es un índice. El detalle de cada decisión y su registro están en la sección 
 | 2.3 | Qué pasa con `InMemoryEventPublisher` | 2 | 04/11 | PR 2b | ✅ |
 | 3.1 | Valores del despachador (review 6) 👥 | 3 | 04/11 | D78 | ✅ |
 | 3.2 | Método del despachador para los tests | 3 | 04/11 | Fases 4 y 5 | ✅ |
-| 4.1 | Qué es el "avance del informe" 👥 | 4 | 04/11 | Fase 4 | ⬜ |
-| 4.2 | Un suscriptor de notificaciones o uno por evento | 4 | 05/11 | Fase 4 | ⬜ |
+| 4.1 | Qué es el "avance del informe" 👥 | 4 | 04/11 | Fase 4 | ✅ |
+| 4.2 | Un suscriptor de notificaciones o uno por evento | 4 | 05/11 | Fase 4 | ✅ |
+| 4.3 | Identidad de la notificación y duplicados | 4 | 08/11 | Fase 4 | ✅ |
+| 4.4 | Dónde se integra la línea de tiempo al informe | 4 | 08/11 | Fase 4 | ✅ |
 | 5.1 | Duración y fecha de la presentación 👥 | 5 | Lo antes posible | Fase 5 | ⬜ |
 | 5.2 | Formato de la presentación 👥 | 5 | 06/11 | Fase 5 | ⬜ |
 | 5.3 | Cómo espera la demo al despachador | 5 | 08/11 | Demo | ⬜ |

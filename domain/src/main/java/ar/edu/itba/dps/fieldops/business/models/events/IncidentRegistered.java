@@ -19,4 +19,9 @@ public record IncidentRegistered(EventId id, ExpeditionId expeditionId, Incident
     public LocalDateTime occurredAt() {
         return incident.occurredAt();
     }
+
+    @Override
+    public String summary() {
+        return "Incident on activity %s: %s".formatted(incident.activity(), incident.description());
+    }
 }

@@ -127,9 +127,13 @@ class AsyncSubscribersGetAPendingDeliveryTest {
         final var recorded = eventLog.ofExpedition(expedition);
         assertEquals(List.of(ExpeditionApproved.class.getName(), IncidentRegistered.class.getName()),
                 recorded.stream().map(RecordedEventView::type).toList());
-        assertEquals(List.of(), recorded.getFirst().deliveries());
+        assertEquals(List.of(), deliveriesToTheRecordingSubscriber(recorded.getFirst()));
         assertEquals(List.of(new EventDeliveryView(RECORDING, DeliveryStatus.PENDING, 0, Optional.empty())),
-                recorded.getLast().deliveries());
+                deliveriesToTheRecordingSubscriber(recorded.getLast()));
+    }
+
+    private static List<EventDeliveryView> deliveriesToTheRecordingSubscriber(RecordedEventView event) {
+        return event.deliveries().stream().filter(delivery -> delivery.consumer().equals(RECORDING)).toList();
     }
 
     private ExpeditionId approvedAndRunning() {

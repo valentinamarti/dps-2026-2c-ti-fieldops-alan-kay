@@ -18,4 +18,9 @@ public record ActivityCompleted(EventId id, ExpeditionId expeditionId, ActivityI
         Objects.requireNonNull(occurredAt, "occurredAt is required");
         result = DomainArguments.requireText(result, "result");
     }
+
+    @Override
+    public String summary() {
+        return "Activity %s finished: %s".formatted(activity, result);
+    }
 }

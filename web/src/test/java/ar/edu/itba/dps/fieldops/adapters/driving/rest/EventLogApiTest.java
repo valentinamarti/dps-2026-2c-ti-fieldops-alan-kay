@@ -41,14 +41,17 @@ class EventLogApiTest {
     }
 
     @Test
-    void recordsTheEventEvenWhenNoConsumerHasToReceiveIt() throws Exception {
+    void showsThatAConsumerStillHasToReceiveAnEventTheDispatcherHasNotDelivered() throws Exception {
         final var expedition = anExpeditionInExecutionWithTheSampleCollectionStarted();
 
         api.perform(get("/api/expeditions/{id}/events", expedition))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].type").value("ExpeditionApproved"))
-                .andExpect(jsonPath("$[0].deliveries").value(Matchers.empty()));
+                .andExpect(jsonPath("$[0].deliveries.length()").value(1))
+                .andExpect(jsonPath("$[0].deliveries[0].consumer").value("notify-responsibles"))
+                .andExpect(jsonPath("$[0].deliveries[0].status").value("PENDING"))
+                .andExpect(jsonPath("$[0].deliveries[0].attempts").value(0));
     }
 
     @Test

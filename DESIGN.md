@@ -844,6 +844,7 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
 - **Alternativas descartadas:**
   - Event Sourcing (reconstruir la expedición a partir de sus eventos) — ver la tabla de patrones no aplicados.
   - Guardar el incidente solo en la propuesta — el informe de la expedición dejaría de contar los incidentes.
+- **Revisado en D80:** el informe suma a esta auditoría la línea de tiempo de los eventos de la expedición, con el estado de cada consumidor. La propuesta, la bitácora y la original quedan como están.
   - Mantener los incidentes en `ActivityTracking` y sumar otra lista para los de actividades pendientes — el mismo concepto en dos lugares.
   - Copiar el itinerario original dentro de la propuesta — duplicaría la expedición original, que ya está guardada y no cambia.
   - Un repositorio de incidentes con su propio generador de ids — el incidente es parte de la expedición y no se consulta suelto.
@@ -1428,12 +1429,15 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
   - **`ActivityCompleted` lleva el id de la actividad, el momento en que terminó y su resultado.** No lleva el `ItineraryItem` ni la `Activity`, porque son entidades mutables y el evento tiene que ser inmutable. A diferencia de `Incident`, que es un `record`, copiarlas lo dejaría expuesto a cambios posteriores. El resultado va porque es lo que muestran los interesados en que una actividad termine. El momento es el `at` con el que se la terminó, como el del incidente.
   - **El contrato común** deja que quien trate eventos en general los ordene y los muestre sin un condicional por tipo.
   - `IncidentRegistered` es el `IncidentReported` del ejemplo de la consigna: se mantuvo el nombre que ya tenían el código, los tests y D45.
+  - **Cada evento se describe en palabras con `summary()`** (decisión 1.6). El hecho sabe contarse, y así las notificaciones (D79) no preguntan de qué tipo es el evento. Nombra la actividad por su id porque el evento lleva ids y no entidades. No es un componente del `record`, así que el JSON del registro no lo guarda (D75): se calcula cada vez.
 - **Alternativas descartadas:**
   - Ids de tipo `String` o `UUID` sueltos — un concepto del dominio como primitivo (D26).
   - Un proveedor de ids de eventos — ver arriba.
   - Tomar `occurredAt` de un reloj al registrar el evento — sería el momento en que el sistema se enteró y no el del hecho, y metería un reloj en el dominio.
   - Que el cliente mande el momento de la aprobación en el body — la aprobación ocurre en el sistema, y el cliente podría mandar cualquier fecha. Además cambiaba la API, el frontend y el guion de la demo.
   - Un `Clock` inyectado en `ApproveExpedition` — el dominio dejaría de recibir el tiempo como dato, solo para este caso.
+  - Un `switch` sobre el tipo de evento en el consumidor para armar el texto — sumar un evento obligaría a tocarlo, y es justo lo que el contrato común evita.
+  - Un mapa de tipo a texto en la configuración — separa al evento de lo que dice sin ganar nada: cada evento nuevo tendría que acordarse de registrar su texto en otro lado.
 - **Consecuencia:**
   - El `occurredAt` de un evento es el que informó el cliente. No sirve para ordenar los eventos en el orden en que el sistema los conoció.
   - Como el id es aleatorio, los tests no comparan un evento entero con `equals`: verifican su tipo y sus datos.
@@ -1645,6 +1649,55 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
   - **Sin reentrega manual de una `FAILED`.** No hay un endpoint para volver a intentarla: hay que pasar la fila a `PENDING` en la base, con sus intentos en cero. El error queda en el registro, que es donde se ve.
   - Cambiar el `consumerName()` de un consumidor deja sus entregas pendientes como las de un consumidor desconocido, que terminan `FAILED`. Por eso es un nombre estable elegido a mano y no el de la clase (D72).
   - La garantía de orden depende del supuesto de arriba: un evento nuevo tiene que cambiar la fila `expedition`.
+
+### D79 — Notificaciones: un consumidor asíncrono del dominio, guardadas en la base (Entrega 3, propuesta de valor)
+
+- **Origen:** la consigna pide al menos un consumidor que procese eventos fuera del flujo de la petición, y nombra las notificaciones. Los tres hechos le interesan a los responsables de la expedición.
+- **Patrón / principio:** Observer asíncrono detrás del puerto `AsyncEventSubscriber` (D72) + polimorfismo sobre `DomainEvent` en vez de un condicional por tipo.
+- **Dónde:** `NotifyResponsibles` en `business.usecases`; `Notification` en `business.models.notifications`; puerto `NotificationRepository` con `JpaNotificationRepository`; tabla `notification` de `V3__notifications_and_progress.sql`; consulta `QueryNotifications` y `GET /api/expeditions/{id}/notifications`.
+- **Por qué:**
+  - **La regla es de negocio y vive en `business`:** a quién se avisa y qué se le dice. El despachador solo entrega (D77), así que la lógica no se duplica en la capa nueva.
+  - **Un solo suscriptor, con `eventType()` igual a `DomainEvent`** (decisión 4.2). Lo único que varía entre los eventos es el texto, y eso ya lo resuelve `summary()` (D71). Tiene una sola razón de cambio (SRP), y sumar un evento que deba avisar es sumar su clase, sin tocar al consumidor (OCP).
+  - **Conserva el orden entre tipos de evento.** D78 garantiza el orden por expedición y por consumidor: con un solo consumidor, un responsable recibe la aprobación antes que el incidente, aunque la primera se esté reintentando.
+  - **Una notificación se identifica por su evento y su responsable.** Es lo que significa: "este hecho, contado a esta persona". No hace falta un id generado, y la restricción `UNIQUE (event_id, responsible_id)` deja la invariante en el esquema.
+  - **El `UNIQUE` no es deduplicar.** Deduplicar sigue siendo del despachador (D78). Si una entrega se repitiera por un error, la base rechaza el aviso y la falla se ve en el registro, en vez de aparecer un aviso repetido.
+  - **El orden sale de una secuencia de la tabla, no de `occurredAt`,** que manda el cliente (D71). La secuencia no sale del adaptador, igual que en `domain_event` (D76).
+  - **El texto es `TEXT`:** un resumen suma un prefijo a una descripción o un resultado que ya pueden llegar a 1000 caracteres.
+- **Alternativas descartadas:**
+  - Un suscriptor por evento — tres clases con el mismo cuerpo, y cada evento nuevo pide una clase y un bean. Además, el orden valdría solo dentro de cada tipo.
+  - Una clase genérica instanciada una vez por tipo en la configuración — daría una lista explícita de qué eventos avisan, pero hoy avisan todos, y pierde el orden entre tipos.
+  - Un id propio para la notificación — un id que nadie usa, y nada impediría dos avisos iguales.
+  - Que el consumidor ignore el duplicado — contradice D78, que descartó deduplicar en dos lugares, y escondería un error real.
+  - Mandar un mail o usar un servicio externo — es un efecto fuera de la base, que sí se podría duplicar (D78), y la consigna no lo pide.
+- **Consecuencia:**
+  - Los avisos aparecen unos segundos después del hecho: es la consistencia eventual que se muestra en la demo.
+  - Una falla de un evento frena a los siguientes de esa expedición para las notificaciones, hasta unos 25 s, sin importar de qué tipo sean (D78).
+  - Si una entrega se repitiera, se reintenta y termina `FAILED`: el aviso ya estaba, y el error queda visible. Lo prueba `anEventDeliveredAgainDoesNotNotifyTwiceAndTheFailureIsVisible`.
+  - Todo evento nuevo avisa por defecto. Si alguno no debiera, hay que pasar a registrar los tipos en la configuración. Cambiar así el nombre del consumidor deja sus entregas pendientes `FAILED` (D78).
+
+### D80 — Historial de avance y eventos en el informe (Entrega 3, propuesta de valor, revisa D48)
+
+- **Origen:** la consigna pide que los eventos queden integrados a la auditoría existente y nombra la actualización de informes como consumidor posible. `ExpeditionReporter` ya calcula las actividades programadas, las terminadas y el consumo, y la consigna pide no duplicar lógica.
+- **Patrón / principio:** proyección de solo lectura alimentada por un evento + composición en el caso de uso, con el cálculo puro separado de la lectura de puertos (SRP y DIP).
+- **Dónde:** `TrackProgress` en `business.usecases`; `ProgressEntry` en `business.models.report`; puerto `ProgressHistory` con `JpaProgressHistory`; tabla `expedition_progress` de `V3__notifications_and_progress.sql`; `ReportExpedition` y `ExpeditionReportView`, con los campos `timeline` y `progress` en `GET /api/expeditions/{id}/report`.
+- **Por qué:**
+  - **El informe dice dónde está la expedición; el historial, cómo llegó ahí** (decisión 4.1). El agregado solo conoce su estado actual. Cuántas actividades había terminadas cada vez que terminó una es un dato que no tiene y no puede recalcular.
+  - **El historial no calcula nada.** `TrackProgress` le pide los números a `ExpeditionReporter` y los guarda, así que el cálculo sigue en un solo lugar.
+  - **Las actividades que hereda una alternativa se cuentan,** porque los números salen del agregado. Una lista armada solo con los eventos no las vería: se terminaron en la original y la alternativa no emite un evento por ellas.
+  - **`ReportExpedition` compone el informe,** y `ExpeditionReporter` sigue siendo un cálculo puro sobre la expedición. Si el reporter leyera el historial, el consumidor que lo usa para escribirlo dependería de lo que escribe.
+  - **La línea de tiempo entra en `ExpeditionReportView` y no en `ExpeditionReport`.** `RecordedEventView` es una vista, y un modelo no debe depender de una vista (D64).
+  - **Los eventos entran a la auditoría existente (D48)** en vez de quedar en un endpoint aparte.
+- **Alternativas descartadas:**
+  - Guardar solo la lista de actividades terminadas — el resultado y el fin ya están en `ActivityTracking`, y el orden en `domain_event`. Serían dos fuentes de verdad para lo mismo.
+  - Regenerar y guardar el informe, y que `GET /report` devuelva el guardado — `start`, `suspend`, `resume` y `review` no emiten eventos, así que el estado quedaría desactualizado, y antes del primer evento no habría informe.
+  - No tener proyección y dejar solo las notificaciones — cumple la consigna, pero `ActivityCompleted` tendría un solo interesado, que es lo que justificaba el evento.
+  - Que `ExpeditionReporter` reciba los puertos — mezcla cálculo con lectura, y sus tests dejarían de ser puros.
+  - Que `reportOf` reciba la línea de tiempo y el historial ya cargados — el consumidor tendría que pasarle listas vacías.
+- **Consecuencia:**
+  - **La foto se toma al despachar, no en el momento del hecho.** Si dos actividades terminan en el mismo intervalo, o hay reintentos (hasta unos 25 s, D78), la primera puede mostrar un número adelantado.
+  - El historial aparece unos segundos después de `finishedActivities`, que sale del agregado. Lo prueba `beforeTheDispatcherRunsTheReportAlreadyKnowsTheStateButNotTheHistory`.
+  - `ExpeditionReport` deja de ser el informe completo: el completo es la vista.
+  - Si `TrackProgress` falla, la operación no se deshace y las notificaciones siguen: lo prueba `AFailingProgressConsumerTest`.
 
 ## Funcionalidades nuevas de la Entrega 2
 
@@ -1879,6 +1932,7 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
 | Entrega asíncrona de eventos (bus o cola) | El criterio de F3 exige que la propuesta exista cuando vuelve el registro del incidente. Con un solo proceso y una transacción por caso de uso, la entrega síncrona del `InMemoryEventPublisher` lo garantiza sin reintentos ni orden de entrega que resolver (D45, D68). **Revisado en D74:** la Entrega 3 sí suma la entrega asíncrona, y la síncrona no se perdió: es el paso 1 del publicador del outbox, así que la propuesta sigue existiendo cuando vuelve el registro del incidente. Lo que cambió es que ahora conviven las dos, y el tipo del suscriptor dice cuál le toca (D72). | Si un suscriptor se vuelve lento o externo (avisar por correo, otro servicio), habría que sumar un adaptador asíncrono detrás del mismo `EventPublisher`, con un outbox para no perder eventos. **Cumplido en D74:** el outbox es la tabla `domain_event` con una entrega por consumidor. |
 | Broker de mensajería (RabbitMQ, Kafka) | Lo que la propuesta de valor necesita es que el hecho quede guardado junto con el cambio que lo produjo, y eso lo da la misma base con la transacción del caso de uso (D74, D68). Un broker sumaría un servicio que levantar, configurar y tener corriendo en la demostración, y encima no resolvería la atomicidad: entre confirmar la transacción y publicar en el broker hay una ventana donde el evento se pierde, y taparla es, otra vez, un outbox. | No sirve para repartir el trabajo entre varios procesos ni para que lo consuma otra aplicación: la aplicación corre en una sola instancia, y eso es parte del precio. Si apareciera un consumidor de afuera, el camino es publicar al broker desde quien lee el outbox, sin tocar ni el dominio ni el registro. |
 | Saga (orquestada o coreografiada) | Una saga coordina una operación que cruza varias transacciones o servicios, con una acción que compensa cada paso si uno posterior falla. Acá no hay operaciones distribuidas que compensar: cada caso de uso es una sola transacción sobre una sola base (D68), y lo único que se deshace ante una falla es lo síncrono, que el rollback deshace solo (si `ProposeReplan` falla, no queda el incidente). Los consumidores asíncronos no son pasos de la operación: cuando corren, la operación ya está confirmada, y si fallan se reintentan, no se compensan (D77, D78). | Una falla definitiva de un consumidor asíncrono no deshace nada: la entrega queda `FAILED` y visible en el registro, y la operación original se mantiene. Si algún día un consumidor tuviera que poder revertir la operación, por ejemplo rechazar una aprobación, eso sí sería una saga, con su evento de compensación, y no un reintento. |
+| CQRS | CQRS separa el modelo con el que se escribe del modelo con el que se lee. Acá el modelo de lectura sigue siendo el agregado: el informe se calcula con `ExpeditionReporter` y todas las consultas leen la expedición. `expedition_progress` es una proyección puntual de un dato que el agregado no guarda (D80), no un segundo modelo. Si el informe se leyera siempre de una proyección alimentada por eventos, eso sí sería CQRS, con su atraso en cada lectura |
 | Anotar el dominio con JPA | D36 prohíbe que `domain` dependa de un framework, y el enforcer lo hace cumplir. El adaptador tiene sus propias entidades y mappers, y el dominio solo sabe volcar y reconstruir su estado (D65, D67). | Hay más código de mapeo, y un atributo nuevo se escribe en el modelo, la entidad, el mapper y una migración. `PersistedStateRoundTripTest` avisa si algo se pierde en el camino. |
 | Clases de Java con el escenario de la demostración | Los datos de la demostración son datos: viven en `demo/catalog.json` y `demo/expedition.json`, y el único Java es un cargador genérico que los mete por los casos de uso, igual que el adaptador REST (D50). Una clase que armara el escenario en código lo dejaría en el lenguaje más caro de leer y de cambiar, y haría recompilar para mover un horario. | El esquema de los documentos es el de los cuerpos de la API, así que lo que se puede sembrar es exactamente lo que se puede pedir por HTTP. Un escenario que necesitara un estado que la API no sabe producir no se puede expresar, y eso es a propósito. |
 

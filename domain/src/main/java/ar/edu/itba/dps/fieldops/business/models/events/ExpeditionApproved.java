@@ -13,4 +13,9 @@ public record ExpeditionApproved(EventId id, ExpeditionId expeditionId, LocalDat
         Objects.requireNonNull(expeditionId, "expeditionId is required");
         Objects.requireNonNull(occurredAt, "occurredAt is required");
     }
+
+    @Override
+    public String summary() {
+        return "The expedition was approved";
+    }
 }

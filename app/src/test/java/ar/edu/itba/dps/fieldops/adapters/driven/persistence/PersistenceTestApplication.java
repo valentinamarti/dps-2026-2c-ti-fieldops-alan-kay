@@ -2,6 +2,8 @@ package ar.edu.itba.dps.fieldops.adapters.driven.persistence;
 
 import ar.edu.itba.dps.fieldops.business.providers.EventLog;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
+import ar.edu.itba.dps.fieldops.business.providers.NotificationRepository;
+import ar.edu.itba.dps.fieldops.business.providers.ProgressHistory;
 import ar.edu.itba.dps.fieldops.business.providers.ReplanProposalRepository;
 import ar.edu.itba.dps.fieldops.business.providers.ResourceCatalog;
 import ar.edu.itba.dps.fieldops.business.providers.ZoneRepository;
@@ -52,6 +54,16 @@ class PersistenceTestApplication {
     @Bean
     EventLog eventLog(DomainEventJpaRepository events, EventDeliveryJpaRepository deliveries) {
         return new JpaEventLog(events, deliveries);
+    }
+
+    @Bean
+    NotificationRepository notificationRepository(NotificationJpaRepository notifications) {
+        return new JpaNotificationRepository(notifications);
+    }
+
+    @Bean
+    ProgressHistory progressHistory(ProgressEntryJpaRepository entries) {
+        return new JpaProgressHistory(entries);
     }
 
     @Bean
