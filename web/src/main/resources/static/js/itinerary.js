@@ -31,53 +31,79 @@ async function assignmentsView(activity, base, refresh) {
         assignmentForm(activity, base, "supplies", "Supplies", supplies, refresh));
 }
 
-function trackingView(expedition, activity, base, refresh) {
-    const run = (path, body) => reporting(async () => {
-        await api.post(`${base}/${path}`, body());
-        await refresh();
-    });
+const TRACKING_LABELS = {PENDING: "Pending", IN_PROGRESS: "In progress", FINISHED: "Finished"};
+
+function trackingSummary(tracking) {
+    const moments = [
+        tracking.startedAt ? `Started ${tracking.startedAt.replace("T", " ")}` : null,
+        tracking.finishedAt ? `finished ${tracking.finishedAt.replace("T", " ")}` : null,
+        tracking.result ? `result: ${tracking.result}` : null,
+    ].filter(Boolean);
+    return [
+        moments.length > 0 ? h("div", {class: "muted"}, moments.join(" · ")) : null,
+        tracking.observations.length > 0
+            ? h("ul", {}, tracking.observations.map(observation => h("li", {}, `${observation.recordedAt.replace("T", " ")}: ${observation.note}`)))
+            : null,
+    ];
+}
+
+function trackingBadge(tracking) {
+    return badge(TRACKING_LABELS[tracking.status], tracking.status === "FINISHED" ? "ok" : "");
+}
+
+function trackingActions(expedition, activity, base, refresh) {
+    const status = activity.tracking.status;
     const incidents = `/expeditions/${encodeURIComponent(expedition.id)}/incidents`;
+    const start = formOf([], "Start", reporting(async () => {
+        await api.post(`${base}/start`, {at: now()});
+        await refresh();
+    }));
+    const finish = formOf([field("Result", textInput("result", {required: true}))], "Finish", reporting(async data => {
+        await api.post(`${base}/completion`, {at: now(), result: data.get("result")});
+        await refresh();
+    }));
+    const observe = formOf([field("Observation", textInput("note", {required: true}))], "Record observation", reporting(async data => {
+        await api.post(`${base}/observations`, {note: data.get("note"), recordedAt: now()});
+        await refresh();
+    }));
+    const incident = formOf([
+        field("Incident", textInput("description", {required: true})),
+        field("Affected resource", selectOf("resourceId", [{value: "", label: "None"}, ...assignedIds(activity)])),
+        field("Expected delay (minutes)", textInput("delay", {type: "number", min: "1"})),
+    ], "Register incident", reporting(async data => {
+        await api.post(incidents, {
+            activityId: activity.id,
+            description: data.get("description"),
+            occurredAt: now(),
+            resourceId: data.get("resourceId") || null,
+            expectedDelayMinutes: data.get("delay") ? Number(data.get("delay")) : null,
+        });
+        await refresh();
+    }));
     return h("details", {}, h("summary", {}, "Track"),
-        formOf([], "Start", run("start", () => ({at: now()}))),
-        formOf([field("Result", textInput("result", {required: true}))], "Finish", reporting(async data => {
-            await api.post(`${base}/completion`, {at: now(), result: data.get("result")});
-            await refresh();
-        })),
-        formOf([field("Observation", textInput("note", {required: true}))], "Record observation", reporting(async data => {
-            await api.post(`${base}/observations`, {note: data.get("note"), recordedAt: now()});
-            await refresh();
-        })),
-        formOf([
-            field("Incident", textInput("description", {required: true})),
-            field("Affected resource", selectOf("resourceId", [{value: "", label: "None"}, ...assignedIds(activity)])),
-            field("Expected delay (minutes)", textInput("delay", {type: "number", min: "1"})),
-        ], "Register incident", reporting(async data => {
-            await api.post(incidents, {
-                activityId: activity.id,
-                description: data.get("description"),
-                occurredAt: now(),
-                resourceId: data.get("resourceId") || null,
-                expectedDelayMinutes: data.get("delay") ? Number(data.get("delay")) : null,
-            });
-            await refresh();
-        })));
+        status === "PENDING" ? [start, incident] : [finish, observe, incident]);
 }
 
 function assignedIds(activity) {
     return [...activity.assignedStaffIds, ...activity.assignedEquipmentIds, ...activity.assignedSupplyIds];
 }
 
+function showsTracking(expedition, activity) {
+    return expedition.status === "IN_EXECUTION" || activity.tracking.status !== "PENDING";
+}
+
 async function activityView(expedition, node, refresh) {
     const activity = node.activity;
     const base = `/expeditions/${encodeURIComponent(expedition.id)}/activities/${encodeURIComponent(activity.id)}`;
     return h("div", {class: "node"},
-        h("strong", {}, `${activity.name} `), badge(activity.estimatedRisk),
+        h("strong", {}, `${activity.name} `), badge(activity.estimatedRisk), " ", showsTracking(expedition, activity) ? trackingBadge(activity.tracking) : null,
         h("div", {class: "muted"}, `${activity.id} · ${formatPeriod(activity.scheduledPeriod)} · estimated ${formatMinutes(activity.estimatedDurationMinutes)}`),
         h("div", {class: "muted"}, `Needs: ${requirementsText(activity) || "nothing"}`),
         h("div", {}, `Assigned: ${assignedIds(activity).join(", ") || "nothing yet"}`),
         activity.dependencyIds.length > 0 ? h("div", {class: "muted"}, `Depends on: ${activity.dependencyIds.join(", ")}`) : null,
         expedition.status === "DRAFT" ? await assignmentsView(activity, base, refresh) : null,
-        expedition.status === "IN_EXECUTION" ? trackingView(expedition, activity, base, refresh) : null);
+        trackingSummary(activity.tracking),
+        expedition.status === "IN_EXECUTION" && activity.tracking.status !== "FINISHED" ? trackingActions(expedition, activity, base, refresh) : null);
 }
 
 async function nodeView(expedition, node, refresh) {

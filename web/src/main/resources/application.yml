@@ -1,8 +1,6 @@
 spring:
-  datasource:
-    url: ${FIELDOPS_DB_URL:jdbc:postgresql://localhost:5433/fieldops}
-    username: ${FIELDOPS_DB_USER:fieldops}
-    password: ${FIELDOPS_DB_PASSWORD:fieldops}
+  profiles:
+    default: prod
   jpa:
     hibernate:
       ddl-auto: validate

@@ -2,6 +2,7 @@ import {api} from "./api.js";
 import {badge, button, formatMinutes, formatPeriod, h, panel, table} from "./dom.js";
 import {reporting} from "./messages.js";
 import {approvalView} from "./approval.js";
+import {eventsView, notificationsView, timelineTable} from "./events.js";
 import {itineraryView} from "./itinerary.js";
 import {planningView} from "./planning.js";
 import {proposalsView} from "./proposals.js";
@@ -68,18 +69,27 @@ function reportView(report) {
         report.acceptedWarnings.length > 0
             ? table(["Warning", "Accepted by", "Justification"], report.acceptedWarnings.map(accepted =>
                 [accepted.warning.message, accepted.responsibleId, accepted.justification]))
-            : h("p", {class: "muted"}, "No accepted warnings."));
+            : h("p", {class: "muted"}, "No accepted warnings."),
+        h("h3", {}, "Progress"),
+        report.progress.length > 0
+            ? table(["When", "Activity", "Finished"], report.progress.map(entry =>
+                [entry.occurredAt.replace("T", " "), entry.activityId, `${entry.finishedActivities} of ${entry.scheduledActivities}`]))
+            : h("p", {class: "muted"}, "No activity finished yet."),
+        h("h3", {}, "Event timeline"),
+        report.timeline.length > 0 ? timelineTable(report.timeline) : h("p", {class: "muted"}, "No events yet."));
 }
 
 export async function renderExpedition(id) {
     const base = `/expeditions/${encodeURIComponent(id)}`;
-    const [expedition, itinerary, validation, estimate, report, proposals] = await Promise.all([
+    const [expedition, itinerary, validation, estimate, report, proposals, events, notifications] = await Promise.all([
         api.get(base),
         api.get(`${base}/itinerary`),
         api.get(`${base}/validation`),
         api.get(`${base}/estimate`),
         api.get(`${base}/report`),
         api.get(`${base}/replan-proposals`),
+        api.get(`${base}/events`),
+        api.get(`${base}/notifications`),
     ]);
     const refresh = refreshing(id);
     return h("div", {},
@@ -88,6 +98,8 @@ export async function renderExpedition(id) {
         expedition.status === "DRAFT" ? await planningView(expedition, refresh) : null,
         approvalView(expedition, validation, refresh),
         proposalsView(expedition, proposals, refresh),
+        eventsView(events, refresh),
+        notificationsView(notifications, refresh),
         estimateView(estimate),
         reportView(report));
 }

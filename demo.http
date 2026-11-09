@@ -9,12 +9,21 @@
 #   mvn -B install -DskipTests
 #   mvn spring-boot:run -pl web -Dspring-boot.run.profiles=demo
 #
+# El perfil `demo` no necesita Docker: usa H2 en memoria (D82). Arranca con el seed y no
+# guarda nada al apagarse.
+#
 # El seed deja el catálogo (8 personas, 2 vehículos, 9 instrumentos, 3 consumibles),
 # las 2 zonas y una expedición en borrador con 10 actividades de los 6 tipos, con un
 # bloque paralelo dentro de un secuencial y recursos compartidos entre actividades que
 # no se superponen. Este guion arranca desde ahí: agrega la actividad NOCTURNA (F1),
 # choca con el error crítico, lo corrige, acepta la advertencia, aprueba, ejecuta,
-# registra un incidente y replanifica (F3).
+# registra un incidente y replanifica (F3). En el camino muestra los eventos que dispara
+# cada hecho, sus entregas, las notificaciones y el avance.
+#
+# LOS EFECTOS ASÍNCRONOS LLEGAN DESPUÉS: el despachador corre cada 2 segundos (D77). Los
+# pasos marcados con "ESPERAR" necesitan unos segundos desde el paso anterior; si se
+# consultan antes, las entregas se ven PENDING y todavía no hay aviso. Es la consistencia
+# eventual que se quiere mostrar.
 #
 # EL GUION NO ES IDEMPOTENTE: deja la expedición reemplazada y la nocturna agendada.
 # Para correrlo de nuevo hay que REINICIAR LA APLICACIÓN (Ctrl+C y volver a levantarla
@@ -255,24 +264,51 @@ Content-Type: application/json
 }
 
 
-### Paso 27 — Aprobada, y con los recursos reservados
+### Paso 27 — ESPERAR. EL EVENTO DE LA APROBACIÓN, con sus entregas
+# La expedición registró `ExpeditionApproved` en la misma transacción que la aprobación
+# (D70, D74). El despachador se lo entregó después al consumidor de notificaciones (D79).
+GET {{host}}/api/expeditions/{{expedition}}/events
+Accept: application/json
+
+> {%
+    client.test("la aprobación quedó registrada y entregada", function() {
+        client.assert(response.body.length === 1);
+        client.assert(response.body[0].type === "ExpeditionApproved");
+        client.assert(response.body[0].deliveries.every(d => d.status === "DELIVERED"));
+    });
+%}
+
+
+### Paso 28 — ESPERAR. Un aviso para cada responsable
+# Ada y Nils son los dos responsables de la expedición: un aviso por cada uno (D79).
+GET {{host}}/api/expeditions/{{expedition}}/notifications
+Accept: application/json
+
+> {%
+    client.test("un aviso por responsable", function() {
+        client.assert(response.body.length === 2);
+    });
+%}
+
+
+### Paso 29 — Aprobada, y con los recursos reservados
 GET {{host}}/api/expeditions/{{expedition}}
 Accept: application/json
 
 
-### Paso 28 — A ejecución
+### Paso 30 — A ejecución
 POST {{host}}/api/expeditions/{{expedition}}/execution
 Content-Type: application/json
 
 
-### Paso 29 — Arranca la recolección de muestras del humedal (a-08)
+### Paso 31 — Arranca la recolección de muestras del humedal (a-08)
 POST {{host}}/api/expeditions/{{expedition}}/activities/a-08/start
 Content-Type: application/json
 
 {"at": "2026-11-04T11:30:00"}
 
 
-### Paso 30 — Una observación de campo
+### Paso 32 — Una observación de campo
 POST {{host}}/api/expeditions/{{expedition}}/activities/a-08/observations
 Content-Type: application/json
 
@@ -282,7 +318,7 @@ Content-Type: application/json
 }
 
 
-### Paso 31 — SE REGISTRA EL INCIDENTE (F3)
+### Paso 33 — SE REGISTRA EL INCIDENTE (F3)
 # La tormenta inunda la estación y Lee vuelve al campamento: el incidente reporta un
 # retraso de 120 minutos Y un recurso afectado.
 # La respuesta YA TRAE LA PROPUESTA, porque el evento se entrega de forma síncrona (D45),
@@ -313,18 +349,44 @@ Content-Type: application/json
 %}
 
 
-### Paso 32 — Las propuestas de la expedición
+### Paso 34 — ESPERAR. El incidente también es un evento
+# La propuesta se generó de forma síncrona, dentro de la operación (D45, D72). El aviso
+# es asíncrono: sale del mismo `IncidentRegistered`, sin que quien lo publica lo sepa (D73).
+GET {{host}}/api/expeditions/{{expedition}}/events
+Accept: application/json
+
+> {%
+    client.test("el incidente quedó registrado", function() {
+        client.assert(response.body.length === 2);
+        client.assert(response.body[1].type === "IncidentRegistered");
+    });
+%}
+
+
+### Paso 35 — ESPERAR. El aviso del incidente
+# Dos avisos más, uno por responsable.
+GET {{host}}/api/expeditions/{{expedition}}/notifications
+Accept: application/json
+
+> {%
+    client.test("cuatro avisos", function() {
+        client.assert(response.body.length === 4);
+    });
+%}
+
+
+### Paso 36 — Las propuestas de la expedición
 GET {{host}}/api/expeditions/{{expedition}}/replan-proposals
 Accept: application/json
 
 
-### Paso 33 — La propuesta en detalle, todavía pendiente
+### Paso 37 — La propuesta en detalle, todavía pendiente
 # Trae el incidente que la motivó, las opciones numeradas y `decision: null`.
 GET {{host}}/api/replan-proposals/{{proposal}}
 Accept: application/json
 
 
-### Paso 34 — SE CIERRA LA ACTIVIDAD AFECTADA, ANTES DE ACEPTAR
+### Paso 38 — SE CIERRA LA ACTIVIDAD AFECTADA, ANTES DE ACEPTAR
 # D47 lo exige: con una actividad en curso, aceptar una opción falla con 409
 # (`ActivitiesInProgressException`). El resultado real lo pone quien la ejecutó (D29).
 POST {{host}}/api/expeditions/{{expedition}}/activities/a-08/completion
@@ -336,7 +398,38 @@ Content-Type: application/json
 }
 
 
-### Paso 35 — SE ACEPTA LA OPCIÓN 1 (reprogramar)
+### Paso 39 — ESPERAR. `ActivityCompleted` tiene DOS interesados
+# Notificaciones y avance reciben el mismo evento, y cada uno tiene su propia entrega
+# (D74, D80): uno puede fallar sin frenar al otro.
+GET {{host}}/api/expeditions/{{expedition}}/events
+Accept: application/json
+
+> {%
+    client.test("la actividad terminada llegó a sus dos consumidores", function() {
+        client.assert(response.body.length === 3);
+        client.assert(response.body[2].type === "ActivityCompleted");
+        client.assert(response.body[2].deliveries.length === 2);
+        client.assert(response.body[2].deliveries.every(d => d.status === "DELIVERED"));
+    });
+%}
+
+
+### Paso 40 — ESPERAR. El avance y la línea de tiempo, en el informe
+# `progress` es lo que dejó el consumidor asíncrono; `timeline` integra los eventos a la
+# auditoría existente (D80).
+GET {{host}}/api/expeditions/{{expedition}}/report
+Accept: application/json
+
+> {%
+    client.test("el informe muestra el avance y los eventos", function() {
+        client.assert(response.body.progress.length === 1);
+        client.assert(response.body.progress[0].activityId === "a-08");
+        client.assert(response.body.timeline.length === 3);
+    });
+%}
+
+
+### Paso 41 — SE ACEPTA LA OPCIÓN 1 (reprogramar)
 # Responde 201 con LA ALTERNATIVA, en borrador y apuntando a la original con
 # `replacedExpeditionId`. OJO: `replacementId` de la original todavía es `null` y la
 # original queda SUSPENDED; el vínculo de vuelta aparece al aprobar la alternativa
@@ -363,12 +456,12 @@ Content-Type: application/json
 %}
 
 
-### Paso 36 — La original quedó suspendida y todavía sin reemplazo
+### Paso 42 — La original quedó suspendida y todavía sin reemplazo
 GET {{host}}/api/expeditions/{{expedition}}
 Accept: application/json
 
 
-### Paso 37 — EL ITINERARIO DE LA ALTERNATIVA: conserva los bloques y corre lo que sigue
+### Paso 43 — EL ITINERARIO DE LA ALTERNATIVA: conserva los bloques y corre lo que sigue
 # Ocho nodos, con el bloque secuencial y el paralelo adentro intactos, y la actividad
 # afectada más todo lo que tiene que moverse con ella dos horas más tarde (el horario de
 # abajo es el de inicio, antes -> después):
@@ -381,12 +474,12 @@ GET {{host}}/api/expeditions/{{alternative}}/itinerary
 Accept: application/json
 
 
-### Paso 38 — La alternativa pasa a revisión
+### Paso 44 — La alternativa pasa a revisión
 POST {{host}}/api/expeditions/{{alternative}}/review
 Content-Type: application/json
 
 
-### Paso 39 — Y se aprueba, VOLVIENDO A ACEPTAR LA ADVERTENCIA
+### Paso 45 — Y se aprueba, VOLVIENDO A ACEPTAR LA ADVERTENCIA
 # Las aceptaciones no se heredan: la alternativa es una expedición nueva y la nocturna
 # sigue por encima de la tolerancia (D22, D33). Al aprobarla, la alternativa toma las
 # reservas de la original.
@@ -405,7 +498,7 @@ Content-Type: application/json
 }
 
 
-### Paso 40 — AHORA SÍ: la original es REPLACED y apunta a la alternativa
+### Paso 46 — AHORA SÍ: la original es REPLACED y apunta a la alternativa
 GET {{host}}/api/expeditions/{{expedition}}
 Accept: application/json
 
@@ -417,7 +510,7 @@ Accept: application/json
 %}
 
 
-### Paso 41 — LA AUDITORÍA (tercer criterio de F3)
+### Paso 47 — LA AUDITORÍA (tercer criterio de F3)
 # La propuesta ES el registro: el incidente que la motivó, las cinco opciones que se
 # ofrecieron, qué se eligió, quién lo decidió, por qué y cuándo, y a qué expedición
 # llevó (D48).
@@ -425,26 +518,50 @@ GET {{host}}/api/replan-proposals/{{proposal}}
 Accept: application/json
 
 
-### Paso 42 — El plan original sigue consultable, con sus horarios de antes
+### Paso 48 — El plan original sigue consultable, con sus horarios de antes
 # a-08 sigue a las 11:30 en la original: la alternativa es otra expedición, no un parche.
 GET {{host}}/api/expeditions/{{expedition}}/itinerary
 Accept: application/json
 
 
-### Paso 43 — El informe de la original
+### Paso 49 — El informe de la original
 # Once actividades agendadas, una terminada, el incidente y la advertencia aceptada con
 # su justificación.
 GET {{host}}/api/expeditions/{{expedition}}/report
 Accept: application/json
 
 
-### Paso 44 — El informe de la alternativa
+### Paso 50 — El informe de la alternativa
 # Hereda el incidente de la original (D48): el historial no se pierde al replanificar.
 GET {{host}}/api/expeditions/{{alternative}}/report
 Accept: application/json
 
 
-### Paso 45 — El contrato completo de la API
+### Paso 51 — La línea de tiempo completa de la original
+# Aprobación, incidente y actividad terminada, en el orden en que el sistema los registró (D78).
+GET {{host}}/api/expeditions/{{expedition}}/events
+Accept: application/json
+
+> {%
+    client.test("tres eventos en orden", function() {
+        client.assert(response.body.map(e => e.type).join() === "ExpeditionApproved,IncidentRegistered,ActivityCompleted");
+    });
+%}
+
+
+### Paso 52 — ESPERAR. La línea de tiempo de la alternativa
+# La alternativa es otra expedición y tiene su propia aprobación.
+GET {{host}}/api/expeditions/{{alternative}}/events
+Accept: application/json
+
+> {%
+    client.test("la alternativa registró su aprobación", function() {
+        client.assert(response.body.map(e => e.type).join() === "ExpeditionApproved");
+    });
+%}
+
+
+### Paso 53 — El contrato completo de la API
 # Swagger UI está en http://localhost:8080/swagger-ui.html
 GET {{host}}/v3/api-docs
 Accept: application/json

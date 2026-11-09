@@ -1,5 +1,6 @@
 package ar.edu.itba.dps.fieldops.adapters.driving.seed;
 
+import ar.edu.itba.dps.fieldops.adapters.driven.EventDispatcher;
 import com.jayway.jsonpath.JsonPath;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,7 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("demo")
-@Sql("/clean-database.sql")
+@Sql("/clean-demo-database.sql")
 class DemoScriptApiTest {
     private static final String NIGHT_DIVE = """
             {
@@ -55,6 +56,8 @@ class DemoScriptApiTest {
     private MockMvc api;
     @Autowired
     private DemoDataLoader loader;
+    @Autowired
+    private EventDispatcher dispatcher;
 
     @BeforeEach
     void loadTheDemo() throws Exception {
@@ -189,6 +192,16 @@ class DemoScriptApiTest {
         approve(expedition).andExpect(status().isNoContent());
         assertStatus(expedition, "APPROVED");
 
+        dispatcher.dispatchPending();
+        api.perform(get("/api/expeditions/{id}/events", expedition))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].type").value(Matchers.contains("ExpeditionApproved")))
+                .andExpect(jsonPath("$[0].deliveries[*].consumer").value(Matchers.contains("notify-responsibles")))
+                .andExpect(jsonPath("$[0].deliveries[*].status").value(Matchers.everyItem(Matchers.is("DELIVERED"))));
+        api.perform(get("/api/expeditions/{id}/notifications", expedition))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].responsibleId").value(Matchers.containsInAnyOrder("p-ada", "p-nils")));
+
         transition(expedition, "execution").andExpect(status().isNoContent());
         api.perform(post("/api/expeditions/{id}/activities/{activityId}/start", expedition, "a-08")
                         .contentType(MediaType.APPLICATION_JSON).content("""
@@ -228,6 +241,12 @@ class DemoScriptApiTest {
                 .andReturn().getResponse().getContentAsString();
         final String proposal = JsonPath.read(registered, "$.id");
 
+        dispatcher.dispatchPending();
+        api.perform(get("/api/expeditions/{id}/events", expedition))
+                .andExpect(jsonPath("$[*].type").value(Matchers.contains("ExpeditionApproved", "IncidentRegistered")));
+        api.perform(get("/api/expeditions/{id}/notifications", expedition))
+                .andExpect(jsonPath("$.length()").value(4));
+
         api.perform(get("/api/expeditions/{id}/replan-proposals", expedition))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
@@ -243,6 +262,18 @@ class DemoScriptApiTest {
                                  "result": "One of the four samples collected before the station flooded"}
                                 """))
                 .andExpect(status().isNoContent());
+
+        dispatcher.dispatchPending();
+        api.perform(get("/api/expeditions/{id}/events", expedition))
+                .andExpect(jsonPath("$[*].type").value(Matchers.contains("ExpeditionApproved", "IncidentRegistered", "ActivityCompleted")))
+                .andExpect(jsonPath("$[2].deliveries.length()").value(2))
+                .andExpect(jsonPath("$[2].deliveries[*].status").value(Matchers.everyItem(Matchers.is("DELIVERED"))));
+        api.perform(get("/api/expeditions/{id}/report", expedition))
+                .andExpect(jsonPath("$.progress.length()").value(1))
+                .andExpect(jsonPath("$.progress[0].activityId").value("a-08"))
+                .andExpect(jsonPath("$.progress[0].finishedActivities").value(1))
+                .andExpect(jsonPath("$.progress[0].scheduledActivities").value(11))
+                .andExpect(jsonPath("$.timeline.length()").value(3));
 
         final var accepted = api.perform(post("/api/replan-proposals/{proposalId}/acceptance", proposal)
                         .contentType(MediaType.APPLICATION_JSON).content("""
@@ -307,6 +338,13 @@ class DemoScriptApiTest {
                 .andExpect(jsonPath("$.scheduledActivities").value(11))
                 .andExpect(jsonPath("$.incidents.length()").value(1))
                 .andExpect(jsonPath("$.incidents[0].id").value(expedition + "/incidents/1"));
+
+        dispatcher.dispatchPending();
+        api.perform(get("/api/expeditions/{id}/events", expedition))
+                .andExpect(jsonPath("$[*].type").value(Matchers.contains("ExpeditionApproved", "IncidentRegistered", "ActivityCompleted")));
+        api.perform(get("/api/expeditions/{id}/events", alternative))
+                .andExpect(jsonPath("$[*].type").value(Matchers.contains("ExpeditionApproved")))
+                .andExpect(jsonPath("$[0].deliveries[*].status").value(Matchers.everyItem(Matchers.is("DELIVERED"))));
     }
 
     @Test
