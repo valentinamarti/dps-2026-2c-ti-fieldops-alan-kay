@@ -1,5 +1,6 @@
 package ar.edu.itba.dps.fieldops;
 
+import ar.edu.itba.dps.fieldops.adapters.driven.EventDispatcher;
 import ar.edu.itba.dps.fieldops.adapters.driven.EventSerializer;
 import ar.edu.itba.dps.fieldops.adapters.driven.OutboxEventPublisher;
 import ar.edu.itba.dps.fieldops.adapters.driven.persistence.DomainEventJpaRepository;
@@ -13,13 +14,16 @@ import ar.edu.itba.dps.fieldops.business.providers.EventPublisher;
 import ar.edu.itba.dps.fieldops.business.providers.ExpeditionRepository;
 import ar.edu.itba.dps.fieldops.business.usecases.QueryExpeditionEvents;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import java.time.Clock;
 import java.util.List;
 
 @Configuration
+@EnableConfigurationProperties(EventsProperties.class)
 public class EventsConfig {
 
     @Bean
@@ -50,5 +54,14 @@ public class EventsConfig {
     QueryExpeditionEventsPort queryExpeditionEvents(EventLog events, ExpeditionRepository expeditions,
                                                     TransactionalUseCases transactional) {
         return transactional.reading(QueryExpeditionEventsPort.class, new QueryExpeditionEvents(events, expeditions));
+    }
+
+    @Bean
+    EventDispatcher eventDispatcher(ObjectProvider<AsyncEventSubscriber<?>> asyncSubscribers,
+                                    DomainEventJpaRepository events, EventDeliveryJpaRepository deliveries,
+                                    EventSerializer serializer, PlatformTransactionManager transactions,
+                                    EventsProperties properties, Clock clock) {
+        return new EventDispatcher(asyncSubscribers.stream().toList(), events, deliveries, serializer, transactions,
+                properties.retryPolicy(), clock);
     }
 }
