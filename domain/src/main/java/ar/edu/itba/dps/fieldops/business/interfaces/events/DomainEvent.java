@@ -11,4 +11,6 @@ public interface DomainEvent {
     ExpeditionId expeditionId();
 
     LocalDateTime occurredAt();
+
+    String summary();
 }
