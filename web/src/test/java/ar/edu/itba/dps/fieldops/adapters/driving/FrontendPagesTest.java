@@ -28,7 +28,7 @@ class FrontendPagesTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"/styles.css", "/js/main.js", "/js/api.js", "/js/dom.js", "/js/messages.js", "/js/catalog.js",
-            "/js/expedition-list.js", "/js/expedition.js", "/js/itinerary.js", "/js/planning.js", "/js/approval.js", "/js/proposals.js"})
+            "/js/expedition-list.js", "/js/expedition.js", "/js/itinerary.js", "/js/planning.js", "/js/approval.js", "/js/proposals.js", "/js/events.js", "/js/format.js"})
     void servesEveryFileThePageNeeds(String path) throws Exception {
         web.perform(get(path)).andExpect(status().isOk());
     }

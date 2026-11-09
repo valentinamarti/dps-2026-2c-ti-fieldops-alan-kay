@@ -22,19 +22,19 @@ function acceptancesFrom(data, warnings) {
     }));
 }
 
-function approvalForm(expedition, validation, refresh) {
+function approvalForm(expedition, validation, names, refresh) {
     return formOf([
-        field("Responsible who accepts", selectOf("responsibleId", expedition.responsibleIds)),
+        field("Responsible who accepts", selectOf("responsibleId", expedition.responsibleIds.map(id => ({value: id, label: names.resource(id)})))),
         ...warningFields(validation.warnings),
     ], "Approve", reporting(async data => {
         await api.post(`/expeditions/${encodeURIComponent(expedition.id)}/approval`, {
             acceptedWarnings: acceptancesFrom(data, validation.warnings),
         });
         await refresh();
-    }));
+    }, "Expedition approved."));
 }
 
-export function approvalView(expedition, validation, refresh) {
+export function approvalView(expedition, validation, names, refresh) {
     return panel("Validation",
         h("p", {class: validation.canBeApproved ? "ok" : "critical"},
             validation.canBeApproved ? "No critical errors." : "It has critical errors and cannot be approved."),
@@ -42,5 +42,5 @@ export function approvalView(expedition, validation, refresh) {
         findingsView(validation.criticals, "critical", "None."),
         h("h3", {}, "Warnings"),
         findingsView(validation.warnings, "warning", "None."),
-        expedition.status === "IN_REVIEW" ? approvalForm(expedition, validation, refresh) : null);
+        expedition.status === "IN_REVIEW" ? approvalForm(expedition, validation, names, refresh) : null);
 }

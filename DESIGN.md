@@ -12,6 +12,8 @@ Antes de poder aprobarse, una expedición se corre contra un conjunto de reglas 
 
 Durante la ejecución se registra el comienzo, la finalización, las observaciones y los **incidentes** de cada actividad. Un incidente publica un evento de dominio y, del otro lado, una **propuesta de replanificación** (`ReplanProposal`) ofrece las opciones que se pueden armar —reprogramar, reemplazar un recurso, cancelar—, cada una con el motivo (`ReplanReason`) con el que el replanificador construiría la alternativa. Un responsable acepta una opción o la rechaza, y la propuesta queda como el registro de la auditoría: el incidente que la motivó, las opciones que se ofrecieron y la decisión que se tomó. Aceptar no modifica el plan original: construye **otra expedición** en borrador que lo reemplaza, y la original sigue siendo consultable tal como estaba (D45, D46, D47, D48).
 
+La aprobación, el incidente y la finalización de una actividad son **eventos de dominio**: `Expedition` los registra y, al guardarse, quedan en un registro consultable junto con su entrega a cada consumidor asíncrono. Notificaciones y avance reaccionan fuera de la operación; la propuesta de replanificación sigue siendo síncrona (D70 a D80).
+
 La persistencia no aparece en el modelo: los casos de uso hablan con puertos de salida (`business.providers`), y el adaptador JPA guarda el estado en PostgreSQL con sus propias entidades (D65 a D68). Cada caso de uso es una transacción, y dos escrituras en conflicto terminan en un 409.
 
 ## Patrones y principios aplicados
@@ -924,6 +926,7 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
   - **El guion y el test tienen que moverse juntos.** `DemoScriptApiTest` recorre los mismos pasos en el mismo orden, con los mismos cuerpos, y `DemoDataLoaderTest` verifica el escenario que dejan los archivos sin levantar contexto. Si el guion y el test se separan, el guion miente y la CI avisa.
   - Sumar un escenario es sumar un par de archivos y apuntar las dos propiedades; sumar un tipo de recurso al seed es una lista más en el documento y una línea en el cargador, el mismo costo que el controller de D52.
   - El cargador comparte el `ObjectMapper` de la aplicación (Jackson 3, el que trae Spring Boot 4), así que los documentos se interpretan exactamente como los cuerpos que llegan por HTTP.
+- **Revisado en D82:** el perfil `demo` ya no usa la base de la aplicación: corre sobre H2 en memoria, así que reiniciar vuelve a dejar el seed.
 
 ### D51 — La persistencia es en memoria detrás de los puertos, con los tests de repositorio como contrato (Entrega 2, F5, deuda técnica de la entrega)
 
@@ -1344,6 +1347,7 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
   - Una entidad JPA por nodo con relaciones — más clases y más cascadas para un árbol que siempre se lee y se escribe entero.
   - H2 para los tests — otra base distinta de la de producción, con otras diferencias.
 - **Consecuencia:** los adaptadores pasan los contratos contra PostgreSQL, y desde D68 la aplicación corre sobre ellos. Correr los tests de `app` requiere Docker.
+- **Revisado en D82:** PostgreSQL sigue siendo la base de `prod` y de los tests, salvo `DemoScriptApiTest`, que corre sobre H2 como la demostración.
 
 ### D68 — La aplicación corre sobre la base, con la transacción en el borde del caso de uso (corrección de la Entrega 2, persistencia, cierra D51, revisa D37, D45 y D50)
 
@@ -1381,6 +1385,7 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
   - La pantalla ofrece iniciar y finalizar en todas las actividades mientras la expedición está en ejecución, porque la respuesta del itinerario no trae el seguimiento. Si la acción no corresponde, el dominio la rechaza y se muestra el motivo.
   - Las fechas de seguimiento son las del momento de la acción.
   - Los tests verifican que los archivos se sirven, pero no recorren la pantalla con un navegador: ese recorrido se probó a mano.
+- **Revisado en D81:** la página de la expedición suma las secciones de eventos y notificaciones, el avance y la línea de tiempo en el informe, y acciones de seguimiento según el estado de cada actividad. También suma textos legibles, nombres en vez de ids, bloques plegables y un estilo general nuevo, siempre sin framework ni build. El formulario de bloques en JSON se quitó: los bloques se ven en el itinerario, pero se crean por la API o desde el seed.
 
 ### D70 — La expedición guarda sus eventos y se publican al guardarla (Entrega 3, propuesta de valor, revisa D45)
 
@@ -1699,6 +1704,49 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
   - `ExpeditionReport` deja de ser el informe completo: el completo es la vista.
   - Si `TrackProgress` falla, la operación no se deshace y las notificaciones siguen: lo prueba `AFailingProgressConsumerTest`.
 
+### D81 — El itinerario muestra el seguimiento y el frontend muestra los eventos (Entrega 3, propuesta de valor, completa D69)
+
+- **Patrón / principio:** vista de lectura (D64). El frontend solo consume la API (D69).
+- **Dónde:** `ActivityTrackingView` y `TrackingStatus` en `business.models.responses`; `TrackingResponse` y `ObservationDto` en el adaptador REST; `itinerary.js`, `events.js` y `expedition.js`.
+- **Por qué:**
+  - La API registraba inicio, fin, resultado y observaciones, pero no los devolvía. Sin eso, la demostración de `ActivityCompleted` no se puede seguir desde la pantalla.
+  - El estado (pendiente, en curso o terminada) lo calcula el dominio y llega hecho: el frontend solo elige qué acciones ofrecer.
+  - Un incidente se puede registrar en una actividad pendiente o en curso (D23, D47), así que el formulario está en esos dos estados. Una actividad terminada no ofrece acciones.
+  - Las secciones de eventos y notificaciones tienen un botón para recargar, porque las entregas llegan unos segundos después de la acción que las origina (D77).
+  - El frontend se mostraba como una salida de la API (`IN_PROGRESS`, `1 people`, `p-rita`), y es lo que se ve en el video. `format.js` reúne en funciones puras cómo se muestran los estados, las fechas, las cantidades y los eventos. La página de la expedición también consulta el catálogo y las zonas para mostrar nombres, y si no encuentra un id, muestra el id.
+  - Los bloques del itinerario se pueden plegar, y al plegarse dejan un resumen de sus actividades. Están desplegados por defecto. `disclosure` en `dom.js` recuerda en memoria qué quedó abierto, porque la página se vuelve a dibujar después de cada acción. Un bloque no tiene id (D39), así que la clave es la expedición más su ruta en el árbol.
+- **Alternativas descartadas:**
+  - Deducir el estado en JavaScript a partir de las fechas — pondría una regla del dominio en el frontend.
+  - Recargar las secciones por intervalo — es una complejidad que la demostración no necesita, y esconde la consistencia eventual que se quiere mostrar.
+  - Svelte o React — obligaban a reescribir los módulos del frontend y a sumar Node a Maven y a la CI, y nada de lo que se mejoró lo necesita.
+- **Consecuencia:**
+  - `ScheduledActivityResponse` suma `tracking` también en la respuesta de agendar una actividad, donde siempre está pendiente.
+  - Los textos que arma el dominio, como los avisos y las propuestas de replanificación, siguen trayendo ids. Cambiarlos es trabajo del dominio, no del frontend.
+  - Lo que queda plegado se olvida al recargar el navegador.
+  - El frontend ya no crea bloques. Pedir un árbol en JSON no era apto para quien usa la aplicación, y un editor visual es mucho código para lo que se muestra. `POST /blocks` sigue en la API, y `demo.http` y el seed lo usan.
+  - Agendar una actividad ya no pide un id: el frontend arma el siguiente `a-NN` a partir del itinerario, y las dependencias se eligen por nombre.
+  - El motivo de una replanificación, las indisponibilidades de un recurso y el tipo de una actividad no se ven en el frontend, porque la API no los devuelve. Se dejaron afuera para no cambiar la API a días de la entrega.
+
+### D82 — Perfiles `prod` y `demo`: PostgreSQL persistente y H2 efímero (Entrega 3, revisa D50 y D67)
+
+- **Patrón / principio:** configuración por perfil, sin cambios en el dominio ni en los adaptadores.
+- **Dónde:** `application.yml` (`spring.profiles.default: prod`), `application-prod.yml`, `application-demo.yml`, `h2` con scope `runtime` en `web/pom.xml`, y `clean-demo-database.sql` en los tests.
+- **Por qué:**
+  - `prod` guarda los datos reales: arranca vacío, sin seed, y persiste en el volumen de Compose.
+  - `demo` tiene que correr sin Docker y volver a su punto de partida: carga el seed al arrancar y lo que cambia se pierde al reiniciar.
+  - `prod` es el perfil por defecto porque, con H2 en el classpath, un arranque sin perfil levantaría una base embebida vacía sin avisar.
+  - Las dos bases usan las mismas migraciones. H2 corre en modo PostgreSQL y con `NON_KEYWORDS=VALUE`, porque `activity_parameter` tiene una columna `value`.
+  - `DemoScriptApiTest` corre sobre H2 para que la CI recorra la demostración sobre la base con la que se muestra.
+- **Alternativas descartadas:**
+  - PostgreSQL también en `demo`, volviendo al inicio con `docker compose down -v` — mantenía un solo motor, pero exigía Docker para mostrar la demostración y un paso manual para repetirla.
+  - Perfil `prod` sin default — arrancar sin perfil caería en H2 sin avisar.
+  - Migraciones separadas para H2 — duplicarían el esquema, y no hizo falta.
+- **Consecuencia:**
+  - **La demostración no muestra la durabilidad del outbox (D74).** Con H2 en memoria, una caída pierde todo. La garantía es de `prod`, y las pruebas de `app` y `web` la verifican sobre PostgreSQL con Testcontainers.
+  - `DemoScriptApiTest` no puede usar `clean-database.sql`, porque H2 no acepta `TRUNCATE` de varias tablas con `CASCADE`. Una tabla nueva hay que sumarla también a `clean-demo-database.sql`.
+  - H2 forma parte del jar de `prod`, aunque ese perfil no lo use.
+  - Flyway avisa al arrancar `demo` que H2 2.4 es más nuevo que la última versión que verificó. Las migraciones y la demostración pasan igual.
+
 ## Funcionalidades nuevas de la Entrega 2
 
 ### F1 — Actividades nocturnas
@@ -1915,6 +1963,69 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
   - La cascada y el arrastre — `ItineraryCascadeTest` y los tests nuevos de `ExpeditionReplannerTest`; la bitácora de incidentes, `ExpeditionIncidentsTest`.
   - **En la demostración** (D50): el guion registra el incidente sobre la actividad en curso con retraso y recurso afectado, recibe las cinco opciones, cierra la actividad, acepta la reprogramación, aprueba la alternativa —que conserva los bloques y corre lo que depende de la actividad afectada, incluida la nocturna— y recorre la auditoría entera y los dos informes — `DemoScriptApiTest.walksTheScriptOfTheDemoFromTheNightActivityToTheAuditOfTheReplanning`.
 
+## Propuesta de valor: arquitectura orientada a eventos
+
+Una aprobación, un incidente o una actividad terminada le interesan a varias partes del sistema. Con eventos, quien produce el hecho no conoce a los interesados, y cada interesado reacciona con la garantía que necesita.
+
+**Decisiones:** D70 a D80 cubren los eventos, el outbox, el despachador, las garantías y los consumidores. D81 y D82 cubren lo que se muestra y cómo corre.
+
+### Flujo de un evento
+
+```mermaid
+flowchart LR
+  A["Expedition registra el hecho"] --> B["El caso de uso guarda (PublishingExpeditionRepository)"]
+  B --> C["OutboxEventPublisher, en la misma transacción"]
+  C --> D["Suscriptor síncrono: ProposeReplan"]
+  C --> E["domain_event + event_delivery pendiente"]
+  E --> F["EventDispatcher, cada 2 s"]
+  F --> G["NotifyResponsibles"]
+  F --> H["TrackProgress"]
+  G --> I["Registro e informe"]
+  H --> I
+```
+
+| Evento | Lo emite | Síncrono | Asíncrono |
+| --- | --- | --- | --- |
+| `ExpeditionApproved` | `Expedition` al aprobar | — | `NotifyResponsibles` |
+| `IncidentRegistered` | `Expedition` al registrar el incidente | `ProposeReplan` | `NotifyResponsibles` |
+| `ActivityCompleted` | `Expedition` al terminar la actividad | — | `NotifyResponsibles` y `TrackProgress` |
+
+La propuesta de replanificación es síncrona porque el responsable decide en ese momento, y si falla se deshace el incidente. Las notificaciones y el avance son asíncronos porque pueden llegar después y no deben frenar ni deshacer la operación.
+
+### Garantías
+
+Entrega al-menos-una-vez, sin efectos duplicados, porque el consumidor y la marca de la entrega se confirman juntos. Orden por expedición y por consumidor. Hasta 5 intentos con espera creciente, de 1 s a 30 s como máximo; después, la entrega queda `FAILED` y visible (D78).
+
+### Costo del cambio
+
+Desde el inicio de la Entrega 3 (`2401377`), con los tests y `demo.http`: 148 archivos, con 5190 líneas agregadas y 308 quitadas. El detalle de producción:
+
+- **Clases agregadas en `domain`:** `ExpeditionApproved`, `ActivityCompleted`, `EventId`, `ConsumerName`, `DeliveryStatus`, `AsyncEventSubscriber`, `Notification`, `ProgressEntry`, las vistas `RecordedEventView`, `EventDeliveryView`, `ActivityTrackingView` y `TrackingStatus`, los puertos `EventLog`, `NotificationRepository`, `ProgressHistory`, `QueryExpeditionEventsPort` y `QueryNotificationsPort`, `PublishingExpeditionRepository` y los casos de uso `NotifyResponsibles`, `TrackProgress`, `QueryExpeditionEvents` y `QueryNotifications`.
+- **Clases agregadas en `app`:** `OutboxEventPublisher`, `EventDispatcher`, `EventSerializer`, `RetryPolicy`, `UnknownEventTypeException` y las entidades, repositorios y adaptadores JPA del registro, las notificaciones y el avance.
+- **Clases agregadas en `web`:** `EventsConfig`, `EventsProperties`, `EventDispatchScheduler`, `EventLogController`, `NotificationController`, sus mappers y DTOs, y `events.js`.
+- **Clases existentes modificadas:** `Expedition`, `DomainEvent`, `IncidentRegistered`, `ExpeditionReportView`, `ScheduledActivityView`, `ApproveExpeditionPort`, `QueryReplanProposalsPort`, `RegisterIncidentPort`, `ApproveExpedition`, `ProposeReplan`, `QueryReplanProposals`, `RegisterIncident`, `ReportExpedition`, `FieldOpsConfig`, `ReplanningConfig`, `ExpeditionLifecycleController`, `IncidentController`, `ExpeditionReportResponse`, `ScheduledActivityResponse`, `ActivityMapper`, `ReportMapper`, `expedition.js` e `itinerary.js`.
+- **Infraestructura agregada:** las migraciones `V2` y `V3`, Jackson en `app`, `@EnableScheduling`, Awaitility en los tests y H2 para la demostración.
+
+### Deuda técnica que se decidió no resolver
+
+Una sola instancia, sin versión de esquema de los eventos, sin backfill para un consumidor nuevo, sin reentrega manual de un `FAILED`, un registro que crece sin límite y sin broker.
+
+### Cada requisito de la consigna con su test
+
+| Requisito | Test |
+| --- | --- |
+| Emisión ante cada operación | `ExpeditionApprovalTest.approvingRecordsExpeditionApprovedAtTheMomentItReceives`, `ExpeditionIncidentsTest.registeringAnIncidentRecordsTheEventOfTheFact`, `ExpeditionTrackingTest.finishingAnActivityRecordsActivityCompleted` |
+| Publicación desacoplada | `PublishingExpeditionRepositoryTest`, `RegisterIncidentTest`, `HexagonalArchitectureTest` |
+| Efecto de los consumidores | `NotificationsApiTest.theResponsibleIsToldOnceTheDispatcherDeliversTheEvent`, `ReportWithEventsApiTest.theReportShowsTheProgressOnceTheDispatcherDeliversTheEvent` |
+| Consumidor asíncrono que falla | `EventDispatcherTest.exhaustingTheAttemptsLeavesItFailedWithItsErrorAndHowManyAttemptsItTook`, `EventDispatcherTest.aFailingConsumerDoesNotUndoTheOperationNorHoldBackTheOtherConsumerOfTheSameEvent`, `AFailingProgressConsumerTest` |
+| Orden ante una falla | `EventDispatcherTest.theNextEventsOfThatExpeditionWaitForThatConsumerAndArriveInOrder` |
+| Sin efectos duplicados | `NotificationsApiTest.dispatchingAgainDoesNotNotifyTwice`, `NotificationsApiTest.anEventDeliveredAgainDoesNotNotifyTwiceAndTheFailureIsVisible` |
+| Si la operación se deshace, el evento no queda | `OutboxEventPublisherTest.aFailingSubscriberReachesWhoeverPublishedAndLeavesNothingRecorded` |
+| Consumidor síncrono que falla | `TransactionalUseCasesTest.aFailingSubscriberUndoesTheIncidentThatPublishedTheEvent` |
+| Despachador real | `ScheduledDispatchTest.theSchedulerDeliversWhatAnOperationLeftPendingWithoutAnyoneCallingTheDispatcher` |
+| Registro consultable e integrado a la auditoría | `JpaEventLogTest`, `EventLogApiTest`, `ReportWithEventsApiTest` |
+| Recorrido completo de la demostración | `DemoScriptApiTest` |
+
 ## Patrones que decidimos no aplicar
 
 | Patrón | Por qué no                                                                                                                                                                                              | Consecuencias |
@@ -1976,3 +2087,4 @@ La persistencia no aparece en el modelo: los casos de uso hablan con puertos de 
 - El seed carga los datos en cada arranque con el perfil `demo` y el guion los consume: no hay reversión ni limpieza. Correr el guion dos veces seguidas exige reiniciar la aplicación (D50).
 - Los momentos de los hechos del campo (el inicio y el fin de una actividad, una observación y un incidente) los informa el cliente, y el sistema confía en ellos: pasan en el campo y se pueden cargar después. La aprobación es un acto del sistema, y su momento es la hora del servidor al recibir el pedido. El dominio no lee la hora en ningún caso: la recibe (D71).
 - La aplicación corre en una sola instancia. El despachador de eventos no bloquea las entregas que toma, así que con dos instancias dos despachadores podrían entregar dos veces la misma. Si hicieran falta varias, la salida es tomar las entregas con `SELECT … FOR UPDATE SKIP LOCKED`, para que cada una la tome un solo despachador (D77).
+- El perfil `prod` arranca sin datos y sus cambios persisten en el volumen de Compose. El perfil `demo` arranca con el seed y sus cambios se pierden al reiniciar (D82).

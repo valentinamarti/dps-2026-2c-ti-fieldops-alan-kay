@@ -23,7 +23,8 @@ public record ScheduledActivityView(ActivityId id, String name, String zoneId, T
                                     List<StaffRequirement> requiredStaff, List<ResourceId> assignedStaffIds,
                                     List<ReusableRequirement> requiredEquipment, List<ResourceId> assignedEquipmentIds,
                                     List<DepletableRequirement> requiredSupplies, List<ResourceId> assignedSupplyIds,
-                                    Set<Certification> requiredCertifications, Set<Permit> requiredPermits) {
+                                    Set<Certification> requiredCertifications, Set<Permit> requiredPermits,
+                                    ActivityTrackingView tracking) {
 
     public static ScheduledActivityView of(ItineraryItem item) {
         final var activity = item.getActivity();
@@ -43,7 +44,8 @@ public record ScheduledActivityView(ActivityId id, String name, String zoneId, T
                 activity.requiredSupplies(),
                 idsOf(item.getAssignedSupplies()),
                 activity.requiredCertificationsForAllStaff(),
-                activity.requiredPermits());
+                activity.requiredPermits(),
+                ActivityTrackingView.of(item));
     }
 
     private static List<ResourceId> idsOf(Collection<? extends Resource> resources) {

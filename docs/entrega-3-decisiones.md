@@ -105,7 +105,7 @@ La consigna pide mostrar el flujo completo de un evento y discutir sus consecuen
 ## Pendiente de definir
 
 - Reparto de tareas entre los cinco integrantes.
-- Formato de la presentación y cómo se preparan los cinco, porque presenta uno elegido al azar.
+- Qué decisiones se presentan en el video y quién habla de cada una (`docs/entrega-3-presentacion.md`).
 - Valores concretos: intervalo del despachador, cantidad de reintentos y espera entre ellos.
 
 Puntos a resolver al implementar:
@@ -113,3 +113,29 @@ Puntos a resolver al implementar:
 - Quién genera el `EventId` (la entidad con un `UUID` o un proveedor de ids, como `ExpeditionIdProvider`) y cómo se toman los eventos pendientes de la entidad después del `save`.
 - La forma del comando de aprobar con `approvedAt`, que cambia `ApproveExpeditionPort`, la API y `demo.http`. La alternativa es un puerto de reloj en el dominio, que no cambia la API.
 - Qué guarda exactamente la proyección del avance del informe, sin duplicar la lógica de `ExpeditionReporter`. Por ejemplo, que la proyección sea la línea de tiempo de lo terminado y el informe la lea, en vez de volver a calcular el consumo.
+
+## Fase 5 (09/11/2026)
+
+| Tema | Decisión | Notas |
+|---|---|---|
+| Perfiles | **`prod` y `demo`, con `prod` como perfil por defecto** | Sin perfil, la aplicación va a PostgreSQL (`spring.profiles.default: prod`). Si no hubiera default, H2 en el classpath haría que un arranque sin perfil levantara una base embebida vacía sin avisar. |
+| Base de `prod` | **PostgreSQL de Compose, vacía al principio y persistente** | Solo corren las migraciones, sin seed. Los cambios quedan en el volumen `fieldops-data`, entre reinicios de la aplicación y del contenedor. |
+| Base de `demo` | **H2 en memoria, con el seed de siempre y cambios efímeros** | Corre sin Docker. Al arrancar carga `demo/catalog.json` y `demo/expedition.json`. Lo que se cambia se pierde al reiniciar, y el próximo arranque vuelve al seed. Usa las mismas migraciones que `prod`, en modo PostgreSQL y con `NON_KEYWORDS=VALUE`, porque `value` es una palabra reservada de H2. |
+| Qué prueba cada base | **`DemoScriptApiTest` corre en H2 y el resto en PostgreSQL** | La CI recorre la demo sobre la base con la que se muestra. Las garantías del outbox se siguen probando en PostgreSQL con Testcontainers. |
+| Cómo espera la demo al despachador | **Nota de "ESPERAR" en `demo.http`** (decisión 5.3) | Va en cada consulta asíncrona que sigue a una operación. La espera sirve para explicar la consistencia eventual. |
+| Framework del frontend | **Ninguno, sigue D69** | Svelte o React obligaban a reescribir los módulos del frontend y a sumar Node a Maven y a la CI, y nada de lo pedido lo necesita. |
+| Alcance de las mejoras del frontend (decisión 5.5) | **Todas las pantallas** | Textos humanos (`In progress`, `1 person`), nombres en vez de ids en las pantallas de la expedición, bloques plegables desplegados por defecto con un resumen de lo plegado, y estilo general. El catálogo mantiene la columna `Id`. Los textos que arma el dominio, como los avisos y las propuestas, quedan igual y traen ids. |
+| Formulario de bloques | **Se quita del frontend** | Pedía un árbol en JSON, y la pantalla tiene que entenderse sin conocimientos técnicos. Los bloques se ven y se pliegan en el itinerario, pero se crean por la API o desde el seed. |
+| Notificaciones en pantalla | **Una fila por evento, con todos sus destinatarios** | Se descartó mostrar la aplicación como un solo responsable: no hay usuarios ni sesión, y aprobar o decidir ya pide elegir responsable. Un filtro simulado además escondía que el consumidor genera un aviso por responsable. |
+| Lo que el frontend no muestra | **Motivo de replanificación, indisponibilidades y tipo de actividad** | La API no los devuelve, y se decidió no cambiarla a días de la entrega. Lo que la API ya entregaba sí se suma: demora y recurso del incidente, permisos, certificaciones y ventana de cada actividad, máximo de participantes, y terminar una expedición suspendida. |
+
+Consecuencia para la presentación: la demo no muestra que el outbox sobreviva a una caída, porque con H2 en memoria se pierde todo al reiniciar. Esa garantía es de `prod`.
+
+## Cambios al implementar
+
+Lo que este documento dice arriba y terminó distinto. Las decisiones están en `docs/entrega-3-plan.md`.
+
+- **`POST /incidents` sigue respondiendo con la propuesta y su `Location`**, no con el incidente (decisión 1.1). `RegisterIncidentPort` sí devuelve el `Incident`, y es el controller el que busca la propuesta. `demo.http` y el frontend no cambiaron por esto.
+- **`approvedAt` lo pone el controller con `LocalDateTime.now()`** (decisión 1.2). El cuerpo de la aprobación y `demo.http` no cambiaron.
+- **La demo corre en H2, sin `docker compose up`** (ver "Fase 5"). Revisa la idea inicial de mostrarla sobre PostgreSQL.
+- **La presentación es un video de YouTube sin listar, de 8 a 12 minutos, con los cinco hablando de una parte distinta.** Reemplaza la presentación en clase de un integrante elegido al azar. Lo informó Tobías el 09/11/2026.

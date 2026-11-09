@@ -1,18 +1,28 @@
 import {h} from "./dom.js";
 
+const SUCCESS_DURATION_MS = 3000;
+
 const container = () => document.getElementById("messages");
 
+let dismissal;
+
+function show(...messages) {
+    clearTimeout(dismissal);
+    container().replaceChildren(...messages);
+}
+
 export function clearMessages() {
-    container().replaceChildren();
+    show();
 }
 
 export function showError(error) {
-    container().replaceChildren(h("div", {class: "message"}, error.message));
+    show(h("div", {class: "message"}, error.message));
     window.scrollTo({top: 0});
 }
 
 export function showSuccess(text) {
-    container().replaceChildren(h("div", {class: "message success"}, text));
+    show(h("div", {class: "message success"}, text));
+    dismissal = setTimeout(clearMessages, SUCCESS_DURATION_MS);
 }
 
 export function reporting(action, successText) {

@@ -1,3 +1,5 @@
+import {humanize} from "./format.js";
+
 export function h(tag, attributes = {}, ...children) {
     const element = document.createElement(tag);
     Object.entries(attributes).forEach(([name, value]) => applyAttribute(element, name, value));
@@ -45,8 +47,49 @@ export function badge(text, kind = "") {
     return h("span", {class: `badge ${kind}`}, text);
 }
 
+const STATUS_KINDS = {
+    IN_REVIEW: "info",
+    APPROVED: "info",
+    IN_EXECUTION: "accent",
+    IN_PROGRESS: "accent",
+    SUSPENDED: "warn",
+    FINISHED: "ok",
+    ACCEPTED: "ok",
+    DELIVERED: "ok",
+    REJECTED: "danger",
+    FAILED: "danger",
+};
+
+const RISK_KINDS = {MEDIUM: "info", HIGH: "warn", EXTREME: "danger"};
+
+export function statusBadge(status) {
+    return badge(humanize(status), STATUS_KINDS[status] ?? "");
+}
+
+export function riskBadge(level) {
+    return badge(`${humanize(level)} risk`, RISK_KINDS[level] ?? "");
+}
+
+const remembered = new Map();
+
+export function disclosure(key, openByDefault, header, ...children) {
+    return h("details", {
+        open: remembered.get(key) ?? openByDefault,
+        onToggle: event => remembered.set(key, event.target.open),
+    }, h("summary", {}, header), ...children);
+}
+
 export function button(label, onClick, kind = "") {
     return h("button", {type: "button", class: kind, onClick}, label);
+}
+
+export function checkboxes(name, options) {
+    return h("div", {class: "checks"}, options.map(option => h("label", {class: "inline"},
+        h("input", {type: "checkbox", name, value: option.id}), option.name)));
+}
+
+export function submitButton(label) {
+    return h("button", {type: "submit"}, label);
 }
 
 export function formOf(fields, submitLabel, onSubmit) {
@@ -56,17 +99,7 @@ export function formOf(fields, submitLabel, onSubmit) {
             event.preventDefault();
             onSubmit(new FormData(event.target), event.target);
         },
-    }, ...fields, h("button", {type: "submit"}, submitLabel));
-}
-
-export function formatMinutes(minutes) {
-    const hours = Math.floor(minutes / 60);
-    const rest = minutes % 60;
-    return hours > 0 ? `${hours} h ${rest} min` : `${rest} min`;
-}
-
-export function formatPeriod(period) {
-    return `${period.start.replace("T", " ")} → ${period.end.replace("T", " ")}`;
+    }, ...fields, submitLabel ? submitButton(submitLabel) : null);
 }
 
 export function listOfText(value) {

@@ -12,5 +12,6 @@ public record ScheduledActivityResponse(String id, String name, String zoneId, P
                                         List<String> assignedEquipmentIds,
                                         List<SupplyRequirementDto> requiredSupplies,
                                         List<String> assignedSupplyIds,
-                                        List<String> requiredCertifications, List<String> requiredPermits) {
+                                        List<String> requiredCertifications, List<String> requiredPermits,
+                                        TrackingResponse tracking) {
 }

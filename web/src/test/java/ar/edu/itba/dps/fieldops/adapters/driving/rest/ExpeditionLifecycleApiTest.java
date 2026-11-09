@@ -76,6 +76,49 @@ class ExpeditionLifecycleApiTest {
     }
 
     @Test
+    void theItineraryShowsTheTrackingOfEachActivityAsItAdvances() throws Exception {
+        final var expedition = anExpeditionWithASampleCollectionFullyResourced();
+        transition(expedition, "review").andExpect(status().isNoContent());
+        approve(expedition, "{}").andExpect(status().isNoContent());
+        transition(expedition, "execution").andExpect(status().isNoContent());
+
+        api.perform(get("/api/expeditions/{id}/itinerary", expedition))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nodes[0].activity.tracking.status").value("PENDING"))
+                .andExpect(jsonPath("$.nodes[0].activity.tracking.startedAt").value(Matchers.nullValue()))
+                .andExpect(jsonPath("$.nodes[0].activity.tracking.observations").isEmpty());
+
+        api.perform(post("/api/expeditions/{expeditionId}/activities/{activityId}/start", expedition, "a-1")
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"at": "2026-10-01T08:00:00"}
+                                """))
+                .andExpect(status().isNoContent());
+        api.perform(post("/api/expeditions/{expeditionId}/activities/{activityId}/observations", expedition, "a-1")
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"note": "Calm seas, on schedule", "recordedAt": "2026-10-01T08:30:00"}
+                                """))
+                .andExpect(status().isNoContent());
+
+        api.perform(get("/api/expeditions/{id}/itinerary", expedition))
+                .andExpect(jsonPath("$.nodes[0].activity.tracking.status").value("IN_PROGRESS"))
+                .andExpect(jsonPath("$.nodes[0].activity.tracking.startedAt").value("2026-10-01T08:00:00"))
+                .andExpect(jsonPath("$.nodes[0].activity.tracking.finishedAt").value(Matchers.nullValue()))
+                .andExpect(jsonPath("$.nodes[0].activity.tracking.observations[0].note").value("Calm seas, on schedule"))
+                .andExpect(jsonPath("$.nodes[0].activity.tracking.observations[0].recordedAt").value("2026-10-01T08:30:00"));
+
+        api.perform(post("/api/expeditions/{expeditionId}/activities/{activityId}/completion", expedition, "a-1")
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"at": "2026-10-01T09:00:00", "result": "Collected 1 sample"}
+                                """))
+                .andExpect(status().isNoContent());
+
+        api.perform(get("/api/expeditions/{id}/itinerary", expedition))
+                .andExpect(jsonPath("$.nodes[0].activity.tracking.status").value("FINISHED"))
+                .andExpect(jsonPath("$.nodes[0].activity.tracking.finishedAt").value("2026-10-01T09:00:00"))
+                .andExpect(jsonPath("$.nodes[0].activity.tracking.result").value("Collected 1 sample"));
+    }
+
+    @Test
     void approvalAcceptsAWarningCopiedFromTheValidationResponseAndTheReportShowsItAccepted() throws Exception {
         final var expedition = anExpeditionWithARiskyDroneSurveyFullyResourced();
 

@@ -15,6 +15,8 @@ import ar.edu.itba.dps.fieldops.business.models.activities.RiskLevel;
 import ar.edu.itba.dps.fieldops.business.models.activities.StaffRequirement;
 import ar.edu.itba.dps.fieldops.business.models.common.Quantity;
 import ar.edu.itba.dps.fieldops.business.models.events.ActivityCompleted;
+import ar.edu.itba.dps.fieldops.business.models.responses.ActivityTrackingView;
+import ar.edu.itba.dps.fieldops.business.models.responses.TrackingStatus;
 import ar.edu.itba.dps.fieldops.business.models.resources.Depletable;
 import ar.edu.itba.dps.fieldops.business.models.resources.ResourceCategory;
 import ar.edu.itba.dps.fieldops.business.models.zones.Zone;
@@ -62,6 +64,45 @@ class ExpeditionTrackingTest {
         expedition.start();
         expedition.pullEvents();
         return expedition;
+    }
+
+    @Test
+    void theViewOfAnActivityThatDidNotStartIsPendingAndEmpty() {
+        final var view = ActivityTrackingView.of(item);
+
+        assertEquals(TrackingStatus.PENDING, view.status());
+        assertTrue(view.startedAt().isEmpty());
+        assertTrue(view.finishedAt().isEmpty());
+        assertTrue(view.result().isEmpty());
+        assertTrue(view.observations().isEmpty());
+    }
+
+    @Test
+    void theViewOfAStartedActivityIsInProgressWithItsObservations() {
+        inExecution();
+        expedition.startActivity(item, at(9, 0));
+        final var observation = new Observation("Calm seas", at(9, 30));
+        expedition.recordObservation(item, observation);
+
+        final var view = ActivityTrackingView.of(item);
+
+        assertEquals(TrackingStatus.IN_PROGRESS, view.status());
+        assertEquals(at(9, 0), view.startedAt().orElseThrow());
+        assertTrue(view.finishedAt().isEmpty());
+        assertEquals(List.of(observation), view.observations());
+    }
+
+    @Test
+    void theViewOfAFinishedActivityCarriesWhenItEndedAndItsResult() {
+        inExecution();
+        expedition.startActivity(item, at(9, 0));
+        expedition.finishActivity(item, at(10, 30), "Three samples");
+
+        final var view = ActivityTrackingView.of(item);
+
+        assertEquals(TrackingStatus.FINISHED, view.status());
+        assertEquals(at(10, 30), view.finishedAt().orElseThrow());
+        assertEquals("Three samples", view.result().orElseThrow());
     }
 
     @Test

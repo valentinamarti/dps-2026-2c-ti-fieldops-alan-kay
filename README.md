@@ -20,8 +20,8 @@ replanning after an incident. A REST API over PostgreSQL, with a web frontend se
 
 - **JDK 25** — the build checks it with `maven-enforcer-plugin` and fails with any other version.
 - **Maven 3.9+**
-- **Docker**, running, with Compose: the application needs PostgreSQL and the tests of `app` and `web` start
-  their own container with Testcontainers.
+- **Docker**, running, with Compose: the `prod` profile needs PostgreSQL and the tests of `app` and `web` start
+  their own container with Testcontainers. The `demo` profile does not need Docker.
 
 Check both before building; `mvn -v` must report Java 25 too, since Maven uses the JDK found through `JAVA_HOME`:
 
@@ -38,7 +38,7 @@ If Maven picks another JDK, point `JAVA_HOME` to JDK 25:
 | macOS | `export JAVA_HOME=$(/usr/libexec/java_home -v 25)` |
 | Windows (PowerShell) | `$env:JAVA_HOME = "C:\Program Files\Java\jdk-25"` |
 
-Nothing else is needed: Compose starts the database and Flyway creates the schema when the application starts.
+Nothing else is needed: Flyway creates the schema when the application starts.
 
 ## Build and test
 
@@ -50,6 +50,15 @@ mvn test -pl domain  # only the domain tests, which do not need Docker
 ```
 
 ## Run
+
+The application has two profiles:
+
+| Profile | Database | On the first start | Changes |
+| --- | --- | --- | --- |
+| `prod` (the default) | PostgreSQL from Compose | Empty: only the schema, no data | Kept in the `fieldops-data` volume across restarts of the application and the container |
+| `demo` | H2 in memory, no Docker | The scenario in `demo/` is loaded | Lost on restart: the next start loads the scenario again |
+
+To run with `prod`:
 
 ```bash
 docker compose up -d          # PostgreSQL on port 5433, with its data in the fieldops-data volume
@@ -94,7 +103,8 @@ talks to the API, and shows the `ProblemDetail` of a failed request as it comes.
 
 It covers the catalog and the zones, creating an expedition, the itinerary with its blocks, the assignment of
 resources, validation and estimation, the approval with the acceptance of warnings, the lifecycle, the tracking,
-the incidents and their replan proposals, and the final report.
+the incidents and their replan proposals, the events and notifications, and the final report. Blocks of the
+itinerary can be collapsed into a summary of their activities.
 
 ## Run the demonstration
 
@@ -104,7 +114,6 @@ through. [`demo.http`](demo.http) is the script that tells the story against the
 and commented (in Spanish, which is the language of the presentation).
 
 ```bash
-docker compose up -d
 mvn -B install -DskipTests
 mvn spring-boot:run -pl web -Dspring-boot.run.profiles=demo
 ```
@@ -133,10 +142,9 @@ What the script adds and walks: the **night activity** of F1 (which is where the
 from), the approval that the critical blocks, the correction, the acceptance of the warning with its
 justification, the approval, the execution, an incident, and the replanning of F3 with its audit trail.
 
-The script is **not idempotent**: it leaves the expedition replaced and the night dive scheduled, and restarting
-the application no longer undoes that, because the data stays in the database. To run it again, stop the
-application, delete the volume with `docker compose down -v`, and start both again: the seed loads on the empty
-database. The same walk
+The script is **not idempotent**: it leaves the expedition replaced and the night dive scheduled. To run it
+again, restart the application: the `demo` database lives in memory, so the seed loads again. Steps marked
+`ESPERAR` query what the dispatcher delivers, so they need a few seconds after the previous step. The same walk
 runs in the CI as `DemoScriptApiTest`, so if the script and the test drift apart the build says so.
 
 The files are read off the classpath, so the same build works from `spring-boot:run`, from the jar and from
@@ -147,6 +155,22 @@ java -jar web/target/web-1.0-SNAPSHOT.jar --spring.profiles.active=demo \
   --fieldops.demo.catalog=file:/path/to/catalog.json \
   --fieldops.demo.expeditions=file:/path/to/expedition.json
 ```
+
+## Events
+
+An approval, an incident and a finished activity are domain events. The expedition records them, and they are
+saved in the same transaction as the change. A dispatcher delivers them afterwards to the asynchronous consumers,
+which notify the responsibles and update the progress shown in the report. The replan proposal stays synchronous.
+Delivery is at least once, without duplicated effects, and in order per expedition and consumer. See D70 to D80 in
+[DESIGN.md](DESIGN.md).
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `fieldops.events.dispatcher-enabled` | `true` | Whether the scheduled dispatcher runs |
+| `fieldops.events.dispatch-interval` | `2s` | How often it looks for pending deliveries |
+| `fieldops.events.max-attempts` | `5` | Attempts before a delivery ends up `FAILED` |
+| `fieldops.events.initial-backoff` | `1s` | Wait before the first retry, doubled after each one |
+| `fieldops.events.max-backoff` | `30s` | Longest wait between retries |
 
 ## Structure
 
@@ -306,9 +330,10 @@ property brings them structured, with the same shape `GET /api/expeditions/{id}/
 
 ## Tests
 
-`mvn -B verify` runs 912 tests: 722 in `domain`, 40 in `app` and 150 in `web`. The ones in `app` and `web` run
+`mvn -B verify` runs 1004 tests: 743 in `domain`, 78 in `app` and 183 in `web`. The ones in `app` and `web` run
 against a real PostgreSQL, the same image as Compose, in a container that Testcontainers starts by itself, so
-Docker has to be running and `docker compose up` does not.
+Docker has to be running and `docker compose up` does not. The exception is `DemoScriptApiTest`, which runs on
+the H2 database of the `demo` profile.
 
 | Kind | Where |
 | --- | --- |
@@ -342,5 +367,5 @@ Work happens on one branch per phase with small pull requests.
 ## Design decisions
 
 See [DESIGN.md](DESIGN.md), in Spanish: D1 to D34 come from the first delivery, D35 to D69 from the second
-and D70 to D73 from the third, plus one section per new functionality of the second delivery (F1, F2 and F3)
+and D70 to D82 from the third, plus one section per new functionality of the second delivery (F1, F2 and F3)
 with the classes added and modified, the refactorings and the technical debt that was left unresolved on purpose.
