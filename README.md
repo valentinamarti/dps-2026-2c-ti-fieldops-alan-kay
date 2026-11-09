@@ -188,7 +188,7 @@ DESIGN.md                                                      # design decision
 
 ## API contracts
 
-49 endpoints, all under `/api`, generated into OpenAPI by springdoc:
+50 endpoints, all under `/api`, generated into OpenAPI by springdoc:
 <http://localhost:8080/swagger-ui.html>. Operations that are not CRUD are sub-resources in `POST` and not
 verbs in the URL (`/approval`, `/suspension`, `/completion`), which is the convention D49 fixes.
 
@@ -282,6 +282,12 @@ A supply has stock and not a calendar, so `/api/supplies/{id}/unavailabilities` 
 | Method and path | What it does |
 | --- | --- |
 | `GET /api/expeditions/{id}/events` | What happened in the expedition, in the order the system recorded it, with a line per consumer of each event: its status, its attempts and the error of the last failed one. `type` is the name of the event class, without its package |
+
+### Notifications
+
+| Method and path | What it does |
+| --- | --- |
+| `GET /api/expeditions/{id}/notifications` | What the responsibles of the expedition were told, one notification per responsible and event, in the order they arrived. They appear some seconds after the fact, once the dispatcher delivers the event |
 
 ### Errors
 
