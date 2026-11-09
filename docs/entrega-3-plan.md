@@ -787,17 +787,17 @@ Integra lo de las otras fases en lo que se muestra y prepara a los cinco para el
 - **Por qué:** _a completar_
 - **Se registra en:** este plan y `docs/entrega-3-presentacion.md`
 
-#### 5.5 — Qué se mejora del frontend y hasta dónde · ⬜ pendiente
+#### 5.5 — Qué se mejora del frontend y hasta dónde · ✅ decidida
 
 - **Pregunta:** el frontend se puede pulir mucho, y hay pocos días. Hay que decidir qué mejoras entran y cuánto tiempo se les da, sin que se coman la demo y la presentación.
 - **Opciones:**
   - a) Una pasada acotada, de medio día como mucho: solo lo que se ve en el guion de la demo, empezando por las pantallas de la expedición, el itinerario y las secciones de eventos y notificaciones.
   - b) Una revisión completa de todas las pantallas, incluido el catálogo y las zonas.
 - **Recomendación:** a). Lo que se evalúa es lo que se muestra, y el resto del frontend ya cumple el recorrido. Si sobra tiempo después del ensayo, se sigue con b).
-- **Decisión:** _a completar, con la lista priorizada_
-- **Quién y cuándo:** _a completar, antes del viernes 06/11_
-- **Por qué:** _a completar_
-- **Se registra en:** D81
+- **Decisión:** b), sin framework. Textos humanos en vez de valores de la API, nombres en vez de ids en las pantallas de la expedición, bloques del itinerario plegables (desplegados por defecto, con un resumen de lo plegado), estilo general, y también el catálogo y el listado.
+- **Quién y cuándo:** Tobías, 09/11/2026
+- **Por qué:** es lo que se muestra en el video, y salía como una salida de la API (`IN_PROGRESS`, `1 people`, `p-rita`). Se descartó Svelte o React: obligaban a reescribir los módulos del frontend y a sumar Node a Maven y a la CI, y nada de lo pedido lo necesita.
+- **Se registra en:** D81 y `docs/entrega-3-decisiones.md`
 
 #### 5.6 — **Agregada:** perfiles `prod` y `demo` con H2 · ✅ decidida
 
@@ -828,9 +828,9 @@ Integra lo de las otras fases en lo que se muestra y prepara a los cinco para el
 
 **La Fase 5 también se encarga de mejorar el frontend en general, no solo de sumar las secciones nuevas.** Es lo que se muestra en el video y en la presentación, así que tiene que verse prolijo y entenderse sin explicación. El frontend de la Entrega 2 (D69) es mínimo: cumple el recorrido, pero se pensó para que funcione, no para mostrarlo.
 
-- [ ] Recorrer todas las pantallas siguiendo el guion de la demo y anotar qué se ve mal, qué confunde y qué cuesta encontrar.
-- [ ] Priorizar la lista con la decisión 5.5. Primero lo que aparece en el video.
-- [ ] Candidatos a revisar, según lo que hay hoy:
+- [x] Recorrer todas las pantallas siguiendo el guion de la demo y anotar qué se ve mal, qué confunde y qué cuesta encontrar.
+- [x] Priorizar la lista con la decisión 5.5. Primero lo que aparece en el video.
+- [x] Candidatos a revisar, según lo que hay hoy:
   - **Navegación:** que siempre se sepa en qué expedición se está y cómo volver a la lista.
   - **Estados:** que el estado de la expedición y el de cada actividad se vean de un vistazo (badges y colores consistentes en todas las pantallas).
   - **Acciones:** que solo aparezcan las que se pueden hacer en ese estado, y que después de cada una haya una confirmación visible y no solo el refresco.
@@ -838,12 +838,12 @@ Integra lo de las otras fases en lo que se muestra y prepara a los cinco para el
   - **Estados vacíos:** qué se ve cuando todavía no hay eventos, notificaciones, propuestas o actividades.
   - **Formularios:** etiquetas claras, fechas fáciles de cargar, y el bloque en JSON (D69) con un ejemplo a mano.
   - **Estilo:** una sola tipografía, espaciados y colores parejos en `styles.css`, y que se lea bien en la pantalla del proyector.
-- [ ] Límites:
+- [x] Límites:
   - Sigue sin framework ni build (D69).
   - No suma funcionalidades que no estén en la API: la consigna pide no agregar cosas ajenas a la propuesta de valor.
   - Las reglas siguen en el dominio: el frontend no valida ni decide nada que el dominio ya resuelve.
 - [ ] `FrontendPagesTest` sigue en verde, y el recorrido completo se prueba a mano antes de grabar el video.
-- [ ] D81 registra qué se mejoró y por qué, como completa de D69.
+- [x] D81 registra qué se mejoró y por qué, como completa de D69.
 
 ### Demo
 
@@ -907,7 +907,7 @@ Es un video de YouTube sin listar, de 8 a 12 minutos, con los cinco hablando de 
 
 ### `DESIGN.md`
 
-- D81: seguimiento en el itinerario y frontend de eventos. Completa D69. Las mejoras generales se suman cuando se decida la 5.5.
+- D81: seguimiento en el itinerario y frontend de eventos. Completa D69, y suma las mejoras generales de la 5.5.
 - D82: perfiles `prod` y `demo` con H2.
 
 **Terminado cuando:** la demo corre entera desde un clon limpio, `DemoScriptApiTest` la recorre en la CI y el video está subido con los cinco.
@@ -988,7 +988,7 @@ Es un índice. El detalle de cada decisión y su registro están en la sección 
 | 5.2 | Qué se presenta y cómo se graba 👥                      | 5                      | 06/11            | Fase 5                             | ⬜     |
 | 5.3 | Cómo espera la demo al despachador                 | 5                      | 08/11            | Demo                               | ✅     |
 | 5.4 | Quién habla de qué en el video 👥  | 5                      | 06/11            | Video                              | ⬜     |
-| 5.5 | Qué se mejora del frontend y hasta dónde          | 5                      | 06/11            | Frontend                           | ⬜     |
+| 5.5 | Qué se mejora del frontend y hasta dónde          | 5                      | 06/11            | Frontend                           | ✅     |
 | 5.6 | Perfiles `prod` y `demo` con H2                     | 5                      | 09/11            | Demo                               | ✅     |
 
 ### Riesgos

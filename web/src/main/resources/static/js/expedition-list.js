@@ -1,8 +1,9 @@
 import {api} from "./api.js";
-import {badge, field, formatPeriod, formOf, h, listOfText, panel, selectOf, table, textInput} from "./dom.js";
+import {badge, field, formOf, h, listOfText, panel, selectOf, statusBadge, table, textInput} from "./dom.js";
+import {formatPeriod, humanize} from "./format.js";
 import {reporting} from "./messages.js";
 
-const RISK_LEVELS = ["LOW", "MEDIUM", "HIGH", "EXTREME"];
+const RISK_LEVELS = ["LOW", "MEDIUM", "HIGH", "EXTREME"].map(value => ({value, label: humanize(value)}));
 
 function linkTo(expedition) {
     return h("a", {href: `#/expeditions/${encodeURIComponent(expedition.id)}`}, expedition.name);
@@ -10,7 +11,7 @@ function linkTo(expedition) {
 
 function checkboxes(name, options) {
     return h("div", {}, options.map(option => h("label", {class: "inline"},
-        h("input", {type: "checkbox", name, value: option.id}), `${option.name} (${option.id})`)));
+        h("input", {type: "checkbox", name, value: option.id}), option.name)));
 }
 
 function creationForm(zones, staff) {
@@ -45,7 +46,7 @@ export async function renderExpeditionList() {
         panel("All expeditions", expeditions.length > 0
             ? table(["Name", "Status", "Period"], expeditions.map(expedition => [
                 linkTo(expedition),
-                h("span", {}, badge(expedition.status), expedition.staleAlternative ? badge("stale alternative", "danger") : null),
+                h("span", {class: "row"}, statusBadge(expedition.status), expedition.staleAlternative ? badge("Stale alternative", "danger") : null),
                 formatPeriod(expedition.period),
             ]))
             : h("p", {class: "muted"}, "There are no expeditions yet.")),

@@ -1,8 +1,9 @@
 import {api} from "./api.js";
 import {field, formOf, h, listOfText, panel, selectOf, table, textInput} from "./dom.js";
+import {humanize, quantity} from "./format.js";
 import {reporting} from "./messages.js";
 
-const UNITS = ["UNITS", "LITERS", "KILOGRAMS"];
+const UNITS = ["UNITS", "LITERS", "KILOGRAMS"].map(value => ({value, label: humanize(value)}));
 const names = list => (list ?? []).join(", ");
 
 const SECTIONS = [
@@ -43,7 +44,7 @@ const SECTIONS = [
         title: "Supplies",
         path: "/supplies",
         headers: ["Id", "Name", "Category", "Stock"],
-        row: supply => [supply.id, supply.name, supply.category, `${supply.stock.amount} ${supply.stock.unit}`],
+        row: supply => [supply.id, supply.name, supply.category, quantity(supply.stock)],
         fields: () => [identity(), name(), category(),
             field("Initial stock", textInput("amount", {type: "number", min: "0", step: "any", required: true})),
             field("Unit", selectOf("unit", UNITS))],
@@ -104,7 +105,7 @@ async function sectionView(section) {
         formOf(section.fields(), "Register", reporting(async data => {
             await api.post(section.path, section.body(data));
             await refresh();
-        })),
+        }, "Registered.")),
         section.schedulable && items.length > 0 ? unavailabilityForm(section, items) : null);
 }
 

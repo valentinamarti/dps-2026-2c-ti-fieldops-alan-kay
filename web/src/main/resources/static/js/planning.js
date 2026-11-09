@@ -1,5 +1,6 @@
 import {api} from "./api.js";
 import {field, formOf, h, listOfText, panel, selectOf, textInput} from "./dom.js";
+import {eventName, humanize} from "./format.js";
 import {reporting, showError} from "./messages.js";
 
 const BLOCK_EXAMPLE = JSON.stringify({
@@ -22,13 +23,13 @@ function parametersFrom(types, data) {
 }
 
 function activityForm(expedition, types, zones, base, refresh) {
-    const options = types.map(type => ({value: type.name, label: `${type.name} (${type.parameterNames.join(", ")})`}));
+    const options = types.map(type => ({value: type.name, label: `${humanize(type.name)} (${type.parameterNames.map(name => eventName(name).toLowerCase()).join(", ")})`}));
     return formOf([
         field("Id", textInput("id", {required: true})),
         field("Name", textInput("name", {required: true})),
         field("Type", selectOf("type", options)),
         field("Value of the type parameter", textInput("parameterValue", {type: "number", min: "1", required: true})),
-        field("Zone", selectOf("zoneId", zones.map(zone => zone.id).filter(id => expedition.zoneIds.includes(id)))),
+        field("Zone", selectOf("zoneId", zones.filter(zone => expedition.zoneIds.includes(zone.id)).map(zone => ({value: zone.id, label: zone.name})))),
         field("Window start", textInput("windowStart", {type: "datetime-local", required: true})),
         field("Window end", textInput("windowEnd", {type: "datetime-local", required: true})),
         field("Scheduled start", textInput("start", {type: "datetime-local", required: true})),
@@ -48,7 +49,7 @@ function activityForm(expedition, types, zones, base, refresh) {
             atNight: data.get("atNight") !== null,
         });
         await refresh();
-    }));
+    }, "Activity scheduled."));
 }
 
 function blockForm(base, refresh) {
@@ -68,7 +69,7 @@ function blockForm(base, refresh) {
             await api.post(`${base}/blocks`, block);
             await refresh();
         }
-    }));
+    }, "Block scheduled."));
 }
 
 export async function planningView(expedition, refresh) {

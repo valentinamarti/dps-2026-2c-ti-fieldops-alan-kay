@@ -103,7 +103,8 @@ talks to the API, and shows the `ProblemDetail` of a failed request as it comes.
 
 It covers the catalog and the zones, creating an expedition, the itinerary with its blocks, the assignment of
 resources, validation and estimation, the approval with the acceptance of warnings, the lifecycle, the tracking,
-the incidents and their replan proposals, and the final report.
+the incidents and their replan proposals, the events and notifications, and the final report. Blocks of the
+itinerary can be collapsed into a summary of their activities.
 
 ## Run the demonstration
 
@@ -329,7 +330,7 @@ property brings them structured, with the same shape `GET /api/expeditions/{id}/
 
 ## Tests
 
-`mvn -B verify` runs 1003 tests: 743 in `domain`, 78 in `app` and 182 in `web`. The ones in `app` and `web` run
+`mvn -B verify` runs 1004 tests: 743 in `domain`, 78 in `app` and 183 in `web`. The ones in `app` and `web` run
 against a real PostgreSQL, the same image as Compose, in a container that Testcontainers starts by itself, so
 Docker has to be running and `docker compose up` does not. The exception is `DemoScriptApiTest`, which runs on
 the H2 database of the `demo` profile.

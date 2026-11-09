@@ -1,13 +1,20 @@
 :root {
     --ink: #1c2733;
     --muted: #5d6b78;
-    --line: #d7dee5;
+    --line: #dfe5ea;
     --surface: #ffffff;
     --page: #f3f6f8;
     --accent: #0b6e7f;
+    --accent-soft: #d9eef1;
+    --info-soft: #e2e8f5;
+    --info: #2f4a86;
     --danger: #b3261e;
+    --danger-soft: #fde8e6;
     --warning: #8a5a00;
+    --warning-soft: #fdf0d5;
     --ok: #1b6e3c;
+    --ok-soft: #e0f2e7;
+    --neutral-soft: #e9edf1;
 }
 
 * {
@@ -18,7 +25,7 @@ body {
     margin: 0;
     background: var(--page);
     color: var(--ink);
-    font: 15px/1.45 system-ui, sans-serif;
+    font: 16px/1.5 system-ui, sans-serif;
 }
 
 a {
@@ -41,7 +48,7 @@ a {
 
 .brand {
     font-weight: 700;
-    font-size: 17px;
+    font-size: 18px;
 }
 
 main {
@@ -51,49 +58,76 @@ main {
 }
 
 h1 {
-    font-size: 24px;
-    margin: 8px 0 4px;
+    font-size: 28px;
+    margin: 6px 0 6px;
 }
 
 h2 {
-    font-size: 17px;
-    margin: 0 0 10px;
+    font-size: 19px;
+    margin: 0 0 12px;
 }
 
 h3 {
-    font-size: 15px;
-    margin: 12px 0 6px;
+    font-size: 16px;
+    margin: 16px 0 6px;
+}
+
+p {
+    margin: 6px 0;
+}
+
+.back {
+    font-size: 14px;
+    text-decoration: none;
 }
 
 .panel {
     background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: 6px;
-    padding: 14px 16px;
-    margin: 12px 0;
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin: 16px 0;
+    box-shadow: 0 1px 2px rgba(28, 39, 51, 0.05);
 }
 
 .muted {
     color: var(--muted);
+    font-size: 14px;
 }
 
 .badge {
     display: inline-block;
-    padding: 1px 8px;
-    border-radius: 10px;
-    background: var(--line);
+    padding: 1px 10px;
+    border-radius: 999px;
+    background: var(--neutral-soft);
     font-size: 12px;
     font-weight: 600;
+    white-space: nowrap;
 }
 
-.badge.danger {
-    background: var(--danger);
-    color: #fff;
+.badge.accent {
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
+.badge.info {
+    background: var(--info-soft);
+    color: var(--info);
+}
+
+.badge.warn {
+    background: var(--warning-soft);
+    color: var(--warning);
 }
 
 .badge.ok {
-    background: var(--ok);
-    color: #fff;
+    background: var(--ok-soft);
+    color: var(--ok);
+}
+
+.badge.danger {
+    background: var(--danger-soft);
+    color: var(--danger);
 }
 
 .row {
@@ -108,6 +142,7 @@ h3 {
     grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
     gap: 10px;
     align-items: end;
+    margin: 8px 0;
 }
 
 label {
@@ -126,15 +161,16 @@ label.inline {
 
 input, select, textarea, button {
     font: inherit;
-    padding: 6px 8px;
+    padding: 6px 10px;
     border: 1px solid var(--line);
-    border-radius: 4px;
+    border-radius: 6px;
     max-width: 100%;
 }
 
 textarea {
     width: 100%;
     font-family: ui-monospace, monospace;
+    font-size: 13px;
 }
 
 button {
@@ -142,6 +178,11 @@ button {
     color: #fff;
     border-color: var(--accent);
     cursor: pointer;
+    font-weight: 600;
+}
+
+button:hover {
+    filter: brightness(1.1);
 }
 
 button.secondary {
@@ -161,23 +202,49 @@ button.danger {
 table {
     width: 100%;
     border-collapse: collapse;
+    font-size: 15px;
+}
+
+th {
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
 }
 
 th, td {
     text-align: left;
-    padding: 6px 8px;
+    padding: 8px 10px;
     border-bottom: 1px solid var(--line);
     vertical-align: top;
 }
 
+tbody tr:last-child td {
+    border-bottom: 0;
+}
+
 .node {
-    border-left: 3px solid var(--line);
-    padding-left: 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 14px;
     margin: 10px 0;
+    background: var(--surface);
 }
 
 .node.block {
-    border-left-color: var(--accent);
+    border-left: 4px solid var(--accent);
+    background: #fafcfd;
+}
+
+.detail {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 8px;
+    font-size: 14px;
+    margin-top: 2px;
+}
+
+.detail-label {
+    color: var(--muted);
 }
 
 .critical {
@@ -193,6 +260,9 @@ th, td {
 }
 
 .messages {
+    position: sticky;
+    top: 8px;
+    z-index: 10;
     max-width: 1040px;
     margin: 0 auto;
     padding: 0 20px;
@@ -201,19 +271,53 @@ th, td {
 .message {
     margin-top: 12px;
     padding: 10px 14px;
-    border-radius: 4px;
-    background: #fde8e6;
+    border-radius: 6px;
+    background: var(--danger-soft);
     color: var(--danger);
     white-space: pre-wrap;
+    box-shadow: 0 2px 8px rgba(28, 39, 51, 0.15);
 }
 
 .message.success {
-    background: #e4f3ea;
+    background: var(--ok-soft);
     color: var(--ok);
 }
 
-details summary {
+details > summary {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    list-style: none;
     cursor: pointer;
     color: var(--accent);
     margin: 6px 0;
+}
+
+details > summary::-webkit-details-marker {
+    display: none;
+}
+
+details > summary::before {
+    content: "▾";
+    display: inline-block;
+    transform: rotate(-90deg);
+    transition: transform 0.12s ease;
+}
+
+details[open] > summary::before {
+    transform: rotate(0deg);
+}
+
+.block-header {
+    color: var(--ink);
+    flex: 1;
+}
+
+.when-collapsed {
+    font-size: 14px;
+    margin-top: 2px;
+}
+
+details[open] > summary .when-collapsed {
+    display: none;
 }
